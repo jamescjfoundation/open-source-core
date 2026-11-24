@@ -1,0 +1,18 @@
+[package]
+name = "jcj-entries"
+description = "Entries: typed records with fields from a template, names, mentions and backlinks"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

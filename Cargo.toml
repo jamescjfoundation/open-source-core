@@ -11,6 +11,7 @@ members = [
     "crates/jcj-project",
     "crates/jcj-theme",
     "crates/jcj-board",
+    "crates/jcj-entries",
     "crates/jcj-shell",
     "crates/jcj-agents",
     "crates/jcj-features",
@@ -20,7 +21,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.3"
+version = "0.1.4"
 edition = "2024"
 # The minimum supported Rust version: WordCraft's (v0.18.1). The exact build toolchain is
 # rust-toolchain.toml.
@@ -41,6 +42,7 @@ jcj-proof = { path = "crates/jcj-proof" }
 jcj-project = { path = "crates/jcj-project" }
 jcj-theme = { path = "crates/jcj-theme" }
 jcj-board = { path = "crates/jcj-board" }
+jcj-entries = { path = "crates/jcj-entries" }
 jcj-shell = { path = "crates/jcj-shell" }
 jcj-agents = { path = "crates/jcj-agents" }
 jcj-features = { path = "crates/jcj-features" }

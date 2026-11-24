@@ -21,6 +21,7 @@ jcj-proof = { workspace = true }
 jcj-project = { workspace = true }
 jcj-theme = { workspace = true }
 jcj-board = { workspace = true }
+jcj-entries = { workspace = true }
 jcj-shell = { workspace = true }
 jcj-agents = { workspace = true }
 jcj-features = { workspace = true }

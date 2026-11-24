@@ -187,6 +187,19 @@ pub fn run() -> Result<Vec<Step>, String> {
     check(board.index_of(b) == Some(0) && board.index_of(a) == Some(1), "the order changed")?;
     step("board", "two cards, reordered".to_owned());
 
+    // jcj-entries: entries found by name in the sample's text.
+    let mut people: Vec<(u32, jcj_entries::Entry<u32, String>)> =
+        vec![(1, jcj_entries::Entry::new("person", "Sample")), (2, jcj_entries::Entry::new("person", "Nobody"))];
+    if let Some((_, e)) = people.get_mut(0) {
+        e.aliases.push("Example".into());
+    }
+    let paragraphs: Vec<String> = paras.iter().map(|(_, p)| p.plain_text()).collect();
+    let docs = [jcj_entries::Document { id: 100u32, links: &[], paragraphs: &paragraphs }];
+    let refs = jcj_entries::backlinks(1, &people[0].1.names(), docs);
+    check(refs.mentioned == vec![100], "the sample mentions the entry by name")?;
+    check(jcj_entries::find_by_name(people.iter().map(|(i, e)| (i, e)), "example") == Some(1), "an alias finds its entry")?;
+    step("entries", "an entry found by its name in the sample".to_owned());
+
     // jcj-theme: the neutral tokens make a theme.
     let tokens = jcj_theme::Tokens::default();
     let json = tokens.to_json();
@@ -214,7 +227,21 @@ mod tests {
         let names: Vec<&str> = steps.iter().map(|s| s.name).collect();
         assert_eq!(
             names,
-            ["doc", "engine", "features", "layout", "output", "interchange", "proof", "file access", "project", "board", "theme", "agents"]
+            [
+                "doc",
+                "engine",
+                "features",
+                "layout",
+                "output",
+                "interchange",
+                "proof",
+                "file access",
+                "project",
+                "board",
+                "entries",
+                "theme",
+                "agents"
+            ]
         );
     }
 }

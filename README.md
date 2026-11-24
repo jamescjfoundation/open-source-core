@@ -20,6 +20,7 @@ apps; any later foundation app builds on it the same way.
 | `jcj-output` | PDF, page images, printing |
 | `jcj-interchange` | DOCX, ODT, RTF, Markdown, HTML, EPUB and plain text |
 | `jcj-proof` | Spelling and hyphenation |
+| `jcj-entries` | Entries beside documents: typed records, templates, names, mentions, backlinks |
 | `jcj-project` | The project file: one document or many, assets, atomic saves, backups, recovery, snapshots |
 | `jcj-features` | Document features every app shares: bookmarks, notes, revision sets, change tracking, page locks, watermarks, headers and footers, comparison |
 | `jcj-theme` | A product's design tokens turned into the shell's theme |
