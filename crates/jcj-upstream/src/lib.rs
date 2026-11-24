@@ -44,7 +44,7 @@ pub use craft_print as print;
 pub const WORDCRAFT_RELEASE: &str = "v0.18.1";
 
 /// The commit of our fork's `jcj` branch the core builds from.
-pub const WORDCRAFT_FORK_COMMIT: &str = "0e24d51b8e05bbd0652b2b9904d941b12f6a9849";
+pub const WORDCRAFT_FORK_COMMIT: &str = "73717786b6a01a93fba79892f04a2f2d3380a761";
 
 #[cfg(test)]
 mod tests {

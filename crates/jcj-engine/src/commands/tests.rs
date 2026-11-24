@@ -235,13 +235,15 @@ fn reset_to_style_keeps_the_style_and_extension_data() {
 }
 
 #[test]
-fn the_engines_paragraph_reset_drops_extension_data() {
-    // Why `format.resetToStyle` exists. If this starts failing, upstream keeps extension data
-    // now: say so in the module docs.
-    let mut s = doc("Text");
-    LABEL.set(s.doc.para_mut(StoryRef::Body, &Path::top(0)).unwrap(), &"lost".to_string()).unwrap();
-    s.run("para.reset", &json!({})).unwrap();
-    assert!(!LABEL.is_set(s.doc.para(StoryRef::Body, &Path::top(0)).unwrap()));
+fn the_engines_paragraph_reset_keeps_extension_data() {
+    // Our fork's extension-data patch makes `para.reset` and `format.clear` keep it
+    // (docs/UPSTREAM.md); a pin move that loses that fails here.
+    for id in ["para.reset", "format.clear"] {
+        let mut s = doc("Text");
+        LABEL.set(s.doc.para_mut(StoryRef::Body, &Path::top(0)).unwrap(), &"kept".to_string()).unwrap();
+        s.run(id, &json!({})).unwrap();
+        assert_eq!(LABEL.get_or_none(s.doc.para(StoryRef::Body, &Path::top(0)).unwrap()).as_deref(), Some("kept"), "{id}");
+    }
 }
 
 #[test]

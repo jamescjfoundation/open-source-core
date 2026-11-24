@@ -175,6 +175,7 @@ mod tests {
     #[test]
     fn a_frame_draws_its_shapes_and_text() {
         let ctx = egui::Context::default();
+        jcj_theme::install_fonts(&ctx, &jcj_theme::FontNames::default(), &[]);
         let pic = render(&ctx, Vec2::new(300.0, 200.0), 1.0, Vec::new(), 2, |ui| {
             ui.heading("A heading");
             ui.painter().rect_filled(Rect::from_min_size(Pos2::new(100.0, 100.0), Vec2::new(50.0, 50.0)), 0.0, Color32::from_rgb(255, 0, 0));

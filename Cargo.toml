@@ -86,7 +86,9 @@ quick-xml = "0.41"
 image = { version = "0.25", default-features = false, features = ["png"] }
 
 # Interface: egui 0.37 on storytold's fork, as WordCraft v0.18.1 uses it (patched below).
-egui = { version = "0.37", default-features = false, features = ["default_fonts"] }
+# No `default_fonts`: their Ubuntu Font Licence is outside the allowlist (decision 0001);
+# jcj-theme installs the bundled OFL faces instead.
+egui = { version = "0.37", default-features = false }
 eframe = { version = "0.37", default-features = false, features = ["accesskit", "glow", "wayland", "x11"] }
 egui_kittest = "0.37"
 
@@ -128,17 +130,17 @@ debug = 0
 # BEGIN jcj patch block
 [patch."https://github.com/storytold/wordcraft"]
 # Our fork's `jcj` branch: WordCraft v0.18.1 plus the patches in docs/UPSTREAM.md.
-wordcraft-geom = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "0e24d51b8e05bbd0652b2b9904d941b12f6a9849" }
-wordcraft-doc = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "0e24d51b8e05bbd0652b2b9904d941b12f6a9849" }
-wordcraft-fonts = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "0e24d51b8e05bbd0652b2b9904d941b12f6a9849" }
-wordcraft-layout = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "0e24d51b8e05bbd0652b2b9904d941b12f6a9849" }
-wordcraft-render = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "0e24d51b8e05bbd0652b2b9904d941b12f6a9849" }
-wordcraft-pdf = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "0e24d51b8e05bbd0652b2b9904d941b12f6a9849" }
-wordcraft-engine = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "0e24d51b8e05bbd0652b2b9904d941b12f6a9849" }
-wordcraft-mcp = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "0e24d51b8e05bbd0652b2b9904d941b12f6a9849" }
-wordcraft-control-key = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "0e24d51b8e05bbd0652b2b9904d941b12f6a9849" }
-wordcraft-docx = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "0e24d51b8e05bbd0652b2b9904d941b12f6a9849" }
-wordcraft-formats = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "0e24d51b8e05bbd0652b2b9904d941b12f6a9849" }
+wordcraft-geom = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "73717786b6a01a93fba79892f04a2f2d3380a761" }
+wordcraft-doc = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "73717786b6a01a93fba79892f04a2f2d3380a761" }
+wordcraft-fonts = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "73717786b6a01a93fba79892f04a2f2d3380a761" }
+wordcraft-layout = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "73717786b6a01a93fba79892f04a2f2d3380a761" }
+wordcraft-render = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "73717786b6a01a93fba79892f04a2f2d3380a761" }
+wordcraft-pdf = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "73717786b6a01a93fba79892f04a2f2d3380a761" }
+wordcraft-engine = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "73717786b6a01a93fba79892f04a2f2d3380a761" }
+wordcraft-mcp = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "73717786b6a01a93fba79892f04a2f2d3380a761" }
+wordcraft-control-key = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "73717786b6a01a93fba79892f04a2f2d3380a761" }
+wordcraft-docx = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "73717786b6a01a93fba79892f04a2f2d3380a761" }
+wordcraft-formats = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "73717786b6a01a93fba79892f04a2f2d3380a761" }
 
 [patch.crates-io]
 # Required by craft-pdf: the backend rejects writers that failed during unwinding (as WordCraft).
@@ -147,12 +149,10 @@ krilla = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf4518
 ecolor = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
 emath = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
 epaint = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
-epaint_default_fonts = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
 egui = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
 egui-winit = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
 egui-wgpu = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
 egui_glow = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
-egui_extras = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
 egui_kittest = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
 eframe = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
 winit = { git = "https://github.com/storytold/winit.git", rev = "a517b3846ee8457d84ee4975110bfda6797c44dc" }

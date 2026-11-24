@@ -230,7 +230,7 @@ dependencies = [
  "objc2-foundation 0.3.2",
  "parking_lot",
  "percent-encoding",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
  "wl-clipboard-rs",
  "x11rb",
 ]
@@ -1494,7 +1494,6 @@ dependencies = [
  "bytemuck",
  "ecolor",
  "emath",
- "epaint_default_fonts",
  "font-types 0.12.7",
  "harfrust 0.12.0",
  "log",
@@ -1512,11 +1511,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "epaint_default_fonts"
-version = "0.37.0"
-source = "git+https://github.com/storytold/egui.git?rev=6d518fc799681571963842f95b55a6b68431b15a#6d518fc799681571963842f95b55a6b68431b15a"
-
-[[package]]
 name = "equivalent"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1529,7 +1523,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e35d6e78f4cebb90e51d543db8fe41528851d6deeef6ef21ebd4bfdc1e784776"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2564,6 +2558,7 @@ name = "jcj-theme"
 version = "0.1.0"
 dependencies = [
  "egui",
+ "jcj-layout",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
@@ -3362,7 +3357,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d8fae84b431384b68627d0f9b3b1245fcf9f46f6c0e3dc902e9dce64edd1967"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3770,7 +3765,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4091,7 +4086,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4150,7 +4145,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4872,7 +4867,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.6",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -5789,7 +5784,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -6127,12 +6122,12 @@ dependencies = [
 [[package]]
 name = "wordcraft-control-key"
 version = "0.18.1"
-source = "git+https://github.com/jamescjfoundation/wordcraft?rev=0e24d51b8e05bbd0652b2b9904d941b12f6a9849#0e24d51b8e05bbd0652b2b9904d941b12f6a9849"
+source = "git+https://github.com/jamescjfoundation/wordcraft?rev=73717786b6a01a93fba79892f04a2f2d3380a761#73717786b6a01a93fba79892f04a2f2d3380a761"
 
 [[package]]
 name = "wordcraft-doc"
 version = "0.18.1"
-source = "git+https://github.com/jamescjfoundation/wordcraft?rev=0e24d51b8e05bbd0652b2b9904d941b12f6a9849#0e24d51b8e05bbd0652b2b9904d941b12f6a9849"
+source = "git+https://github.com/jamescjfoundation/wordcraft?rev=73717786b6a01a93fba79892f04a2f2d3380a761#73717786b6a01a93fba79892f04a2f2d3380a761"
 dependencies = [
  "base64 0.23.1",
  "log",
@@ -6146,7 +6141,7 @@ dependencies = [
 [[package]]
 name = "wordcraft-docbin"
 version = "0.18.1"
-source = "git+https://github.com/jamescjfoundation/wordcraft?rev=0e24d51b8e05bbd0652b2b9904d941b12f6a9849#0e24d51b8e05bbd0652b2b9904d941b12f6a9849"
+source = "git+https://github.com/jamescjfoundation/wordcraft?rev=73717786b6a01a93fba79892f04a2f2d3380a761#73717786b6a01a93fba79892f04a2f2d3380a761"
 dependencies = [
  "cfb",
  "chrono",
@@ -6162,7 +6157,7 @@ dependencies = [
 [[package]]
 name = "wordcraft-docx"
 version = "0.18.1"
-source = "git+https://github.com/jamescjfoundation/wordcraft?rev=0e24d51b8e05bbd0652b2b9904d941b12f6a9849#0e24d51b8e05bbd0652b2b9904d941b12f6a9849"
+source = "git+https://github.com/jamescjfoundation/wordcraft?rev=73717786b6a01a93fba79892f04a2f2d3380a761#73717786b6a01a93fba79892f04a2f2d3380a761"
 dependencies = [
  "aes",
  "base64 0.23.1",
@@ -6185,7 +6180,7 @@ dependencies = [
 [[package]]
 name = "wordcraft-engine"
 version = "0.18.1"
-source = "git+https://github.com/jamescjfoundation/wordcraft?rev=0e24d51b8e05bbd0652b2b9904d941b12f6a9849#0e24d51b8e05bbd0652b2b9904d941b12f6a9849"
+source = "git+https://github.com/jamescjfoundation/wordcraft?rev=73717786b6a01a93fba79892f04a2f2d3380a761#73717786b6a01a93fba79892f04a2f2d3380a761"
 dependencies = [
  "chrono",
  "craft-font-catalog",
@@ -6217,7 +6212,7 @@ dependencies = [
 [[package]]
 name = "wordcraft-fonts"
 version = "0.18.1"
-source = "git+https://github.com/jamescjfoundation/wordcraft?rev=0e24d51b8e05bbd0652b2b9904d941b12f6a9849#0e24d51b8e05bbd0652b2b9904d941b12f6a9849"
+source = "git+https://github.com/jamescjfoundation/wordcraft?rev=73717786b6a01a93fba79892f04a2f2d3380a761#73717786b6a01a93fba79892f04a2f2d3380a761"
 dependencies = [
  "brotli-decompressor 5.0.3",
  "harfrust 0.13.3",
@@ -6232,7 +6227,7 @@ dependencies = [
 [[package]]
 name = "wordcraft-formats"
 version = "0.18.1"
-source = "git+https://github.com/jamescjfoundation/wordcraft?rev=0e24d51b8e05bbd0652b2b9904d941b12f6a9849#0e24d51b8e05bbd0652b2b9904d941b12f6a9849"
+source = "git+https://github.com/jamescjfoundation/wordcraft?rev=73717786b6a01a93fba79892f04a2f2d3380a761#73717786b6a01a93fba79892f04a2f2d3380a761"
 dependencies = [
  "aes",
  "base64 0.23.1",
@@ -6259,7 +6254,7 @@ dependencies = [
 [[package]]
 name = "wordcraft-geom"
 version = "0.18.1"
-source = "git+https://github.com/jamescjfoundation/wordcraft?rev=0e24d51b8e05bbd0652b2b9904d941b12f6a9849#0e24d51b8e05bbd0652b2b9904d941b12f6a9849"
+source = "git+https://github.com/jamescjfoundation/wordcraft?rev=73717786b6a01a93fba79892f04a2f2d3380a761#73717786b6a01a93fba79892f04a2f2d3380a761"
 dependencies = [
  "image",
  "serde",
@@ -6268,7 +6263,7 @@ dependencies = [
 [[package]]
 name = "wordcraft-layout"
 version = "0.18.1"
-source = "git+https://github.com/jamescjfoundation/wordcraft?rev=0e24d51b8e05bbd0652b2b9904d941b12f6a9849#0e24d51b8e05bbd0652b2b9904d941b12f6a9849"
+source = "git+https://github.com/jamescjfoundation/wordcraft?rev=73717786b6a01a93fba79892f04a2f2d3380a761#73717786b6a01a93fba79892f04a2f2d3380a761"
 dependencies = [
  "craft-proof",
  "image",
@@ -6289,7 +6284,7 @@ dependencies = [
 [[package]]
 name = "wordcraft-mcp"
 version = "0.18.1"
-source = "git+https://github.com/jamescjfoundation/wordcraft?rev=0e24d51b8e05bbd0652b2b9904d941b12f6a9849#0e24d51b8e05bbd0652b2b9904d941b12f6a9849"
+source = "git+https://github.com/jamescjfoundation/wordcraft?rev=73717786b6a01a93fba79892f04a2f2d3380a761#73717786b6a01a93fba79892f04a2f2d3380a761"
 dependencies = [
  "log",
  "serde_json",
@@ -6302,7 +6297,7 @@ dependencies = [
 [[package]]
 name = "wordcraft-metafile"
 version = "0.18.1"
-source = "git+https://github.com/jamescjfoundation/wordcraft?rev=0e24d51b8e05bbd0652b2b9904d941b12f6a9849#0e24d51b8e05bbd0652b2b9904d941b12f6a9849"
+source = "git+https://github.com/jamescjfoundation/wordcraft?rev=73717786b6a01a93fba79892f04a2f2d3380a761#73717786b6a01a93fba79892f04a2f2d3380a761"
 dependencies = [
  "kurbo",
  "thiserror 2.0.21",
@@ -6311,7 +6306,7 @@ dependencies = [
 [[package]]
 name = "wordcraft-pdf"
 version = "0.18.1"
-source = "git+https://github.com/jamescjfoundation/wordcraft?rev=0e24d51b8e05bbd0652b2b9904d941b12f6a9849#0e24d51b8e05bbd0652b2b9904d941b12f6a9849"
+source = "git+https://github.com/jamescjfoundation/wordcraft?rev=73717786b6a01a93fba79892f04a2f2d3380a761#73717786b6a01a93fba79892f04a2f2d3380a761"
 dependencies = [
  "chrono",
  "craft-pdf",
@@ -6330,7 +6325,7 @@ dependencies = [
 [[package]]
 name = "wordcraft-render"
 version = "0.18.1"
-source = "git+https://github.com/jamescjfoundation/wordcraft?rev=0e24d51b8e05bbd0652b2b9904d941b12f6a9849#0e24d51b8e05bbd0652b2b9904d941b12f6a9849"
+source = "git+https://github.com/jamescjfoundation/wordcraft?rev=73717786b6a01a93fba79892f04a2f2d3380a761#73717786b6a01a93fba79892f04a2f2d3380a761"
 dependencies = [
  "image",
  "log",
@@ -6832,8 +6827,3 @@ dependencies = [
  "syn 3.0.10",
  "winnow",
 ]
-
-[[patch.unused]]
-name = "egui_extras"
-version = "0.37.0"
-source = "git+https://github.com/storytold/egui.git?rev=6d518fc799681571963842f95b55a6b68431b15a#6d518fc799681571963842f95b55a6b68431b15a"

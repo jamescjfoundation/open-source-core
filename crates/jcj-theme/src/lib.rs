@@ -22,6 +22,8 @@ mod tokens;
 mod visuals;
 
 pub use color::{ColorError, hex, parse_hex};
-pub use fonts::{FAMILY_MEDIUM, FAMILY_SEMIBOLD, FontFace, font_definitions, install_fonts, medium, mono, regular, semibold};
+pub use fonts::{
+    FAMILY_MEDIUM, FAMILY_SEMIBOLD, FontFace, default_faces, font_definitions, install_fonts, medium, mono, regular, semibold, with_defaults,
+};
 pub use tokens::{Colors, FontNames, Mode, Radius, Spacing, Theme, Tokens, TokensError, TypeSizes};
 pub use visuals::{apply, style, visuals};

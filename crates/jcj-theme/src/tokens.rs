@@ -170,7 +170,7 @@ pub struct Radius {
 
 /// The names of the interface's fonts: each is a face the app supplies by that name
 /// ([`crate::FontFace`]). A name left out, or a face the app does not supply, falls back to
-/// `regular`, then to egui's own fonts.
+/// `regular`, then to the core's default faces (Inter, JetBrains Mono).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct FontNames {
@@ -280,7 +280,7 @@ impl Default for Radius {
 }
 
 impl Default for Tokens {
-    /// The neutral token set: no product's colors, egui's own fonts.
+    /// The neutral token set: no product's colors, the core's default fonts.
     fn default() -> Self {
         Tokens {
             name: "neutral".into(),

@@ -30,7 +30,7 @@ engine's own commands already do.
   | --- | --- |
   | `find.all`, `find.next`, `find.previous`, `find.replace`, `find.replaceAll` | Literal find (no wildcards or `^` codes) over the whole body, wrapping; lists every match without moving the selection; limited to chosen paragraph styles; `find::replace_all_with` lets an app choose each replacement (a style's casing) |
   | `format.plain` | Removes the text styles set by hand but keeps font, size and marks (`format.resetChar` drops font and size) |
-  | `format.resetToStyle` | Back to the paragraph style, keeping paragraph extension data and run marks (`para.reset` and `format.clear` drop paragraph extension data) |
+  | `format.resetToStyle` | Back to the paragraph style, keeping paragraph extension data and run marks (`para.reset` leaves character formatting; `format.clear` drops the style) |
   | `format.toggleCapitals` | All capitals, or small letters when there are no small letters (`format.changeCase {"mode": "toggle"}` swaps each letter) |
   | `edit.newPage` | A page break as a paragraph property, splitting at the caret (`text.pageBreak` inserts a break character) |
   | `edit.deleteParagraph`, `select.nextParagraph`, `select.previousParagraph` | Not in the engine |
@@ -112,9 +112,8 @@ engine's own commands already do.
 
 - Every app carries the engine's whole catalog in its binary and registry. Agents see it through
   `list_commands`; apps that want agents to see less export only their own prefix as tools.
-- The engine's `para.reset` and `format.clear` drop paragraph extension data. A test in
-  `jcj-engine` pins it for `para.reset`; if upstream starts keeping it, `format.resetToStyle` may
-  be retired.
+- The engine's `para.reset` and `format.clear` used to drop paragraph extension data; our fork's
+  extension-data patch now keeps it there too, and a test in `jcj-engine` pins that.
 - Formatting at a caret inside a word formats the whole word, as the engine's commands do (Script
   formatted only what was typed next).
 

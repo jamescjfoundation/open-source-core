@@ -73,8 +73,56 @@ pub fn generation() -> u64 {
     db().generation()
 }
 
+/// A font face built into the core: WordCraft's bundled set, every face under the SIL Open Font
+/// License 1.1 (Source Sans 3, Source Serif 4, Inter, JetBrains Mono). Apps may use them for the
+/// interface too (`jcj-theme` does by default).
+#[derive(Clone, Copy, Debug)]
+pub struct BundledFace {
+    /// The family name ("Inter").
+    pub family: &'static str,
+    /// The style name ("Regular", "Medium").
+    pub style: &'static str,
+    /// The font file.
+    pub bytes: &'static [u8],
+}
+
+/// The bundled faces' names, in the order WordCraft bundles them.
+const BUNDLED_NAMES: [(&str, &str); 13] = [
+    ("Source Sans 3", "Regular"),
+    ("Source Sans 3", "Semibold"),
+    ("Source Sans 3", "Bold"),
+    ("Source Sans 3", "Italic"),
+    ("Source Serif 4", "Regular"),
+    ("Source Serif 4", "Italic"),
+    ("Source Serif 4", "Semibold"),
+    ("Source Serif 4", "Bold"),
+    ("Source Serif 4", "Bold Italic"),
+    ("Inter", "Regular"),
+    ("Inter", "Medium"),
+    ("Inter", "SemiBold"),
+    ("JetBrains Mono", "Regular"),
+];
+
+/// Every bundled face, with its family and style.
+pub fn bundled_faces() -> Vec<BundledFace> {
+    jcj_upstream::fonts::bundled().iter().zip(BUNDLED_NAMES).map(|(bytes, (family, style))| BundledFace { family, style, bytes }).collect()
+}
+
+/// One bundled face by family and style.
+pub fn bundled_face(family: &str, style: &str) -> Option<BundledFace> {
+    bundled_faces().into_iter().find(|f| f.family == family && f.style == style)
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn bundled_faces_are_named_in_order() {
+        let faces = super::bundled_faces();
+        assert_eq!(faces.len(), 13, "WordCraft changed its bundled set: update BUNDLED_NAMES");
+        let inter = super::bundled_face("Inter", "Regular").unwrap();
+        assert!(!inter.bytes.is_empty());
+    }
+
     use super::*;
 
     #[test]

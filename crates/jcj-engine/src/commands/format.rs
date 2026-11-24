@@ -7,8 +7,9 @@
 //!   `format.resetChar` also drops the font and size.
 //! - `format.resetToStyle`: give the paragraphs the selection touches their style's formatting:
 //!   direct paragraph and character formatting goes; the style, the paragraph's extension data
-//!   and the runs' marks stay. The engine's `para.reset` and `format.clear` drop paragraph
-//!   extension data.
+//!   and the runs' marks stay. The engine's `para.reset` resets only paragraph formatting, and
+//!   `format.clear` also returns the paragraph to Normal (both keep extension data, through our
+//!   fork's patch).
 //! - `format.toggleCapitals`: the selection in capitals, or in small letters when it has no small
 //!   letters. The engine's `format.changeCase {"mode": "toggle"}` swaps each letter instead.
 //!

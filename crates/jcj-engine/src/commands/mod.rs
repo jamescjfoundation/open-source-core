@@ -46,7 +46,7 @@
 //! | `paragraph.delete` | `edit.deleteParagraph` | |
 //! | `paragraph.next`, `paragraph.previous` | `select.nextParagraph`, `select.previousParagraph` | |
 //! | `goto.page {page}` | Engine `edit.goto {page}` | Page labels other than numbers stay in the app |
-//! | An app's own Reset to Style | `format.resetToStyle` | Engine `para.reset` and `format.clear` drop paragraph extension data |
+//! | An app's own Reset to Style | `format.resetToStyle` | Engine `para.reset` leaves character formatting; `format.clear` drops the style |
 //! | `format.bold`, `format.italic`, `format.underline` | Engine, same ids | Engine takes `{"value"?: bool}` |
 //! | `format.style {style, on?}` | Engine `format.<style> {value?}` | `bold`, `italic`, `underline`, `doubleUnderline`, `wordUnderline`, `strikethrough`, `superscript`, `subscript`, `allCaps`, `smallCaps`; dotted: `format.underline {"style": "dotted"}` |
 //! | `format.plain` | `format.plain` | |

@@ -14,6 +14,7 @@ struct State {
     events: Vec<BoardEvent>,
     origin: Pos2,
     on_canvas: bool,
+    fonts: bool,
 }
 
 fn state(n: usize, on_canvas: bool) -> State {
@@ -27,6 +28,11 @@ fn state(n: usize, on_canvas: bool) -> State {
 fn harness(s: State) -> Harness<'static, State> {
     Harness::builder().with_size(vec2(800.0, 600.0)).with_step_dt(0.05).build_ui_state(
         |ui, s: &mut State| {
+            // egui has no fonts of its own built in: install the core's defaults, as the shell does.
+            if !s.fonts {
+                jcj_theme::install_fonts(ui.ctx(), &jcj_theme::FontNames::default(), &[]);
+                s.fonts = true;
+            }
             s.origin = ui.cursor().min;
             let events = if s.on_canvas {
                 Canvas::new("test").show(ui, &s.board, &s.selection, &mut s.canvas)

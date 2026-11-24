@@ -11,7 +11,7 @@ Last train: 2026-11-24 (first pin).
 
 | Source | Pinned at | How we reach it | State |
 | --- | --- | --- | --- |
-| WordCraft (`storytold/wordcraft`) | release tag `v0.18.1` (commit `079f478b`) | Named at storytold's address and tag; the patch block points it at our fork's `jcj` branch, commit `0e24d51b8e05bbd0652b2b9904d941b12f6a9849` (tagged `jcj-2026-11-24` in the fork) | Follow |
+| WordCraft (`storytold/wordcraft`) | release tag `v0.18.1` (commit `079f478b`) | Named at storytold's address and tag; the patch block points it at our fork's `jcj` branch, commit `73717786b6a01a93fba79892f04a2f2d3380a761` (tagged `jcj-2026-11-24-2` in the fork; the first cut, without the reset fix, is `jcj-2026-11-24`) | Follow |
 | craft-libs: `craft-proof` | `01315d9c92b5b0e69082d35ca56099461a1efd45` | storytold's address, the commit WordCraft v0.18.1 pins for it | Follow |
 | craft-libs: `craft-pdf`, `krilla` (patched), `craft-update`, `craft-atomic`, `craft-dialogs` | `6e03f65bf45181db77ba6229716e6624db9eb25b` | storytold's address, the commit WordCraft v0.18.1 pins for craft-pdf and craft-update; craft-atomic and craft-dialogs, which WordCraft does not use, take the same commit | Follow |
 | craft-libs: `craft-font-store`, `craft-font-catalog` | `762a06a4c6b48b522b7d4de84a87917ef90265e6` | Through WordCraft (not named by us) | Follow |
@@ -38,7 +38,7 @@ commit per patch. Older `jcj` branches are kept as tags (`jcj-YYYY-MM-DD`).
 
 | Patch | Fork, topic branch | Files | Why | Upstream status |
 | --- | --- | --- | --- | --- |
-| Extension data on documents, paragraphs and runs (`Ext`) | `jamescjfoundation/wordcraft`, `topic/extension-data` (commit `0e24d51b`) | `crates/doc/src/ext.rs` (new), `lib.rs`, `document.rs`, `props/char_props.rs`, `props/para_props.rs`, `crates/doc/tests/ext.rs` (new), `crates/docx/tests/it/roundtrip.rs` (field lists) | Every app attaches its own data to the model (decision 0006). Replaces Script's nine screenplay fields and `Document::app_data`. | Not yet offered; general enough to offer (claim an issue first, per their AGENTS.md) |
+| Extension data on documents, paragraphs and runs (`Ext`) | `jamescjfoundation/wordcraft`, `topic/extension-data` (commit `73717786`) | `crates/doc/src/ext.rs` (new), `lib.rs`, `document.rs`, `props/char_props.rs`, `props/para_props.rs`, `crates/doc/tests/ext.rs` (new), `crates/docx/tests/it/roundtrip.rs` (field lists), `crates/engine/src/cmd/{para,format,inspector}.rs` (resetting or clearing paragraph formatting keeps extension data), `crates/engine/src/tests.rs` | Every app attaches its own data to the model (decision 0006). Replaces Script's nine screenplay fields and `Document::app_data`. | Not yet offered; general enough to offer (claim an issue first, per their AGENTS.md) |
 
 ## Expected patches, not carried yet
 
