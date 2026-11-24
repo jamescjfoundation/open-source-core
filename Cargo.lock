@@ -1615,6 +1615,12 @@ version = "0.1.0"
 [[package]]
 name = "jcj-layout"
 version = "0.1.0"
+dependencies = [
+ "jcj-doc",
+ "jcj-upstream",
+ "log",
+ "serde_json",
+]
 
 [[package]]
 name = "jcj-output"
