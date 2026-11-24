@@ -42,6 +42,9 @@ pub struct Testbed {
     /// Whether the user started a document (the start window shows until then, unless the
     /// file already exists).
     pub started: bool,
+    /// The central area split: the page beside the document's plain text (the core's split view).
+    pub split: jcj_shell::split::Split,
+    split_state: jcj_shell::split::SplitState,
     /// Words written this session, toward a session target (the core's writing statistics).
     pub writing: jcj_shell::writing::Writing,
 }
@@ -58,6 +61,8 @@ impl Testbed {
             saved_revision: 0,
             revision: 0,
             started: path.is_file(),
+            split: jcj_shell::split::Split::None,
+            split_state: jcj_shell::split::SplitState::default(),
             writing: jcj_shell::writing::Writing::new(0).with_target(Some(500)),
             page: None,
             log: Vec::new(),
@@ -130,6 +135,7 @@ impl Commands for Testbed {
         vec![
             CommandInfo { icon: "new".into(), ..CommandInfo::new(ids::NEW, "New", "Mod+N") },
             CommandInfo::new(ids::NEW_FROM_TEMPLATE, "New from Template", ""),
+            CommandInfo::new("testbed.split", "Split View", ""),
             CommandInfo { icon: "save".into(), ..CommandInfo::new(ids::SAVE, "Save", "Mod+S") },
             CommandInfo { icon: "undo".into(), ..CommandInfo::new(ids::UNDO, "Undo", "Mod+Z") },
             CommandInfo { icon: "redo".into(), ..CommandInfo::new(ids::REDO, "Redo", "Mod+Shift+Z") },
@@ -188,6 +194,9 @@ impl App for Testbed {
     fn run(&mut self, c: &Cmd, _shell: &mut Shell) -> Result<(), String> {
         self.started = true;
         match c.id.as_str() {
+            "testbed.split" => {
+                self.split = if self.split == jcj_shell::split::Split::None { jcj_shell::split::Split::Side } else { jcj_shell::split::Split::None };
+            }
             ids::NEW_FROM_TEMPLATE => {
                 let doc = match c.params.get("template").and_then(|t| t.as_str()) {
                     Some("sample") => sample_document()?,
@@ -244,14 +253,33 @@ impl App for Testbed {
     }
 
     fn document_ui(&mut self, ui: &mut egui::Ui, _shell: &mut Shell) {
-        egui::ScrollArea::both().show(ui, |ui| match self.page_texture(ui.ctx()) {
-            Some(tex) => {
-                ui.add(egui::Image::new(&tex).fit_to_original_size(1.0));
-            }
-            None => {
-                ui.label("The page could not be drawn.");
-            }
-        });
+        let tex = self.page_texture(ui.ctx());
+        let text: Vec<String> = self.session.doc.body.iter().filter_map(|b| b.as_para()).map(|p| p.plain_text()).collect();
+        let mut state = self.split_state;
+        jcj_shell::split::split(
+            ui,
+            ui.make_persistent_id("testbed-split"),
+            self.split,
+            &mut state,
+            |ui| {
+                egui::ScrollArea::both().id_salt("page").show(ui, |ui| match &tex {
+                    Some(tex) => {
+                        ui.add(egui::Image::new(tex).fit_to_original_size(1.0));
+                    }
+                    None => {
+                        ui.label("The page could not be drawn.");
+                    }
+                });
+            },
+            |ui| {
+                egui::ScrollArea::vertical().id_salt("text").show(ui, |ui| {
+                    for p in &text {
+                        ui.label(p);
+                    }
+                });
+            },
+        );
+        self.split_state = state;
     }
 
     fn ribbon_tabs(&self) -> Vec<TabSpec> {

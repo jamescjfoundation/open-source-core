@@ -39,6 +39,7 @@ pub mod ribbon_fit;
 mod shell;
 mod sidebar;
 pub mod snapshot;
+pub mod split;
 pub mod start;
 pub mod updates;
 pub mod workspace;

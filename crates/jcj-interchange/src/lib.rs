@@ -25,7 +25,7 @@
 //! | --- | --- | --- |
 //! | DOCX | `wordcraft-docx` | `wordcraft-docx` |
 //! | ODT, RTF, Markdown, HTML, text | `wordcraft-formats` | `wordcraft-formats` |
-//! | EPUB 3 | not yet (a gap: [`Error::Unsupported`]) | this crate's own writer |
+//! | EPUB 3 | this crate's own reader ([`epub_read`]) | this crate's own writer |
 //!
 //! When craft-libs' crates reach our pins, they replace these behind the same interface.
 //!
@@ -39,6 +39,7 @@
 
 pub mod emphasis;
 mod epub;
+pub mod epub_read;
 mod format;
 mod rtf_direct;
 
@@ -90,7 +91,7 @@ pub fn import(format: Format, bytes: &[u8]) -> Result<Document, Error> {
     let malformed = |reason: String| Error::Malformed { format, reason };
     let mut doc = guarded(
         || match format {
-            Format::Epub => Err(Error::Unsupported { format, direction: Direction::Import }),
+            Format::Epub => epub_read::read(bytes).map_err(malformed),
             Format::Docx => docx::read(bytes).map_err(|e| malformed(e.to_string())),
             other => match formats::import(other.extension(), bytes) {
                 Some(r) => r.map_err(malformed),

@@ -4,7 +4,7 @@
 
 use jcj_doc::props::CharProps;
 use jcj_doc::{Block, Document, Paragraph};
-use jcj_interchange::{Direction, Error, Format, MAX_IMPORT_BYTES, export, import};
+use jcj_interchange::{Error, Format, MAX_IMPORT_BYTES, export, import};
 
 mod common;
 use common::sample;
@@ -81,11 +81,26 @@ fn every_format_round_trips_what_it_holds() {
 }
 
 #[test]
-fn epub_import_is_a_listed_gap() {
+fn epub_import_reads_what_epub_export_writes_but_is_not_listed() {
     let bytes = export(Format::Epub, &sample()).unwrap();
     assert_eq!(Format::sniff(&bytes), Some(Format::Epub));
-    assert!(!Format::Epub.can_import());
-    assert_eq!(import(Format::Epub, &bytes).unwrap_err(), Error::Unsupported { format: Format::Epub, direction: Direction::Import });
+    assert!(!Format::Epub.can_import(), "apps opt in to EPUB import by name");
+    let back = import(Format::Epub, &bytes).unwrap();
+    let words = |d: &jcj_doc::Document| {
+        d.body
+            .iter()
+            .filter_map(|b| b.as_para())
+            .map(|p| p.plain_text())
+            .collect::<Vec<_>>()
+            .join(" ")
+            .split_whitespace()
+            .map(str::to_owned)
+            .collect::<Vec<_>>()
+    };
+    let mine = words(&sample());
+    let theirs = words(&back);
+    assert!(mine.iter().all(|w| theirs.contains(w)), "{mine:?} in {theirs:?}");
+    assert!(import(Format::Epub, b"PK\x03\x04garbage").is_err());
 }
 
 #[test]

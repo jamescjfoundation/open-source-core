@@ -130,7 +130,8 @@ pub fn run() -> Result<Vec<Step>, String> {
     let mut formats = Vec::new();
     for format in Format::ALL {
         let bytes = jcj_interchange::export(format, &doc).map_err(|e| format!("export {format:?}: {e}"))?;
-        if format.can_import() {
+        // EPUB is not offered for import by default, but reads back when asked for by name.
+        if format.can_import() || format == Format::Epub {
             let back = jcj_interchange::import(format, &bytes).map_err(|e| format!("import {format:?}: {e}"))?;
             let text: String = jcj_doc::walk::body_paragraphs(&back).iter().map(|(_, p)| jcj_doc::plain_text(p)).collect();
             check(text.contains("Second Part"), &format!("{format:?} keeps the text"))?;

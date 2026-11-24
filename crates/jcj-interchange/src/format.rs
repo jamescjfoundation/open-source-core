@@ -75,7 +75,9 @@ impl Format {
         }
     }
 
-    /// Whether [`crate::import`] reads this format.
+    /// Whether apps should offer this format for import. EPUB says no so that apps' lists stay
+    /// as they were: [`crate::import`] reads EPUB too ([`crate::epub_read`]), for apps that ask
+    /// for it by name.
     pub fn can_import(self) -> bool {
         self != Format::Epub
     }
