@@ -236,7 +236,21 @@ fn has_nextest(root: &Path) -> bool {
 fn test(root: &Path, scope: &Affected) -> TaskResult {
     if has_nextest(root) {
         scoped(root, scope, &["nextest", "run", "--locked", "--all-features", "--no-tests=pass"], &[])?;
-        scoped(root, scope, &["test", "--locked", "--all-features", "--doc"], &[])
+        // Doc tests exist only in libraries; `--doc -p <bin-only package>` is an error.
+        let docs = match scope {
+            Affected::All => Affected::All,
+            Affected::Some(names) => {
+                let graph = changed::workspace_graph(root)?;
+                Affected::Some(
+                    names
+                        .iter()
+                        .filter(|n| graph.get(n.as_str()).is_some_and(|(dir, _)| root.join(dir).join("src/lib.rs").is_file()))
+                        .cloned()
+                        .collect(),
+                )
+            }
+        };
+        scoped(root, &docs, &["test", "--locked", "--all-features", "--doc"], &[])
     } else {
         scoped(root, scope, &["test", "--locked", "--all-features"], &[])
     }
