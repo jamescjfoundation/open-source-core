@@ -5,7 +5,27 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 ## Unreleased
 
-Nothing yet.
+### Added
+
+- `jcj-output`: `read` (`read_pages`, `ReadLimits`, `PdfPage`, `PdfGlyph`, `GlyphMode`,
+  `ReadError`): a PDF's pages and where each glyph lands, with its text, for importing PDFs and
+  checking exported ones. Bounded for files that are not trusted (size, pages, glyphs a page).
+- `jcj-interchange`: `export_rtf_direct`: RTF with each paragraph's resolved indents, spacing,
+  alignment and page break, and each run's font, size, bold, italic and underline, written out
+  directly, for apps that lay out their own paragraphs. `export(Format::Rtf, ..)` is unchanged.
+- `jcj-engine`: `file_access::current` and `unconfined` (which folders are in force; run code with
+  none).
+- `jcj-proof`: `dictionary_generation` (changes when the user dictionary changes).
+
+### Upstream
+
+- craft-libs' `craft-pdf` reader (same commit as before) and its patched Hayro snapshot
+  (`hayro-syntax`, `hayro-interpret`, `hayro-cmap`, `hayro-postscript`, `hayro-jbig2`), in the
+  patch block (`docs/UPSTREAM.md`).
+
+### What apps must do
+
+- Run `cargo xtask sync` to take the new patch block.
 
 ## 0.1.0 (2026-11-24)
 

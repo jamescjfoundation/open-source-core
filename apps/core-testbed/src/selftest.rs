@@ -117,7 +117,14 @@ pub fn run() -> Result<Vec<Step>, String> {
     check(pdf.starts_with(b"%PDF-"), "the PDF starts with its header")?;
     let image = jcj_output::render_page(&doc, &layout, 0, 0.5, &jcj_output::RenderSettings::default()).ok_or("page 1 did not render")?;
     check(image.width > 0 && image.height > 0, "the page image has a size")?;
-    step("output", format!("PDF {} bytes; page image {} x {}", pdf.len(), image.width, image.height));
+    // Read the PDF back: its pages and their text, as an app's import or golden test does.
+    let read = jcj_output::read_pages(&pdf, &jcj_output::ReadLimits::default()).map_err(|e| format!("pdf read: {e}"))?;
+    check(read.len() == pages, "the PDF reads back with every page")?;
+    let text: String =
+        read.iter().flat_map(|p| &p.glyphs).filter(|g| g.mode == jcj_output::GlyphMode::Fill).filter_map(|g| g.text.as_deref()).collect();
+    check(text.contains("A Sample Document") && text.contains("Second Part"), "the PDF's text reads back")?;
+    let glyphs: usize = read.iter().map(|p| p.glyphs.len()).sum();
+    step("output", format!("PDF {} bytes, {glyphs} glyphs read back; page image {} x {}", pdf.len(), image.width, image.height));
 
     // jcj-interchange: every format out, and back in where it can be read.
     let mut formats = Vec::new();
@@ -130,12 +137,34 @@ pub fn run() -> Result<Vec<Step>, String> {
         }
         formats.push(format.extension());
     }
-    step("interchange", format!("exported {}", formats.join(", ")));
+    // RTF with each paragraph's indents written out, as an app that lays out its own paragraphs
+    // exports it: an indented paragraph keeps its indent when read back.
+    let mut indented = doc.clone();
+    if let Some(jcj_doc::Block::Para(p)) = indented.body.get_mut(1).map(std::sync::Arc::make_mut) {
+        p.props.indent_left = Some(144.0);
+    }
+    let rtf = jcj_interchange::export_rtf_direct(&indented).map_err(|e| format!("direct RTF: {e}"))?;
+    let back = jcj_interchange::import(Format::Rtf, &rtf).map_err(|e| format!("direct RTF import: {e}"))?;
+    let indent = jcj_doc::walk::body_paragraphs(&back).get(1).map(|(_, p)| back.styles.resolve_para(&p.props).indent_left);
+    check(indent == Some(144.0), "direct RTF keeps a paragraph's indent")?;
+    step("interchange", format!("exported {}; direct RTF keeps indents", formats.join(", ")));
 
     // jcj-proof: spelling and hyphenation.
     let issues = jcj_proof::check("This sentense has a mistake.", Some("en-US"), &jcj_proof::SpellingOptions::default(), false);
     check(issues.iter().any(|i| i.range == (5..13)), "the misspelled word is found")?;
+    // The dictionary generation tells a spelling cache when to check again.
+    let generation = jcj_proof::dictionary_generation();
+    jcj_proof::add_word("testbedword");
+    check(jcj_proof::dictionary_generation() != generation, "adding a word moves the dictionary generation")?;
+    jcj_proof::remove_word("testbedword");
     step("proof", format!("{} issue(s); hyphenation: {}", issues.len(), jcj_proof::hyphenate("documentation", Some("en-US"))));
+
+    // jcj-engine's file access: which folders are in force (none here, then the temp folder).
+    check(jcj_engine::file_access::current().is_none(), "nothing is confined by default")?;
+    let roots = jcj_engine::file_access::AutomationRoots::new(Some(&std::env::temp_dir()), None)?;
+    let confined = jcj_engine::file_access::confine(roots.as_ref(), || jcj_engine::file_access::current().is_some());
+    check(confined, "confined code sees its folders")?;
+    step("file access", "confinement reported".to_owned());
 
     // jcj-project: a container with two documents, an asset and a snapshot.
     let mut project = jcj_project::Project::with_document(&APP, "Main", doc.clone()).map_err(|e| e.to_string())?;
@@ -182,6 +211,9 @@ mod tests {
     fn the_self_test_passes() {
         let steps = super::run().unwrap();
         let names: Vec<&str> = steps.iter().map(|s| s.name).collect();
-        assert_eq!(names, ["doc", "engine", "features", "layout", "output", "interchange", "proof", "project", "board", "theme", "agents"]);
+        assert_eq!(
+            names,
+            ["doc", "engine", "features", "layout", "output", "interchange", "proof", "file access", "project", "board", "theme", "agents"]
+        );
     }
 }
