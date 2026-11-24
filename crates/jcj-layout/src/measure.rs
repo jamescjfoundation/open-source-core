@@ -2,8 +2,8 @@
 //! Measuring body blocks: each paragraph's lines (byte ranges and heights) and the resolved
 //! spacing and keep settings the layout used, and each table's height.
 //!
-//! This is what a pass working above the layout reads to decide pages itself. Ported from
-//! Wordsmith Script's pagination (`paginate/measure.rs`), without its screenplay rules.
+//! This is what a pass working above the layout reads to decide pages itself. Ported from the
+//! first foundation app's pagination, without its app-specific rules.
 
 use std::collections::HashMap;
 use std::sync::Arc;

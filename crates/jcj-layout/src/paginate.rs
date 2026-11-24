@@ -19,8 +19,8 @@
 //!    source ([`Paginated::to_source`], [`Paginated::to_output`]);
 //! 4. the output is laid out.
 //!
-//! Ported from Wordsmith Script's pagination (`paginate/`), with its screenplay rules taken out
-//! and made the pass's business.
+//! Ported from the first foundation app's pagination, with its app-specific rules taken out and
+//! made the pass's business.
 //!
 //! **Limits.** The plan reads the body only: footnotes, floating objects that push text, and
 //! multiple columns are not planned for, and a table is kept whole. When the layout of the
