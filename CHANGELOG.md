@@ -7,6 +7,22 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 Nothing yet.
 
+## 0.1.8 (2026-11-24)
+
+### Added
+
+- `jcj-shell`: `tree` (`tree`, `TreeRow`, `TreeState`, `TreeEvent`, `Zone`, `zone`): a tree of rows
+  with selection, open and closed rows, rename in place, drag and drop before, after or inside a
+  row, and a context menu event. The caller passes the visible rows and gets events back; only
+  rows in view are drawn, and each is named as a tree item for screen readers. Promoted from
+  Wordsmith Manuscript's binder for a second app's outline (core issue #6, C5 of Manuscript's
+  plan, C3 of Book's). `core-testbed` shows the sample document's headings in a tree panel.
+
+### What apps must do
+
+- Nothing. Move every `jcj-` dependency to `tag = "v0.1.8"` when convenient (the patch block is
+  unchanged). An app with its own tree can move to this one in a follow-up change.
+
 ## 0.1.7 (2026-11-24)
 
 ### Added

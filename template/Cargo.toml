@@ -13,18 +13,18 @@ publish = false
 [workspace.dependencies]
 # The core, at a release tag. Apps use only jcj- interface crates (never jcj-upstream, WordCraft or
 # craft-libs); `cargo xtask layers` checks it. Move all of them together.
-jcj-doc = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.7" }
-jcj-layout = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.7" }
-jcj-engine = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.7" }
-jcj-output = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.7" }
-jcj-interchange = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.7" }
-jcj-proof = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.7" }
-jcj-project = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.7" }
-jcj-features = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.7" }
-jcj-theme = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.7" }
-jcj-board = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.7" }
-jcj-shell = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.7" }
-jcj-agents = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.7" }
+jcj-doc = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.8" }
+jcj-layout = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.8" }
+jcj-engine = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.8" }
+jcj-output = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.8" }
+jcj-interchange = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.8" }
+jcj-proof = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.8" }
+jcj-project = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.8" }
+jcj-features = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.8" }
+jcj-theme = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.8" }
+jcj-board = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.8" }
+jcj-shell = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.8" }
+jcj-agents = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.8" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # The window, at the egui version the core pins (the patch block points it at the same fork).
