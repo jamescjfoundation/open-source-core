@@ -14,6 +14,8 @@ mod link;
 mod lintroots;
 mod privacy;
 mod spdx;
+// `core_task` is the core's side of sync.
+#[allow(dead_code)]
 mod sync;
 mod util;
 
@@ -166,7 +168,10 @@ fn check_layers(root: &Path) -> TaskResult {
 }
 
 fn check_licenses(root: &Path) -> TaskResult {
-    let out = cargo_output(root, &["tree", "--workspace", "--locked", "--target", "all", "-e", "normal,build,dev", "--prefix", "none", "--format", "{p}\t{l}"])?;
+    let out = cargo_output(
+        root,
+        &["tree", "--workspace", "--locked", "--target", "all", "-e", "normal,build,dev", "--prefix", "none", "--format", "{p}\t{l}"],
+    )?;
     let mut failures = Vec::new();
     let mut checked = BTreeSet::new();
     for line in out.lines().filter(|l| !l.trim().is_empty()) {

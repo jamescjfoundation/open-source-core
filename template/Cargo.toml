@@ -27,6 +27,8 @@ jcj-shell = { git = "https://github.com/jamescjfoundation/open-source-core", tag
 jcj-agents = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.0" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# The window, at the egui version the core pins (the patch block points it at the same fork).
+eframe = { version = "0.37", default-features = false, features = ["accesskit", "glow", "wayland", "x11"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

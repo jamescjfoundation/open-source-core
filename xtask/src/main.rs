@@ -86,6 +86,7 @@ fn main() -> ExitCode {
         },
         "vendor" => vendor(&root, rest.first().map(String::as_str)),
         "install-hooks" => install_hooks(&root),
+        "template-check" => template_check(&root),
         "third-party-licenses" => licenses::task(&root, SHIPPED, "open-source-core's test app", rest.first().map(String::as_str)),
         "privacy" => privacy::task(&root, rest),
         "help" | "--help" | "-h" => {
@@ -121,6 +122,7 @@ fn print_help() {
     println!("  deny                      cargo-deny: licenses, advisories, sources");
     println!("  sync <app dir> [--check]  copy (or compare) shared settings and the patch block into an app");
     println!("  vendor [out file]         archive the vendored sources of every dependency (release asset)");
+    println!("  template-check            build the app template against this checkout, and run its own checks");
     println!("  install-hooks             use the repository's git hooks (pre-commit: fmt and privacy; pre-push: ci --changed)");
     println!("  third-party-licenses [file]  write the dependency license texts");
 }
@@ -184,7 +186,7 @@ fn run_task(name: &str, root: &Path, scope: &Affected) -> TaskResult {
     println!("\n==> {name}");
     let t = std::time::Instant::now();
     let result = match name {
-        "fmt" => cargo(root, &["fmt", "--all", "--", "--check"]),
+        "fmt" => cargo(root, &["fmt", "--all", "--", "--check"]).and_then(|()| fmt_template(root)),
         "lint-roots" => lintroots::check_lint_roots(root, &[], &[]),
         "layers" => check_layers(root),
         "pins" => pins::task(root),
@@ -197,6 +199,18 @@ fn run_task(name: &str, root: &Path, scope: &Affected) -> TaskResult {
     };
     println!("    ({name}: {:.1?})", t.elapsed());
     result.map_err(|e| format!("{name}: {e}"))
+}
+
+/// rustfmt on the app template's own Rust files (not in this workspace, so `cargo fmt` skips them).
+fn fmt_template(root: &Path) -> TaskResult {
+    let files = ["template/xtask/src/main.rs", "template/apps/app/src/main.rs"];
+    let status = Command::new("rustfmt")
+        .current_dir(root)
+        .args(["--check", "--edition", "2024", "--config-path", "rustfmt.toml"])
+        .args(files)
+        .status()
+        .map_err(|e| format!("could not run rustfmt: {e}"))?;
+    if status.success() { Ok(()) } else { Err("the template's Rust files need `rustfmt --edition 2024` (see the diff above)".to_owned()) }
 }
 
 /// Run a cargo command over the affected packages, or not at all when none are.
@@ -343,6 +357,68 @@ fn vendor(root: &Path, out: Option<&str>) -> TaskResult {
         return Err(format!("tar exited with {status}"));
     }
     println!("wrote {}", out.display());
+    Ok(())
+}
+
+/// `cargo xtask template-check`: a copy of `template/` in `target/template-check`, synced from this
+/// checkout and depending on it by path instead of by release tag, must build and pass its own
+/// lint-roots, layers and sync checks. The scheduled CI run does this, so the template never rots
+/// between releases.
+fn template_check(root: &Path) -> TaskResult {
+    let dir = root.join("target").join("template-check");
+    let _ = std::fs::remove_dir_all(&dir);
+    copy_dir(&root.join("template"), &dir, 0)?;
+    sync::write(root, &dir)?;
+    let manifest_path = dir.join("Cargo.toml");
+    let manifest = std::fs::read_to_string(&manifest_path).map_err(|e| format!("template Cargo.toml: {e}"))?;
+    let mut out = String::new();
+    for line in manifest.lines() {
+        match (line.split_once(" = {"), line.contains(link::CORE_GIT)) {
+            (Some((name, _)), true) => {
+                let path = root.join("crates").join(name.trim()).to_string_lossy().replace('\\', "/");
+                out.push_str(&format!("{} = {{ path = \"{path}\" }}\n", name.trim()));
+            }
+            _ => {
+                out.push_str(line);
+                out.push('\n');
+            }
+        }
+    }
+    std::fs::write(&manifest_path, out).map_err(|e| format!("template Cargo.toml: {e}"))?;
+    std::fs::copy(root.join("Cargo.lock"), dir.join("Cargo.lock")).map_err(|e| format!("Cargo.lock: {e}"))?;
+    let target = root.join("target").to_string_lossy().into_owned();
+    let run = |args: &[&str]| -> TaskResult {
+        let status = Command::new(util::cargo_bin())
+            .args(args)
+            .current_dir(&dir)
+            .env("CARGO_TARGET_DIR", &target)
+            .status()
+            .map_err(|e| format!("could not run cargo: {e}"))?;
+        if status.success() { Ok(()) } else { Err(format!("template: `cargo {}` exited with {status}", args.join(" "))) }
+    };
+    run(&["fmt", "--all", "--", "--check"])?;
+    run(&["clippy", "--workspace", "--all-targets", "--", "-D", "warnings"])?;
+    run(&["run", "--quiet", "-p", "xtask", "--", "lint-roots"])?;
+    run(&["run", "--quiet", "-p", "xtask", "--", "layers"])?;
+    run(&["run", "--quiet", "-p", "xtask", "--", "sync", "--check"])?;
+    run(&["test", "--workspace"])?;
+    println!("ok: the app template builds against this checkout and passes its own checks");
+    Ok(())
+}
+
+fn copy_dir(from: &Path, to: &Path, depth: usize) -> TaskResult {
+    if depth > 16 {
+        return Err(format!("{} is nested too deeply", from.display()));
+    }
+    std::fs::create_dir_all(to).map_err(|e| format!("{}: {e}", to.display()))?;
+    for entry in std::fs::read_dir(from).map_err(|e| format!("{}: {e}", from.display()))?.flatten() {
+        let (src, dst) = (entry.path(), to.join(entry.file_name()));
+        if src.is_dir() {
+            copy_dir(&src, &dst, depth + 1)?;
+        } else {
+            std::fs::copy(&src, &dst).map_err(|e| format!("{}: {e}", src.display()))?;
+        }
+    }
     Ok(())
 }
 
