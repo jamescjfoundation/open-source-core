@@ -5,6 +5,10 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 ## Unreleased
 
+Nothing yet.
+
+## 0.1.1 (2026-11-24)
+
 ### Added
 
 - `jcj-output`: `read` (`read_pages`, `ReadLimits`, `PdfPage`, `PdfGlyph`, `GlyphMode`,
@@ -25,7 +29,8 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 ### What apps must do
 
-- Run `cargo xtask sync` to take the new patch block.
+- Move every `jcj-` dependency to `tag = "v0.1.1"`, then run `cargo xtask sync` to take the new
+  patch block.
 
 ## 0.1.0 (2026-11-24)
 
