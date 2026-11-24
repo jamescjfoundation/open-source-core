@@ -12,3 +12,14 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+jcj-theme = { workspace = true }
+jcj-upstream = { workspace = true, features = ["shell"] }
+egui = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
+image = { workspace = true }
+
+[dev-dependencies]
+egui_kittest = { workspace = true }
+serde_json = { workspace = true }

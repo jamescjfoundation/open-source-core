@@ -81,6 +81,8 @@ sha2 = "0.11"
 proptest = "1"
 # XML well-formedness checks in tests (as WordCraft pins it).
 quick-xml = "0.41"
+# PNG files of the interface drawn offscreen (jcj-shell snapshots).
+image = { version = "0.25", default-features = false, features = ["png"] }
 
 # Interface: egui 0.37 on storytold's fork, as WordCraft v0.18.1 uses it (patched below).
 egui = { version = "0.37", default-features = false, features = ["default_fonts"] }
