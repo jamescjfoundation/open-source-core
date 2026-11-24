@@ -41,6 +41,7 @@ mod sidebar;
 pub mod snapshot;
 pub mod split;
 pub mod start;
+pub mod tree;
 pub mod updates;
 pub mod workspace;
 pub mod writing;

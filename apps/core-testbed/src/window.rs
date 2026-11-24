@@ -47,6 +47,8 @@ pub struct Testbed {
     split_state: jcj_shell::split::SplitState,
     /// Words written this session, toward a session target (the core's writing statistics).
     pub writing: jcj_shell::writing::Writing,
+    /// The headings panel's tree state (the core's tree widget).
+    pub headings: jcj_shell::tree::TreeState<usize>,
 }
 
 impl Testbed {
@@ -64,6 +66,7 @@ impl Testbed {
             split: jcj_shell::split::Split::None,
             split_state: jcj_shell::split::SplitState::default(),
             writing: jcj_shell::writing::Writing::new(0).with_target(Some(500)),
+            headings: jcj_shell::tree::TreeState::default(),
             page: None,
             log: Vec::new(),
         }
@@ -317,7 +320,11 @@ impl App for Testbed {
     }
 
     fn panels(&self) -> Vec<PanelSpec> {
-        vec![PanelSpec::new("board", "Board", "outline", Side::Left), PanelSpec::new("log", "Log", "draft", Side::Bottom)]
+        vec![
+            PanelSpec::new("board", "Board", "outline", Side::Left),
+            PanelSpec::new("headings", "Headings", "outline", Side::Right),
+            PanelSpec::new("log", "Log", "draft", Side::Bottom),
+        ]
     }
 
     fn panel_ui(&mut self, panel: &str, ui: &mut egui::Ui, _shell: &mut Shell) {
@@ -328,6 +335,21 @@ impl App for Testbed {
                 for e in &events {
                     if self.board.apply(e, &mut self.selection) {
                         self.revision += 1;
+                    }
+                }
+            }
+            "headings" => {
+                // The document's headings as a tree (jcj_shell::tree); a click logs the heading.
+                let rows: Vec<jcj_shell::tree::TreeRow<usize>> = jcj_doc::walk::body_paragraphs(&self.session.doc)
+                    .into_iter()
+                    .enumerate()
+                    .filter(|(_, (_, p))| p.props.style.as_deref().is_some_and(|s| s.starts_with("Heading")))
+                    .map(|(i, (_, p))| jcj_shell::tree::TreeRow::new(i, 0, jcj_doc::plain_text(p)))
+                    .collect();
+                for e in jcj_shell::tree::tree(ui, "testbed-headings", &mut self.headings, &rows) {
+                    if let jcj_shell::tree::TreeEvent::Select(i) = e {
+                        self.headings.selected = Some(i);
+                        self.log.push(format!("heading {i} selected"));
                     }
                 }
             }
