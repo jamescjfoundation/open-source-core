@@ -21,7 +21,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.5"
+version = "0.1.6"
 edition = "2024"
 # The minimum supported Rust version: WordCraft's (v0.18.1). The exact build toolchain is
 # rust-toolchain.toml.

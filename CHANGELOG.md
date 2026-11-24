@@ -7,6 +7,22 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 Nothing yet.
 
+## 0.1.6 (2026-11-24)
+
+### Fixed
+
+- Shared xtask (`template/xtask/src/sync.rs`): `cargo xtask sync` and `sync --check` locate the
+  core release the app's own workspace members depend on directly (the newest, should they name
+  several), not the first `jcj-doc` in the graph. An app that depends on another app's crates
+  pinning an older core builds both releases, and sync used to pick the older one (core issue
+  #16). With one core in the graph nothing changes. New `sync::choose_core`, tested in the core's
+  xtask.
+
+### What apps must do
+
+- Nothing. Move every `jcj-` dependency to `tag = "v0.1.6"` when convenient and run
+  `cargo xtask sync` to take the fixed module (the patch block is unchanged).
+
 ## 0.1.5 (2026-11-24)
 
 ### Changed
