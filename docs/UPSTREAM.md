@@ -57,7 +57,7 @@ None.
 | Issue | Effect on us | Tracking |
 | --- | --- | --- |
 | `zip` 3 has advisories RUSTSEC-2026-0367, -0368, -0369, -0429, -0545, -0548 | All are in `ZipArchive::extract`, `ZipStreamReader` or AES entries. WordCraft reads entries by name into memory; the `aes` feature is off; the core's own zip code never extracts or streams | Ignored in `deny.toml` with reasons; leaves when WordCraft moves to zip 9 |
-| `chrono` unmaintained (RUSTSEC-2026-0543), `proc-macro-error` unmaintained (RUSTSEC-2024-0370) | Notices only | Ignored in `deny.toml`; upstream's to replace |
+| `chrono` unmaintained (RUSTSEC-2026-0543), `proc-macro-error` unmaintained (RUSTSEC-2024-0370), `zbus_names`/`zvariant`/`zvariant_derive` merged into zbus 6 (RUSTSEC-2026-0370/0371/0372, through eframe's Linux accessibility) | Notices only | Ignored in `deny.toml`; upstream's to replace |
 | No EPUB, RTF, DOCX or MCP-server crates in craft-libs at these commits | The plan named `craft-epub`, `craft-rtf`, `craft-docx`, `craft-mcp-server`; at v0.18.1 WordCraft carries its own `wordcraft-docx`, `wordcraft-formats` and `wordcraft-mcp`, and there is no EPUB code | `jcj-interchange` wraps WordCraft's crates and has its own EPUB 3 writer (decision 0008) |
 
 ## The two-week train

@@ -1,0 +1,56 @@
+# The two-week upstream train's trigger (decision 0004, docs/UPSTREAM.md). Every other Monday it
+# compares the pinned WordCraft release with the newest one and, when there is a newer one, opens
+# an issue with the train's checklist. The train itself (moving pins, rebuilding the fork's `jcj`
+# branch, the contract tests) is done by a person or an agent in pull requests a person merges.
+name: Upstream train
+
+on:
+  schedule:
+    - cron: "23 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Every other week
+        id: week
+        if: github.event_name == 'schedule'
+        run: |
+          if [ $(( $(date +%V) % 2 )) -ne 0 ]; then echo "skip=true" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.week.outputs.skip != 'true'
+        with:
+          persist-credentials: false
+      - name: Toolchain
+        if: steps.week.outputs.skip != 'true'
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Compare releases
+        if: steps.week.outputs.skip != 'true'
+        id: status
+        run: cargo xtask upstream-status | tee -a "$GITHUB_OUTPUT"
+      - name: Open the train issue
+        if: steps.status.outputs.newer != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEWER: ${{ steps.status.outputs.newer }}
+          PINNED: ${{ steps.status.outputs.pinned }}
+        run: |
+          title="Upstream train: WordCraft $NEWER (pinned $PINNED)"
+          if gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$title in:title" --json number --jq 'length' | grep -qv '^0$'; then
+            echo "already open"; exit 0
+          fi
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "WordCraft $NEWER is out; the core pins $PINNED.
+
+          The train (docs/UPSTREAM.md, decision 0004):
+
+          - [ ] Rebuild the fork's \`jcj\` branch on $NEWER; drop patches upstream merged; tag the old branch \`jcj-<date>\`.
+          - [ ] Move the pins (Cargo.toml and template/Cargo.toml patch block, docs/UPSTREAM.md, jcj-upstream's constants), taking the craft-libs commits $NEWER pins.
+          - [ ] \`cargo xtask ci\`, \`cargo xtask deny\`, \`cargo xtask template-check\`; the contract tests decide.
+          - [ ] Record follow / hold / own for each source in docs/UPSTREAM.md.
+          - [ ] With a person's approval: tag a core release and open a pull request in each app."

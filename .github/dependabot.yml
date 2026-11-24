@@ -25,3 +25,9 @@ updates:
       - dependency-name: "ecolor"
       - dependency-name: "winit"
       - dependency-name: "zip"
+      # Shared with WordCraft at the versions it pins; they move with the train.
+      - dependency-name: "quick-xml"
+      - dependency-name: "image"
+      - dependency-name: "serde*"
+      - dependency-name: "chrono"
+      - dependency-name: "sha2"

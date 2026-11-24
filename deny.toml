@@ -26,6 +26,11 @@ ignore = [
     { id = "RUSTSEC-2026-0369", reason = "zip extract()/ZipStreamReader only; never called (docs/UPSTREAM.md)" },
     { id = "RUSTSEC-2026-0429", reason = "zip extract() only; never called (docs/UPSTREAM.md)" },
     { id = "RUSTSEC-2026-0545", reason = "zip AES entries; the aes feature is not built" },
+    # zbus_names, zvariant, zvariant_derive: merged into zbus 6 (notices only, no vulnerability).
+    # They come with eframe's Linux accessibility (accesskit_unix), at the egui WordCraft pins.
+    { id = "RUSTSEC-2026-0370", reason = "zbus 5 crate merged into zbus 6; arrives with egui 0.37's accesskit_unix" },
+    { id = "RUSTSEC-2026-0371", reason = "zbus 5 crate merged into zbus 6; arrives with egui 0.37's accesskit_unix" },
+    { id = "RUSTSEC-2026-0372", reason = "zbus 5 crate merged into zbus 6; arrives with egui 0.37's accesskit_unix" },
     { id = "RUSTSEC-2026-0548", reason = "zip ZipStreamReader only; never called (docs/UPSTREAM.md)" },
 ]
 

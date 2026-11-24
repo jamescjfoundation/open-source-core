@@ -61,6 +61,40 @@ pub fn problems(manifest: &str, lock: &str, upstream_md: &str) -> Vec<String> {
     failures
 }
 
+/// The newest `vX.Y.Z` among `ls-remote --tags` lines.
+pub fn newest_release(ls_remote: &str) -> Option<(u32, u32, u32)> {
+    ls_remote
+        .lines()
+        .filter_map(|l| l.split("refs/tags/").nth(1))
+        .filter(|t| !t.ends_with("^{}"))
+        .filter_map(|t| {
+            let mut parts = t.strip_prefix('v')?.split('.').map(|p| p.parse::<u32>().ok());
+            Some((parts.next()??, parts.next()??, parts.next()??))
+        })
+        .max()
+}
+
+/// The WordCraft release tag the workspace pins.
+pub fn pinned_release(manifest: &str) -> Option<String> {
+    git_pins(manifest).into_iter().find(|(g, _)| g.ends_with("storytold/wordcraft")).map(|(_, tag)| tag)
+}
+
+/// `cargo xtask upstream-status`: the pinned WordCraft release and the newest one upstream. Prints
+/// `newer=<tag>` when a train has something to move to (the scheduled workflow reads it).
+pub fn status(root: &Path) -> TaskResult {
+    let manifest = std::fs::read_to_string(root.join("Cargo.toml")).map_err(|e| format!("Cargo.toml: {e}"))?;
+    let pinned = pinned_release(&manifest).ok_or("no WordCraft release tag in Cargo.toml")?;
+    let out = crate::util::git_output(root, &["ls-remote", "--tags", "https://github.com/storytold/wordcraft"])?;
+    let (a, b, c) = newest_release(&out).ok_or("storytold/wordcraft has no release tags")?;
+    let newest = format!("v{a}.{b}.{c}");
+    println!("pinned={pinned}");
+    println!("newest={newest}");
+    if newest != pinned && newest_release(&format!("x refs/tags/{pinned}")) < Some((a, b, c)) {
+        println!("newer={newest}");
+    }
+    Ok(())
+}
+
 pub fn task(root: &Path) -> TaskResult {
     let read = |p: &str| std::fs::read_to_string(root.join(p)).map_err(|e| format!("cannot read {p}: {e}"));
     let failures = problems(&read("Cargo.toml")?, &read("Cargo.lock")?, &read("docs/UPSTREAM.md")?);
@@ -76,6 +110,13 @@ a = { git = "https://github.com/storytold/wordcraft", tag = "v1.0.0", version = 
 # b = { git = "https://example.invalid/x", rev = "ignored" }
 c = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "abc123" }
 "#;
+
+    #[test]
+    fn finds_the_newest_release() {
+        let out = "a refs/tags/v0.9.0\nb refs/tags/v0.18.1\nc refs/tags/v0.18.1^{}\nd refs/tags/v0.2.10\ne refs/tags/nightly\n";
+        assert_eq!(newest_release(out), Some((0, 18, 1)));
+        assert_eq!(pinned_release(MANIFEST).as_deref(), Some("v1.0.0"));
+    }
 
     #[test]
     fn reads_pins() {

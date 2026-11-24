@@ -6,6 +6,7 @@ Decision 0003. GitHub-hosted runners only; built so nobody waits on CI.
 | --- | --- | --- |
 | `ci.yml` | Every push to `main` and pull request (not documentation-only changes) | Three jobs in parallel: **checks** (fmt, crate roots, layers, pins, template, privacy of every file and commit identity, licenses; no product build), **deny** (cargo-deny), **build** (clippy and tests for the packages changed since the last green commit on `main`, and their dependents). A newer push cancels an older run; nothing is skipped, because the base is the last *green* commit. |
 | `nightly.yml` | Daily, on demand, and before a release | The full gate on Linux, macOS and Windows; the minimum Rust version; cargo-deny with today's advisories; the app template built against this checkout. |
+| `upstream-train.yml` | Every other Monday | Opens an issue with the train checklist when WordCraft has a newer release than the pin (`cargo xtask upstream-status`). |
 | `release.yml` | Pushing a `v*` tag (a person's decision) | The nightly run, then a GitHub release with the changelog section, vendored sources, third-party licenses and checksums. |
 
 Why it rarely makes anyone wait:

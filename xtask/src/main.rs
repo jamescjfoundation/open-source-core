@@ -87,6 +87,7 @@ fn main() -> ExitCode {
         "vendor" => vendor(&root, rest.first().map(String::as_str)),
         "install-hooks" => install_hooks(&root),
         "template-check" => template_check(&root),
+        "upstream-status" => pins::status(&root),
         "third-party-licenses" => licenses::task(&root, SHIPPED, "open-source-core's test app", rest.first().map(String::as_str)),
         "privacy" => privacy::task(&root, rest),
         "help" | "--help" | "-h" => {
@@ -122,6 +123,7 @@ fn print_help() {
     println!("  deny                      cargo-deny: licenses, advisories, sources");
     println!("  sync <app dir> [--check]  copy (or compare) shared settings and the patch block into an app");
     println!("  vendor [out file]         archive the vendored sources of every dependency (release asset)");
+    println!("  upstream-status           the pinned WordCraft release and the newest upstream (the train's trigger)");
     println!("  template-check            build the app template against this checkout, and run its own checks");
     println!("  install-hooks             use the repository's git hooks (pre-commit: fmt and privacy; pre-push: ci --changed)");
     println!("  third-party-licenses [file]  write the dependency license texts");
