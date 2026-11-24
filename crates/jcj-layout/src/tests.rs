@@ -175,3 +175,47 @@ fn page_break_before_starts_a_page() {
     assert!(matches!(p.pages[1].first(), Some(Piece::Source { part, .. }) if part.block == 3));
     assert!(p.matches_plan);
 }
+
+#[test]
+fn a_section_can_start_on_an_odd_page_and_restart_its_numbers() {
+    use jcj_doc::section::{NumFormat, SectionStart};
+    // "Odd page" is by page number, as in word processors: a section starting on an odd page
+    // after page 1 gets a blank page 2 before it; one that restarts its numbers at 1 needs none.
+    let mut paras: Vec<Paragraph> = vec![para("Front"), para("Chapter one"), para("Chapter two")];
+    let front = jcj_doc::SectionProps { page_num_format: NumFormat::LowerRoman, ..jcj_doc::SectionProps::default() };
+    let one = jcj_doc::SectionProps { start: SectionStart::OddPage, ..jcj_doc::SectionProps::default() };
+    paras[0].section = Some(Box::new(front));
+    paras[1].section = Some(Box::new(one));
+    let mut d = doc_of(paras);
+    d.last_section = jcj_doc::SectionProps { start: SectionStart::OddPage, page_num_start: Some(1), ..jcj_doc::SectionProps::default() };
+    let l = print_layout(&d, &mut LayoutCache::new());
+    let boxes = page_boxes(&l);
+    let summary: Vec<(u32, usize)> = boxes.iter().map(|b| (b.number, b.section)).collect();
+    assert_eq!(summary, vec![(1, 0), (2, 0), (3, 1), (1, 2)], "front, a blank page, chapter one, chapter two renumbered");
+    let pieces = pages::body_pieces(&l);
+    assert!(pieces[1].is_empty(), "the blank page carries no text");
+    assert_eq!(pieces[2][0].block, 1);
+    assert_eq!(pieces[3][0].block, 2);
+}
+
+#[test]
+fn a_footnote_is_laid_out_on_the_page_of_its_reference() {
+    use jcj_doc::para::{InlineObject, NoteKind};
+    let mut paras: Vec<Paragraph> = (0..80).map(|i| para(&format!("Line {i}"))).collect();
+    let mut d = doc_of(Vec::new());
+    let note = d.add_part(jcj_doc::PartKind::Footnote, vec![para_block(para("The note's text."))]);
+    let at = paras[60].text.len();
+    paras[60].insert_object(at, InlineObject::NoteRef { kind: NoteKind::Footnote, id: note, custom: String::new() }, &CharProps::default()).unwrap();
+    d.body = paras.into_iter().map(para_block).collect();
+    let l = print_layout(&d, &mut LayoutCache::new());
+    let pieces = pages::body_pieces(&l);
+    let page = pieces.iter().position(|p| p.iter().any(|piece| piece.block == 60)).unwrap();
+    let notes: Vec<usize> = l
+        .pages
+        .iter()
+        .enumerate()
+        .filter(|(_, p)| p.items.iter().any(|it| matches!(it, crate::Placed::Lines { story: StoryRef::Part(id), .. } if *id == note)))
+        .map(|(i, _)| i)
+        .collect();
+    assert_eq!(notes, vec![page], "the note sits at the foot of the reference's page");
+}

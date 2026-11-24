@@ -39,9 +39,18 @@ pub mod props {
     };
 }
 
+/// Section settings: how a section starts (next page, odd or even page), its page numbers, its
+/// header and footer stories, columns and note settings. [`SectionProps`] holds them.
+pub mod section {
+    pub use jcj_upstream::doc::section::{
+        ChapterSep, Columns, DocGrid, DocGridType, HeaderSet, LineNumberRestart, LineNumbering, NoteOptions, NotePos, NoteProps, NoteRestart,
+        NumFormat, PageVAlign, SectionStart,
+    };
+}
+
 /// Inline objects and floating shapes inside paragraphs.
 pub mod para {
-    pub use jcj_upstream::doc::para::{Anchor, Float, InlineObject, OBJ, Paragraph, Run, ShapeKind, Wrap};
+    pub use jcj_upstream::doc::para::{Anchor, Float, InlineObject, NoteKind, OBJ, Paragraph, Run, ShapeKind, Wrap};
 }
 
 /// Shape fills.

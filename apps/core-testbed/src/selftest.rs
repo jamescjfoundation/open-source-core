@@ -104,6 +104,27 @@ pub fn run() -> Result<Vec<Step>, String> {
     check(!marks.to_string().contains("Start"), "undo removes the bookmark")?;
     step("features", format!("find.all: {hits} matches; bookmark and note added and undone"));
 
+    // jcj-doc's section settings: a second section starting on an odd page, numbered in roman.
+    let mut sectioned = doc.clone();
+    sectioned.last_section = jcj_doc::SectionProps {
+        start: jcj_doc::section::SectionStart::OddPage,
+        page_num_format: jcj_doc::section::NumFormat::LowerRoman,
+        ..jcj_doc::SectionProps::default()
+    };
+    let mut first = jcj_doc::Paragraph::with_text("Before the section.", CharProps::default());
+    first.section = Some(Box::new(jcj_doc::SectionProps::default()));
+    sectioned.body.insert(0, para_block(first));
+    let sectioned_pages = jcj_layout::page_count(&jcj_layout::print_layout(&sectioned, &mut jcj_layout::LayoutCache::new()));
+    check(sectioned_pages == 3, "a section starting on an odd page leaves page 2 blank")?;
+    let note = sectioned.add_part(jcj_doc::PartKind::Footnote, vec![para_block(Paragraph::with_text("A footnote.", CharProps::default()))]);
+    let reference = jcj_doc::para::InlineObject::NoteRef { kind: jcj_doc::para::NoteKind::Footnote, id: note, custom: String::new() };
+    if let Some(jcj_doc::Block::Para(p)) = sectioned.body.first_mut().map(std::sync::Arc::make_mut) {
+        let at = p.text.len();
+        p.insert_object(at, reference, &CharProps::default()).map_err(|e| format!("note reference: {e:?}"))?;
+    }
+    check(jcj_layout::page_count(&jcj_layout::print_layout(&sectioned, &mut jcj_layout::LayoutCache::new())) == 3, "a footnote keeps its page")?;
+    step("sections", format!("{sectioned_pages} pages: a section on an odd page, numbered in roman, with a footnote"));
+
     // jcj-layout: pages.
     let mut cache = jcj_layout::LayoutCache::new();
     let layout = jcj_layout::print_layout(&doc, &mut cache);
@@ -231,6 +252,7 @@ mod tests {
                 "doc",
                 "engine",
                 "features",
+                "sections",
                 "layout",
                 "output",
                 "interchange",
