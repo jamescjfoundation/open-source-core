@@ -12,3 +12,11 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+jcj-theme = { workspace = true }
+egui = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+egui_kittest = { workspace = true }
