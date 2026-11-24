@@ -131,17 +131,17 @@ Script's native format stores paragraph and run fields as attributes and text ma
 | 0007 MCP trim | Replaced by core 0007 |
 | 0008 App data | Replaced by core 0006 (extension data) |
 | 0009 Element model, 0010 Typing rules | Stay in Script |
-| 0011 The first editor | General parts (recovery, focus, page view) to core 0010; element editing stays |
+| 0011 The first editor | General parts (recovery, focus, page view) to core 0014; element editing stays |
 | 0012 Pagination | Stays in Script |
 | 0013 PDF export and printing | Core 0007 (output); screenplay PDF rules stay |
 | 0014 Spelling data | Core 0007 (proofing); screenplay skipping rules stay |
 | 0015 Autocomplete | Stays |
-| 0016 Views, theme, writing modes | Theme to core 0010; screenplay views stay |
+| 0016 Views, theme, writing modes | Theme to core 0014; screenplay views stay |
 | 0017 Native format | Container to core 0009; `.wss` contents stay |
 | 0018 Fountain, 0019 Import rules | Stay |
-| 0020 Saving, auto-save, backups, preferences | Core 0009 and 0010 |
+| 0020 Saving, auto-save, backups, preferences | Core 0009 (files, auto-save) and 0014 (preferences) |
 | 0021 Title page and headers | Headers and footers to `jcj-features`; title page stays |
-| 0022 Scenes and tables | Index cards to core 0010 (`jcj-board`); scenes stay |
+| 0022 Scenes and tables | Index cards to core 0014 (`jcj-board`); scenes stay |
 | 0023 Notes, 0024 Revisions, 0026 Page locking | `jcj-features` (record in core 0010); screenplay defaults stay |
 | 0025 Scene numbers, 0027 Reports and revised pages | Stay |
 | 0028 Outlining | Lanes and board to `jcj-board`; outline elements stay |
@@ -150,11 +150,11 @@ Script's native format stores paragraph and run fields as attributes and text ma
 | 0032 Macros and styles | Stays |
 | 0033 Characters and reports, 0034 Planning | Stay (boards: `jcj-board`) |
 | 0035 Production additions | Watermark, locks, tracking, comparison to `jcj-features`; dual dialogue stays |
-| 0036 Workspace | Core 0010 (tabs, split, zoom, keys); statistics and sprints stay until a second app wants them |
-| 0037 Ribbon and panels | Core 0010 |
-| 0038 Releases and updates | Core 0010 (update window) and 0011 (core releases); each app keeps its release identity |
+| 0036 Workspace | Core 0014 (keys, preferences); tabs, split, statistics and sprints stay until a second app wants them |
+| 0037 Ribbon and panels | Core 0014 |
+| 0038 Releases and updates | Core 0014 (update window) and 0011 (core releases); each app keeps its release identity |
 | 0039 A fork of WordCraft | **Replaced** by core 0004 |
 | 0040 Supply chain | Core 0001 and 0003 |
 | 0041 Our names for panel and view | Stays (names are the app's) |
 | 0042 Scope and asking first | Stays; core 0013 covers the core |
-| 0043 Key tips and commands | Core 0010 (every control runs a command; key tips) |
+| 0043 Key tips and commands | Core 0014 (every control runs a command; key tips) |

@@ -13,10 +13,15 @@ from WordCraft keeps WordCraft's credit:
 
 | Path | What it is | Source | License |
 | --- | --- | --- | --- |
-| `crates/jcj-shell/src/ribbon_fit.rs` (if present) | Ribbon groups that shrink to fit | WordCraft `crates/ui-egui`, via Wordsmith Script (decision 0037 there) | MIT OR Apache-2.0 |
-| `crates/jcj-shell/src/icons.rs` (if present) | The icon helper and general icons drawn in code | WordCraft `crates/ui-egui`, via Wordsmith Script | MIT OR Apache-2.0 |
+| `crates/jcj-shell/src/ribbon_fit.rs` | Ribbon groups that shrink to fit | WordCraft `crates/ui-egui`, via Wordsmith Script (decision 0037 there) | MIT OR Apache-2.0 |
+| `crates/jcj-shell/src/icons.rs` | The icon helper and general icons drawn in code | WordCraft `crates/ui-egui`, via Wordsmith Script | MIT OR Apache-2.0 |
 
 ## Assets
 
-None yet. Fonts the shell shows come from WordCraft's bundled set (through
-`jcj-layout`) or from the app.
+The repository holds no font, image or data files of other projects. The
+interface fonts the core uses by default (Inter, JetBrains Mono, SIL Open Font
+License 1.1) are WordCraft's bundled fonts, compiled in from the WordCraft
+dependency (`jcj_layout::fonts::bundled_faces`); their license texts are in
+WordCraft's `assets/fonts/`, and an app shipping them carries those texts with
+its third-party licenses. egui's own default fonts are not built in (decision
+0001). Icons are drawn in code.
