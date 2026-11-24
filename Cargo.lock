@@ -1626,6 +1626,7 @@ name = "jcj-engine"
 version = "0.1.0"
 dependencies = [
  "jcj-doc",
+ "jcj-proof",
  "jcj-upstream",
  "serde",
  "serde_json",
