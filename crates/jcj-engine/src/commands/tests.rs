@@ -381,3 +381,13 @@ fn an_app_adds_its_own_spelling_rules() {
     assert!(misspellings_with(&s.doc, &opts, &skip_short, &known).is_empty());
     assert_eq!(misspellings_with(&s.doc, &opts, &|_| false, &known).len(), 1);
 }
+
+#[test]
+fn the_engines_proofing_and_these_commands_share_the_dictionaries() {
+    // A made-up word, so other tests in the process are not affected.
+    let mut s = doc("A wibbleton here.");
+    let count = |s: &mut Session| s.run("spelling.check", &json!({})).unwrap()["misspellings"].as_array().map(Vec::len);
+    assert_eq!(count(&mut s), Some(1));
+    s.run("review.ignoreAll", &json!({"word": "wibbleton"})).unwrap();
+    assert_eq!(count(&mut s), Some(0));
+}

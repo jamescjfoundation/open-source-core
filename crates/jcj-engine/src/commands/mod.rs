@@ -27,7 +27,8 @@
 //! # Earlier ids and where they are now
 //!
 //! Commands apps carried before the core, by their old ids. "Engine" means the upstream command
-//! already does it; use its id. Where the old id took other parameters, they are noted.
+//! already does it; use its id. Where the old id took other parameters, they are noted. Decision
+//! 0007 (`docs/decisions/0007-engine-agents-output.md`) has the same table.
 //!
 //! | Earlier id | Now | Notes |
 //! | --- | --- | --- |
@@ -45,7 +46,7 @@
 //! | `paragraph.delete` | `edit.deleteParagraph` | |
 //! | `paragraph.next`, `paragraph.previous` | `select.nextParagraph`, `select.previousParagraph` | |
 //! | `goto.page {page}` | Engine `edit.goto {page}` | Page labels other than numbers stay in the app |
-//! | `element.reset` | `format.resetToStyle` | Engine `para.reset` and `format.clear` drop paragraph extension data |
+//! | An app's own Reset to Style | `format.resetToStyle` | Engine `para.reset` and `format.clear` drop paragraph extension data |
 //! | `format.bold`, `format.italic`, `format.underline` | Engine, same ids | Engine takes `{"value"?: bool}` |
 //! | `format.style {style, on?}` | Engine `format.<style> {value?}` | `bold`, `italic`, `underline`, `doubleUnderline`, `wordUnderline`, `strikethrough`, `superscript`, `subscript`, `allCaps`, `smallCaps`; dotted: `format.underline {"style": "dotted"}` |
 //! | `format.plain` | `format.plain` | |
@@ -53,7 +54,7 @@
 //! | `format.color {color}` | Engine `format.color {color}` | |
 //! | `format.lowercase` | Engine `format.changeCase {"mode": "lower"}` | |
 //! | `format.state` | Engine `format.state` | Returns each property, not a list of style names |
-//! | `find.all`, `find.next`, `find.previous` | `find.all`, `find.next`, `find.previous` | `{"query", ...}`; a filter `{"styles": [id]}` replaces the earlier `elements` |
+//! | `find.all`, `find.next`, `find.previous` | `find.all`, `find.next`, `find.previous` | `{"query", ...}`; a filter `{"styles": [id]}` replaces the earlier app-specific one |
 //! | `replace.one`, `replace.all` | `find.replace`, `find.replaceAll` | Casing rules of a paragraph style stay in the app ([`find::replace_all_with`]) |
 //! | `spelling.check` | `spelling.check` | Positions are `{start, end}` positions, not `{block, start, end}` |
 //! | `spelling.suggest {word}` | `spelling.suggest {word}` | |
