@@ -1632,6 +1632,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "jcj-features"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "jcj-doc",
+ "jcj-engine",
+ "jcj-layout",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "jcj-interchange"
 version = "0.1.0"
 dependencies = [
