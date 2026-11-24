@@ -7,6 +7,25 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 Nothing yet.
 
+## 0.1.2 (2026-11-24)
+
+### Added
+
+- `jcj-shell`: `start` (`TemplateSpec`, `chooser`, `start_window`): templates an app lists with
+  the new `App::templates` show on the New page; with the new `ShellOptions::start_window` the
+  shell shows templates, Open and recent files in place of the document while the new
+  `App::has_document` is false. `ids::NEW_FROM_TEMPLATE` (`file.newFromTemplate`). Promoted from
+  Wordsmith Script for Wordsmith Manuscript (core issue #2).
+- `jcj-shell`: `writing` (`Writing`, `History`, `Sprint`, `Day`, `words_per_day`,
+  `progress_bar`): a writing session's net words and target, a sprint timer, words per day,
+  deadlines over writing days. Promoted from Wordsmith Script (core issue #3).
+
+### What apps must do
+
+- Nothing. Move every `jcj-` dependency to `tag = "v0.1.2"` when convenient (the patch block is
+  unchanged). Apps that keep their own start window, templates or writing statistics can move to
+  these in follow-up changes.
+
 ## 0.1.1 (2026-11-24)
 
 ### Added
