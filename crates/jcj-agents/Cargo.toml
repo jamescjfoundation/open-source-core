@@ -12,3 +12,9 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+jcj-upstream = { workspace = true }
+jcj-engine = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+jcj-doc = { workspace = true }

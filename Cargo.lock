@@ -415,6 +415,17 @@ dependencies = [
 [[package]]
 name = "contract-tests"
 version = "0.1.0"
+dependencies = [
+ "jcj-agents",
+ "jcj-doc",
+ "jcj-engine",
+ "jcj-layout",
+ "jcj-output",
+ "jcj-proof",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+]
 
 [[package]]
 name = "core-foundation"
@@ -1590,6 +1601,12 @@ checksum = "3bd1574e617a9a6c1f8f8181bd7e841e1f20e4277607ef28945765188d6284d4"
 [[package]]
 name = "jcj-agents"
 version = "0.1.0"
+dependencies = [
+ "jcj-doc",
+ "jcj-engine",
+ "jcj-upstream",
+ "serde_json",
+]
 
 [[package]]
 name = "jcj-board"
@@ -1607,6 +1624,12 @@ dependencies = [
 [[package]]
 name = "jcj-engine"
 version = "0.1.0"
+dependencies = [
+ "jcj-doc",
+ "jcj-upstream",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "jcj-interchange"
@@ -1624,10 +1647,21 @@ dependencies = [
 [[package]]
 name = "jcj-layout"
 version = "0.1.0"
+dependencies = [
+ "jcj-doc",
+ "jcj-upstream",
+ "log",
+ "serde_json",
+]
 
 [[package]]
 name = "jcj-output"
 version = "0.1.0"
+dependencies = [
+ "jcj-doc",
+ "jcj-layout",
+ "jcj-upstream",
+]
 
 [[package]]
 name = "jcj-project"
@@ -1646,6 +1680,9 @@ dependencies = [
 [[package]]
 name = "jcj-proof"
 version = "0.1.0"
+dependencies = [
+ "jcj-upstream",
+]
 
 [[package]]
 name = "jcj-shell"
