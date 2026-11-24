@@ -1,0 +1,37 @@
+[package]
+name = "jcj-upstream"
+description = "The one place upstream crates (WordCraft, craft-libs) are named; re-exports for the jcj- adapters only"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = []
+# Desktop shell pieces: native dialogs and release checks.
+shell = ["dep:craft-dialogs", "dep:craft-update"]
+# The system print spooler (CUPS, Windows).
+print = ["dep:craft-print"]
+
+[dependencies]
+wordcraft-geom = { workspace = true }
+wordcraft-doc = { workspace = true }
+wordcraft-fonts = { workspace = true }
+wordcraft-layout = { workspace = true }
+wordcraft-render = { workspace = true }
+wordcraft-pdf = { workspace = true }
+wordcraft-engine = { workspace = true }
+wordcraft-mcp = { workspace = true }
+wordcraft-control-key = { workspace = true }
+wordcraft-docx = { workspace = true }
+wordcraft-formats = { workspace = true }
+craft-proof = { workspace = true }
+craft-atomic = { workspace = true }
+craft-dialogs = { workspace = true, optional = true }
+craft-update = { workspace = true, optional = true, features = ["egui"] }
+craft-print = { workspace = true, optional = true }

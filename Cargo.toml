@@ -1,0 +1,154 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/jcj-upstream",
+    "crates/jcj-doc",
+    "crates/jcj-layout",
+    "crates/jcj-engine",
+    "crates/jcj-output",
+    "crates/jcj-interchange",
+    "crates/jcj-proof",
+    "crates/jcj-project",
+    "crates/jcj-theme",
+    "crates/jcj-board",
+    "crates/jcj-shell",
+    "crates/jcj-agents",
+    "apps/core-testbed",
+    "contract-tests",
+    "xtask",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+# The minimum supported Rust version: WordCraft's (v0.18.1). The exact build toolchain is
+# rust-toolchain.toml.
+rust-version = "1.95"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/jamescjfoundation/open-source-core"
+publish = false
+
+[workspace.dependencies]
+# Ours
+jcj-upstream = { path = "crates/jcj-upstream" }
+jcj-doc = { path = "crates/jcj-doc" }
+jcj-layout = { path = "crates/jcj-layout" }
+jcj-engine = { path = "crates/jcj-engine" }
+jcj-output = { path = "crates/jcj-output" }
+jcj-interchange = { path = "crates/jcj-interchange" }
+jcj-proof = { path = "crates/jcj-proof" }
+jcj-project = { path = "crates/jcj-project" }
+jcj-theme = { path = "crates/jcj-theme" }
+jcj-board = { path = "crates/jcj-board" }
+jcj-shell = { path = "crates/jcj-shell" }
+jcj-agents = { path = "crates/jcj-agents" }
+
+# ---------------------------------------------------------------------------------------------
+# Upstream. Only crates/jcj-upstream may use these (`cargo xtask layers`). Pins and patches are
+# recorded in docs/UPSTREAM.md; `cargo xtask pins` checks the two agree.
+#
+# WordCraft is named at storytold's address and release tag. The [patch] block at the end of this
+# file points that address at our fork's `jcj` branch (the tag plus our patches), so the code we
+# build is ours to keep whatever happens upstream.
+# ---------------------------------------------------------------------------------------------
+wordcraft-geom = { git = "https://github.com/storytold/wordcraft", tag = "v0.18.1", version = "=0.18.1" }
+wordcraft-doc = { git = "https://github.com/storytold/wordcraft", tag = "v0.18.1", version = "=0.18.1" }
+wordcraft-fonts = { git = "https://github.com/storytold/wordcraft", tag = "v0.18.1", version = "=0.18.1" }
+wordcraft-layout = { git = "https://github.com/storytold/wordcraft", tag = "v0.18.1", version = "=0.18.1" }
+wordcraft-render = { git = "https://github.com/storytold/wordcraft", tag = "v0.18.1", version = "=0.18.1" }
+wordcraft-pdf = { git = "https://github.com/storytold/wordcraft", tag = "v0.18.1", version = "=0.18.1" }
+wordcraft-engine = { git = "https://github.com/storytold/wordcraft", tag = "v0.18.1", version = "=0.18.1" }
+wordcraft-mcp = { git = "https://github.com/storytold/wordcraft", tag = "v0.18.1", version = "=0.18.1" }
+wordcraft-control-key = { git = "https://github.com/storytold/wordcraft", tag = "v0.18.1", version = "=0.18.1" }
+wordcraft-docx = { git = "https://github.com/storytold/wordcraft", tag = "v0.18.1", version = "=0.18.1" }
+wordcraft-formats = { git = "https://github.com/storytold/wordcraft", tag = "v0.18.1", version = "=0.18.1" }
+# craft-libs: each crate at the commit WordCraft v0.18.1 pins for it (WordCraft pins several
+# craft-libs commits, one per crate group). Crates WordCraft does not use take its newest pin.
+craft-proof = { git = "https://github.com/storytold/craft-libs", rev = "01315d9c92b5b0e69082d35ca56099461a1efd45", version = "=0.1.0" }
+craft-atomic = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf45181db77ba6229716e6624db9eb25b", version = "=0.1.0" }
+craft-dialogs = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf45181db77ba6229716e6624db9eb25b", version = "=0.1.0" }
+craft-update = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf45181db77ba6229716e6624db9eb25b", version = "=0.1.0" }
+craft-print = { git = "https://github.com/storytold/craft-libs", rev = "a3e0b5a9440d18f19422a9dca13516747b7d3181" }
+
+# Foundation (versions as WordCraft pins them)
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+thiserror = "2"
+log = "0.4"
+chrono = { version = "0.4.45", default-features = false, features = ["std"] }
+zip = { version = "3", default-features = false, features = ["deflate"] }
+sha2 = "0.11"
+proptest = "1"
+
+# Interface: egui 0.37 on storytold's fork, as WordCraft v0.18.1 uses it (patched below).
+egui = { version = "0.37", default-features = false, features = ["default_fonts"] }
+eframe = { version = "0.37", default-features = false, features = ["accesskit", "glow", "wayland", "x11"] }
+egui_kittest = "0.37"
+
+# Lint policy shared by every crate, the same as WordCraft's and Script's.
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(coverage)"] }
+
+[workspace.lints.clippy]
+# The six panicking lints (unwrap_used, expect_used, panic, unimplemented, todo, unreachable) are
+# denied by attributes at every product crate root, so integration tests can unwrap.
+# `cargo xtask lint-roots` checks every root carries them.
+cognitive_complexity = "deny"
+wildcard_imports = "deny"
+too_many_arguments = "deny"
+dbg_macro = "warn"
+type_complexity = "allow"
+
+# Dependencies are optimized even in dev builds: layout and PDF tests are slow otherwise.
+[profile.dev.package."*"]
+opt-level = 2
+debug = false
+
+[profile.dev]
+opt-level = 1
+debug = "line-tables-only"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 16
+debug = 0
+
+# ---------------------------------------------------------------------------------------------
+# THE PATCH BLOCK. Cargo honours [patch] only in the top-level project, so every app repository
+# carries an exact copy of the lines between the BEGIN and END markers. `cargo xtask sync` writes
+# it into an app; `cargo xtask sync --check` (in the app's CI) fails if it differs.
+# ---------------------------------------------------------------------------------------------
+# BEGIN jcj patch block
+[patch."https://github.com/storytold/wordcraft"]
+# Our fork's `jcj` branch: WordCraft v0.18.1 plus the patches in docs/UPSTREAM.md.
+wordcraft-geom = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "0e24d51b8e05bbd0652b2b9904d941b12f6a9849" }
+wordcraft-doc = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "0e24d51b8e05bbd0652b2b9904d941b12f6a9849" }
+wordcraft-fonts = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "0e24d51b8e05bbd0652b2b9904d941b12f6a9849" }
+wordcraft-layout = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "0e24d51b8e05bbd0652b2b9904d941b12f6a9849" }
+wordcraft-render = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "0e24d51b8e05bbd0652b2b9904d941b12f6a9849" }
+wordcraft-pdf = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "0e24d51b8e05bbd0652b2b9904d941b12f6a9849" }
+wordcraft-engine = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "0e24d51b8e05bbd0652b2b9904d941b12f6a9849" }
+wordcraft-mcp = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "0e24d51b8e05bbd0652b2b9904d941b12f6a9849" }
+wordcraft-control-key = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "0e24d51b8e05bbd0652b2b9904d941b12f6a9849" }
+wordcraft-docx = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "0e24d51b8e05bbd0652b2b9904d941b12f6a9849" }
+wordcraft-formats = { git = "https://github.com/jamescjfoundation/wordcraft", rev = "0e24d51b8e05bbd0652b2b9904d941b12f6a9849" }
+
+[patch.crates-io]
+# Required by craft-pdf: the backend rejects writers that failed during unwinding (as WordCraft).
+krilla = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf45181db77ba6229716e6624db9eb25b" }
+# egui 0.37 and winit on storytold's forks, at the commits WordCraft v0.18.1 pins.
+ecolor = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+emath = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+epaint = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+epaint_default_fonts = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+egui = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+egui-winit = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+egui-wgpu = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+egui_glow = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+egui_extras = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+egui_kittest = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+eframe = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+winit = { git = "https://github.com/storytold/winit.git", rev = "a517b3846ee8457d84ee4975110bfda6797c44dc" }
+# END jcj patch block

@@ -1,0 +1,17 @@
+[package]
+name = "jcj-doc"
+description = "Document model interface for foundation apps: documents, paragraphs, runs, styles, typed extension data"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+jcj-upstream = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
