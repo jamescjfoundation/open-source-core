@@ -81,7 +81,7 @@ chrono = { version = "0.4.45", default-features = false, features = ["std"] }
 zip = { version = "3", default-features = false, features = ["deflate"] }
 sha2 = "0.11"
 # XML well-formedness checks in tests (as WordCraft pins it).
-quick-xml = "0.41"
+quick-xml = "0.42"
 # PNG files of the interface drawn offscreen (jcj-shell snapshots).
 image = { version = "0.25", default-features = false, features = ["png"] }
 
