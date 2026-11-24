@@ -34,7 +34,8 @@ pub use up::{
 /// Paragraph and character properties, page and border types.
 pub mod props {
     pub use jcj_upstream::doc::props::{
-        Align, Border, BorderStyle, Borders, CharProps, Highlight, LineSpacing, ParaProps, Rgb, TabAlign, TabStop, TextColor, Underline, VertAlign,
+        Align, Border, BorderStyle, Borders, CharProps, Highlight, LineSpacing, ParaProps, Rgb, TabAlign, TabLeader, TabStop, TextColor, Underline,
+        VertAlign,
     };
 }
 
