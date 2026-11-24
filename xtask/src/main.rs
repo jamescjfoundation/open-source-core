@@ -381,7 +381,8 @@ fn vendor(root: &Path, out: Option<&str>) -> TaskResult {
          Rebuild without network: CARGO_HOME=<this folder> cargo build --offline --locked\n",
     )
     .map_err(|e| format!("README.txt: {e}"))?;
-    let out = out.map_or_else(|| dist.join("vendored-sources.tar.gz"), PathBuf::from);
+    // tar runs inside dist/, so a relative path is taken from the workspace root here.
+    let out = out.map_or_else(|| dist.join("vendored-sources.tar.gz"), |o| root.join(o));
     let status =
         Command::new("tar").current_dir(&dist).arg("-czf").arg(&out).arg("cargo-home").status().map_err(|e| format!("could not run tar: {e}"))?;
     if !status.success() {
