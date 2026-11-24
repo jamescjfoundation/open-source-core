@@ -7,6 +7,22 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 Nothing yet.
 
+## 0.1.4 (2026-11-24)
+
+### Added
+
+- `jcj-entries` (new crate, layer 2): entries kept beside documents (a story bible, a cast list):
+  `Entry<Id, B>` generic over the app's id and body types, `Template`, `TemplateField`,
+  `FieldType` (entry types as data), `name_list`, `find_by_name`, `find_mentions` and `mentions`
+  (whole words, matching case when a name starts with a capital), `backlinks` over `Document`s.
+  Promoted from Wordsmith Manuscript's story bible for Wordsmith Script's characters to share
+  (core issue #14, C13). `core-testbed` finds an entry by name in its sample document.
+
+### What apps must do
+
+- Nothing. Move every `jcj-` dependency to `tag = "v0.1.4"` when convenient (the patch block is
+  unchanged). An app that wants entries adds `jcj-entries` at the same tag.
+
 ## 0.1.3 (2026-11-24)
 
 ### Added
