@@ -79,18 +79,47 @@ pub fn write(core: &Path, app: &Path) -> TaskResult {
     Ok(())
 }
 
-/// The core checkout an app builds with: the folder Cargo fetched the pinned `jcj-doc` from.
+/// The core checkout an app builds with: the folder Cargo fetched the pinned `jcj-` crates from.
 pub fn locate_core(app: &Path) -> Result<PathBuf, String> {
     let out = cargo_output(app, &["metadata", "--format-version", "1", "--locked"])?;
-    let meta = json::parse(&out)?;
-    for p in meta.get("packages").map(json::Value::items).unwrap_or_default() {
-        if p.str_of("name") == Some("jcj-doc") {
-            let manifest = PathBuf::from(p.str_of("manifest_path").ok_or("jcj-doc has no manifest_path")?);
-            // <core>/crates/jcj-doc/Cargo.toml
-            return manifest.ancestors().nth(3).map(Path::to_path_buf).ok_or_else(|| "cannot find the core above jcj-doc".to_owned());
+    choose_core(&json::parse(&out)?)
+}
+
+/// The core checkout in `cargo metadata` output. The graph may hold more than one core release
+/// when an app depends on another app's crates that pin an older core; the app's own pin is the
+/// release its workspace members depend on directly (the newest, should they name several).
+pub fn choose_core(meta: &json::Value) -> Result<PathBuf, String> {
+    let members: Vec<&str> =
+        meta.get("workspace_members").map(json::Value::items).unwrap_or_default().iter().filter_map(json::Value::as_str).collect();
+    let mut direct: Vec<&str> = Vec::new();
+    for node in meta.get("resolve").and_then(|r| r.get("nodes")).map(json::Value::items).unwrap_or_default() {
+        if node.str_of("id").is_some_and(|id| members.contains(&id)) {
+            direct.extend(node.get("deps").map(json::Value::items).unwrap_or_default().iter().filter_map(|d| d.str_of("pkg")));
         }
     }
-    Err("this workspace does not depend on open-source-core (no jcj-doc package)".to_owned())
+    let mut best: Option<(Vec<u64>, PathBuf)> = None;
+    for pass_direct_only in [true, false] {
+        for p in meta.get("packages").map(json::Value::items).unwrap_or_default() {
+            let Some(name) = p.str_of("name") else { continue };
+            if !name.starts_with("jcj-") || name == "jcj-upstream" {
+                continue;
+            }
+            if pass_direct_only && !p.str_of("id").is_some_and(|id| direct.contains(&id)) {
+                continue;
+            }
+            let manifest = PathBuf::from(p.str_of("manifest_path").ok_or_else(|| format!("{name} has no manifest_path"))?);
+            // <core>/crates/<name>/Cargo.toml
+            let Some(core) = manifest.ancestors().nth(3).map(Path::to_path_buf) else { continue };
+            let version: Vec<u64> = p.str_of("version").unwrap_or("0").split(['.', '-', '+']).map(|n| n.parse().unwrap_or(0)).collect();
+            if best.as_ref().is_none_or(|(v, _)| version > *v) {
+                best = Some((version, core));
+            }
+        }
+        if best.is_some() {
+            break;
+        }
+    }
+    best.map(|(_, core)| core).ok_or_else(|| "this workspace does not depend on open-source-core (no jcj- package)".to_owned())
 }
 
 /// `cargo xtask sync [--check]` in an app: against the pinned core release.
@@ -103,4 +132,38 @@ pub fn app_task(app: &Path, check: bool) -> TaskResult {
 pub fn core_task(core: &Path, app: &str, check: bool) -> TaskResult {
     let app = PathBuf::from(app);
     if check { report(differences(core, &app)?, "the app's shared settings match this core") } else { write(core, &app) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn meta(packages: &[(&str, &str, &str, &str)], direct: &[&str]) -> json::Value {
+        let pkgs: Vec<String> = packages
+            .iter()
+            .map(|(id, name, version, path)| format!(r#"{{"id":"{id}","name":"{name}","version":"{version}","manifest_path":"{path}"}}"#))
+            .collect();
+        let deps: Vec<String> = direct.iter().map(|d| format!(r#"{{"pkg":"{d}"}}"#)).collect();
+        let text = format!(
+            r#"{{"packages":[{}],"workspace_members":["app"],"resolve":{{"nodes":[{{"id":"app","deps":[{}]}},{{"id":"other","deps":[]}}]}}}}"#,
+            pkgs.join(","),
+            deps.join(",")
+        );
+        json::parse(&text).unwrap()
+    }
+
+    #[test]
+    fn the_apps_own_core_wins_over_an_older_one_in_the_graph() {
+        let packages = [
+            ("old-doc", "jcj-doc", "0.1.4", "/c/old/crates/jcj-doc/Cargo.toml"),
+            ("new-doc", "jcj-doc", "0.1.5", "/c/new/crates/jcj-doc/Cargo.toml"),
+            ("new-shell", "jcj-shell", "0.1.5", "/c/new/crates/jcj-shell/Cargo.toml"),
+        ];
+        assert_eq!(choose_core(&meta(&packages, &["new-shell"])).unwrap(), PathBuf::from("/c/new"));
+        // Only the older core is a direct dependency: it is the app's pin.
+        assert_eq!(choose_core(&meta(&packages, &["old-doc"])).unwrap(), PathBuf::from("/c/old"));
+        // No direct jcj- dependency: the newest in the graph.
+        assert_eq!(choose_core(&meta(&packages, &[])).unwrap(), PathBuf::from("/c/new"));
+        assert!(choose_core(&meta(&[], &[])).is_err());
+    }
 }
