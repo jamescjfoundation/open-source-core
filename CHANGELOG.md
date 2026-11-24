@@ -7,6 +7,23 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 Nothing yet.
 
+## 0.1.7 (2026-11-24)
+
+### Added
+
+- `jcj-doc`: `section` (`SectionStart`, `NumFormat`, `HeaderSet`, `Columns`, `NoteProps`,
+  `NoteOptions`, `NotePos`, `NoteRestart`, `ChapterSep`, `PageVAlign`, `LineNumbering`,
+  `LineNumberRestart`, `DocGrid`, `DocGridType`): the types of `SectionProps`' fields, so apps can
+  start a section on an odd or even page, restart and format page numbers and set header and
+  footer stories. `para::NoteKind`, so apps can add footnote and endnote references (core issue
+  #24). `jcj-layout` tests that an odd-page start is by page number and that a footnote sits at
+  the foot of its reference's page; `core-testbed` lays out both.
+
+### What apps must do
+
+- Nothing. Move every `jcj-` dependency to `tag = "v0.1.7"` when convenient (the patch block is
+  unchanged).
+
 ## 0.1.6 (2026-11-24)
 
 ### Fixed
