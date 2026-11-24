@@ -13,6 +13,8 @@
 //! | [`watermark`] | Diagonal text behind every page; a name on every page | Document `core.watermark` |
 //! | [`header_footer`] | Header and footer bands with fields; app fields | Document `core.header_footer` |
 //! | [`compare`] | Comparing two versions into tracked changes | — |
+//! | [`verify`] | The word-for-word check of an import or export against its source | — |
+//! | [`wordiff`] | Two versions of a text compared paragraph by paragraph, then word by word | — |
 //!
 //! and the pieces they share: [`data`] (settings groups in extension data), [`dates`],
 //! [`marks`] (run marks), [`pages`] (the pages commands see) and [`editing`] (typing that keeps
@@ -51,7 +53,9 @@ pub mod notes;
 pub mod pages;
 pub mod revisions;
 pub mod tracking;
+pub mod verify;
 pub mod watermark;
+pub mod wordiff;
 
 use jcj_engine::CommandSpec;
 

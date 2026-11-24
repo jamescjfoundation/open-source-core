@@ -156,6 +156,9 @@ pub fn run() -> Result<Vec<Step>, String> {
             let back = jcj_interchange::import(format, &bytes).map_err(|e| format!("import {format:?}: {e}"))?;
             let text: String = jcj_doc::walk::body_paragraphs(&back).iter().map(|(_, p)| jcj_doc::plain_text(p)).collect();
             check(text.contains("Second Part"), &format!("{format:?} keeps the text"))?;
+            // Every word comes back, in order (jcj_features::verify).
+            let words = jcj_features::verify::Check::of(&jcj_features::verify::document_words(&doc), &jcj_features::verify::document_words(&back));
+            check(words.passed(), &format!("{format:?} keeps every word: {words}"))?;
         }
         formats.push(format.extension());
     }
@@ -169,7 +172,14 @@ pub fn run() -> Result<Vec<Step>, String> {
     let back = jcj_interchange::import(Format::Rtf, &rtf).map_err(|e| format!("direct RTF import: {e}"))?;
     let indent = jcj_doc::walk::body_paragraphs(&back).get(1).map(|(_, p)| back.styles.resolve_para(&p.props).indent_left);
     check(indent == Some(144.0), "direct RTF keeps a paragraph's indent")?;
-    step("interchange", format!("exported {}; direct RTF keeps indents", formats.join(", ")));
+    // Word by word: one changed word in the edited copy shows as one removed and one added.
+    let mut edited = doc.clone();
+    if let Some(jcj_doc::Block::Para(p)) = edited.body.get_mut(1).map(std::sync::Arc::make_mut) {
+        *p = Paragraph::with_text(&jcj_doc::plain_text(p).replacen("written", "made", 1), CharProps::default());
+    }
+    let diff = jcj_features::wordiff::documents(&doc, &edited);
+    check(diff.removed == 1 && diff.added == 1, "a changed word shows word by word")?;
+    step("interchange", format!("exported {}; direct RTF keeps indents; every word verified; a change shown word by word", formats.join(", ")));
 
     // jcj-proof: spelling and hyphenation.
     let issues = jcj_proof::check("This sentense has a mistake.", Some("en-US"), &jcj_proof::SpellingOptions::default(), false);
