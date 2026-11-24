@@ -1,0 +1,118 @@
+# The full run (decision 0003): every test on Linux, macOS and Windows, the minimum supported
+# Rust version, and cargo-deny with today's advisories. Daily, on demand, and called by the release
+# workflow. Pushes run the faster changed-only ci.yml.
+name: Nightly
+
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  CARGO_NET_RETRY: "10"
+  MSRV: "1.95.0"
+  CARGO_DENY_VERSION: "0.20.2"
+
+jobs:
+  full:
+    name: full gate (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Toolchain
+        shell: bash
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Restore cargo home and target
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: nightly-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: nightly-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}-
+      - name: cargo xtask ci
+        run: cargo xtask ci
+
+  template:
+    name: the app template against this checkout
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Restore cargo home and target
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: template-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: template-${{ hashFiles('rust-toolchain.toml') }}-
+      - name: cargo xtask template-check
+        run: cargo xtask template-check
+
+  msrv:
+    name: build on the minimum Rust version
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Minimum toolchain
+        run: rustup toolchain install "$MSRV" --profile minimal
+      - name: Restore cargo home
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: msrv-${{ env.MSRV }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: msrv-${{ env.MSRV }}-
+      - name: cargo check
+        run: cargo "+$MSRV" check --workspace --all-targets --all-features --locked
+
+  deny:
+    name: cargo-deny with today's advisories
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Cached cargo-deny
+        id: deny-bin
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/bin/cargo-deny
+          key: cargo-deny-${{ env.CARGO_DENY_VERSION }}-${{ hashFiles('rust-toolchain.toml') }}
+      - name: Install cargo-deny
+        if: steps.deny-bin.outputs.cache-hit != 'true'
+        run: cargo install --locked cargo-deny --version "$CARGO_DENY_VERSION"
+      - name: cargo deny check
+        run: cargo deny --locked check

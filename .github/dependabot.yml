@@ -1,0 +1,27 @@
+# Weekly update proposals (decision 0001). Upstream crates are pinned on purpose and move only
+# at the two-week train (docs/UPSTREAM.md), so they are left alone here.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      compatible:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "wordcraft-*"
+      - dependency-name: "craft-*"
+      - dependency-name: "krilla"
+      - dependency-name: "egui*"
+      - dependency-name: "eframe"
+      - dependency-name: "epaint*"
+      - dependency-name: "emath"
+      - dependency-name: "ecolor"
+      - dependency-name: "winit"
+      - dependency-name: "zip"

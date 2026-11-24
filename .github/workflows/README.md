@@ -1,0 +1,22 @@
+# CI
+
+Decision 0003. GitHub-hosted runners only; built so nobody waits on CI.
+
+| Workflow | When | What |
+| --- | --- | --- |
+| `ci.yml` | Every push to `main` and pull request (not documentation-only changes) | Three jobs in parallel: **checks** (fmt, crate roots, layers, pins, template, privacy of every file and commit identity, licenses; no product build), **deny** (cargo-deny), **build** (clippy and tests for the packages changed since the last green commit on `main`, and their dependents). A newer push cancels an older run; nothing is skipped, because the base is the last *green* commit. |
+| `nightly.yml` | Daily, on demand, and before a release | The full gate on Linux, macOS and Windows; the minimum Rust version; cargo-deny with today's advisories; the app template built against this checkout. |
+| `release.yml` | Pushing a `v*` tag (a person's decision) | The nightly run, then a GitHub release with the changelog section, vendored sources, third-party licenses and checksums. |
+
+Why it rarely makes anyone wait:
+
+1. **The same gate runs locally first.** `cargo xtask install-hooks` makes `git push` run
+   `cargo xtask ci --changed` against what the remote has. CI repeats a check that already passed.
+2. **Only what changed is built and tested on pushes**, with a warm cache saved from `main`.
+   Manifests, the lock file or the toolchain changing means everything.
+3. **Cheap checks finish in about a minute**, in parallel with the build, so the common mistakes
+   (format, layers, privacy, licenses) report first.
+4. **The slow, wide checks run on a schedule**, not on every push.
+
+Run any job's work locally: `cargo xtask ci`, `cargo xtask ci --changed --base <ref>`,
+`cargo xtask deny`, `cargo xtask template-check`.

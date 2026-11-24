@@ -1,0 +1,50 @@
+# A core release (decision 0011). Pushing a `v*` tag, which a person does after approval:
+# runs the full gate on every platform, then publishes a GitHub release with the changelog
+# section, the vendored sources of every dependency and the third-party license texts.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    uses: ./.github/workflows/nightly.yml
+
+  publish:
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Version matches the tag
+        run: |
+          version=$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)
+          test "v$version" = "$GITHUB_REF_NAME" || { echo "Cargo.toml says $version, tag is $GITHUB_REF_NAME"; exit 1; }
+      - name: Vendored sources and license texts
+        run: |
+          cargo xtask vendor "dist/open-source-core-$GITHUB_REF_NAME-vendored-sources.tar.gz"
+          cargo xtask third-party-licenses dist/THIRD-PARTY-LICENSES.txt
+          (cd dist && sha256sum ./*.tar.gz THIRD-PARTY-LICENSES.txt > SHA256SUMS.txt)
+      - name: Release notes from CHANGELOG.md
+        run: |
+          awk -v v="${GITHUB_REF_NAME#v}" '
+            $0 ~ "^## " { if (on) exit; if (index($0, v)) { on=1; next } }
+            on { print }' CHANGELOG.md > dist/notes.md
+          test -s dist/notes.md || { echo "CHANGELOG.md has no section for $GITHUB_REF_NAME"; exit 1; }
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "open-source-core $GITHUB_REF_NAME" \
+            --notes-file dist/notes.md \
+            dist/open-source-core-*-vendored-sources.tar.gz dist/THIRD-PARTY-LICENSES.txt dist/SHA256SUMS.txt
