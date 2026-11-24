@@ -854,6 +854,7 @@ dependencies = [
  "ahash",
  "ecolor",
  "emath",
+ "epaint_default_fonts",
  "font-types 0.12.7",
  "harfrust 0.12.0",
  "log",
@@ -869,6 +870,11 @@ dependencies = [
  "unicode-segmentation",
  "vello_cpu",
 ]
+
+[[package]]
+name = "epaint_default_fonts"
+version = "0.37.0"
+source = "git+https://github.com/storytold/egui.git?rev=6d518fc799681571963842f95b55a6b68431b15a#6d518fc799681571963842f95b55a6b68431b15a"
 
 [[package]]
 name = "equivalent"
@@ -1635,6 +1641,12 @@ version = "0.1.0"
 [[package]]
 name = "jcj-theme"
 version = "0.1.0"
+dependencies = [
+ "egui",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
 
 [[package]]
 name = "jcj-upstream"
@@ -4683,11 +4695,6 @@ source = "git+https://github.com/storytold/egui.git?rev=6d518fc799681571963842f9
 
 [[patch.unused]]
 name = "egui_kittest"
-version = "0.37.0"
-source = "git+https://github.com/storytold/egui.git?rev=6d518fc799681571963842f95b55a6b68431b15a#6d518fc799681571963842f95b55a6b68431b15a"
-
-[[patch.unused]]
-name = "epaint_default_fonts"
 version = "0.37.0"
 source = "git+https://github.com/storytold/egui.git?rev=6d518fc799681571963842f95b55a6b68431b15a#6d518fc799681571963842f95b55a6b68431b15a"
 
