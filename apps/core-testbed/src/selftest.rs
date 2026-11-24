@@ -145,7 +145,20 @@ pub fn run() -> Result<Vec<Step>, String> {
         read.iter().flat_map(|p| &p.glyphs).filter(|g| g.mode == jcj_output::GlyphMode::Fill).filter_map(|g| g.text.as_deref()).collect();
     check(text.contains("A Sample Document") && text.contains("Second Part"), "the PDF's text reads back")?;
     let glyphs: usize = read.iter().map(|p| p.glyphs.len()).sum();
-    step("output", format!("PDF {} bytes, {glyphs} glyphs read back; page image {} x {}", pdf.len(), image.width, image.height));
+    // Its facts, as a preflight check reads them: every font embedded, page boxes.
+    let facts = jcj_output::read_facts(&pdf, &jcj_output::ReadLimits::default()).map_err(|e| format!("pdf facts: {e}"))?;
+    check(facts.pages.len() == pages, "the PDF's facts cover every page")?;
+    check(!facts.fonts.is_empty() && facts.unembedded_fonts().is_empty(), "the PDF embeds every font")?;
+    step(
+        "output",
+        format!(
+            "PDF {} bytes, {glyphs} glyphs read back, {} fonts all embedded; page image {} x {}",
+            pdf.len(),
+            facts.fonts.len(),
+            image.width,
+            image.height
+        ),
+    );
 
     // jcj-interchange: every format out, and back in where it can be read.
     let mut formats = Vec::new();

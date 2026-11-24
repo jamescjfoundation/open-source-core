@@ -162,3 +162,97 @@ mod read {
         assert!(!err.to_string().is_empty());
     }
 }
+
+mod facts {
+    use super::doc;
+    use crate::{PdfSettings, ReadError, ReadLimits, export_pdf_with_layout, read_facts};
+
+    /// A PDF written by hand: one page with trim and bleed boxes, a link, a font that is not
+    /// embedded, a 4 by 2 pixel image drawn one inch by half an inch, and two bookmarks, one
+    /// inside the other.
+    fn hand_made() -> Vec<u8> {
+        let objects = [
+            "<< /Type /Catalog /Pages 2 0 R /Outlines 8 0 R >>".to_owned(),
+            "<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_owned(),
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 400] /TrimBox [9 9 291 391] /BleedBox [0 0 300 400] \
+             /Resources << /Font << /F1 4 0 R >> /XObject << /Im1 5 0 R >> >> /Contents 6 0 R /Annots [7 0 R] >>"
+                .to_owned(),
+            "<< /Type /Font /Subtype /Type1 /BaseFont /ABCDEF+Plain >>".to_owned(),
+            "<< /Type /XObject /Subtype /Image /Width 4 /Height 2 /ColorSpace /DeviceGray /BitsPerComponent 8 /Length 8 >>\nstream\nabcdefgh\nendstream"
+                .to_owned(),
+            {
+                let content = "q 72 0 0 36 50 50 cm /Im1 Do Q BT /F1 12 Tf 50 200 Td (Hi) Tj ET";
+                format!("<< /Length {} >>\nstream\n{content}\nendstream", content.len())
+            },
+            "<< /Type /Annot /Subtype /Link /Rect [0 0 10 10] >>".to_owned(),
+            "<< /Type /Outlines /First 9 0 R /Last 9 0 R /Count 2 >>".to_owned(),
+            "<< /Title (One) /Parent 8 0 R /First 10 0 R /Last 10 0 R /Count 1 >>".to_owned(),
+            "<< /Title (Two) /Parent 9 0 R >>".to_owned(),
+        ];
+        let mut out = b"%PDF-1.7\n".to_vec();
+        let mut offsets = Vec::new();
+        for (i, o) in objects.iter().enumerate() {
+            offsets.push(out.len());
+            out.extend_from_slice(format!("{} 0 obj\n{o}\nendobj\n", i + 1).as_bytes());
+        }
+        let xref = out.len();
+        out.extend_from_slice(format!("xref\n0 {}\n0000000000 65535 f \n", objects.len() + 1).as_bytes());
+        for off in offsets {
+            out.extend_from_slice(format!("{off:010} 00000 n \n").as_bytes());
+        }
+        out.extend_from_slice(format!("trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n", objects.len() + 1).as_bytes());
+        out
+    }
+
+    #[test]
+    fn a_hand_made_pdf_gives_its_boxes_link_font_image_and_bookmarks() {
+        let facts = read_facts(&hand_made(), &ReadLimits::default()).unwrap();
+        assert_eq!(facts.pages.len(), 1);
+        let p = &facts.pages[0];
+        assert_eq!((p.media.width(), p.media.height()), (300.0, 400.0));
+        assert_eq!(p.crop, p.media);
+        let trim = p.trim.unwrap();
+        assert_eq!((trim.width(), trim.height()), (282.0, 382.0));
+        assert_eq!(p.bleed.unwrap().margins_around(&trim), [9.0; 4]);
+        assert_eq!(p.rotation, 0);
+        assert_eq!(p.annotations, vec!["Link".to_owned()]);
+        assert_eq!(facts.annotation_count(), 1);
+        assert_eq!(p.images.len(), 1);
+        let im = p.images[0];
+        assert_eq!((im.pixel_width, im.pixel_height), (4, 2));
+        assert!((im.placed_width - 72.0).abs() < 1e-6 && (im.placed_height - 36.0).abs() < 1e-6, "{im:?}");
+        assert!((im.ppi() - 4.0).abs() < 1e-6);
+        assert_eq!(p.fonts, vec!["Plain".to_owned()]);
+        assert_eq!(facts.fonts.len(), 1);
+        assert!(facts.fonts[0].subset && !facts.fonts[0].embedded && facts.fonts[0].kind == "Type1");
+        assert_eq!(facts.unembedded_fonts().len(), 1);
+        assert_eq!(facts.bookmarks, 2);
+    }
+
+    #[test]
+    fn an_exported_pdf_embeds_its_fonts_and_has_no_trim_box() {
+        let d = doc();
+        let bytes = export_pdf_with_layout(&d, &PdfSettings { links: false, ..PdfSettings::deterministic() }).unwrap();
+        let facts = read_facts(&bytes, &ReadLimits::default()).unwrap();
+        assert!(facts.pages.len() >= 2);
+        assert!(!facts.fonts.is_empty());
+        assert!(facts.unembedded_fonts().is_empty(), "{:?}", facts.fonts);
+        for p in &facts.pages {
+            assert!(p.trim.is_none() && p.bleed.is_none() && p.images.is_empty() && p.annotations.is_empty());
+            assert!(p.media.width() > 500.0 && !p.fonts.is_empty());
+        }
+    }
+
+    #[test]
+    fn bad_input_and_limits_are_errors_not_panics() {
+        let limits = ReadLimits::default();
+        assert!(matches!(read_facts(b"", &limits), Err(ReadError::NotPdf(_))));
+        let bytes = hand_made();
+        for n in (0..bytes.len()).step_by(7) {
+            let _ = read_facts(&bytes[..n], &limits);
+        }
+        assert_eq!(read_facts(&bytes, &ReadLimits { max_input_bytes: 10, ..limits }), Err(ReadError::TooLarge(10)));
+        let two = export_pdf_with_layout(&doc(), &PdfSettings::deterministic()).unwrap();
+        assert_eq!(read_facts(&two, &ReadLimits { max_pages: 1, ..limits }), Err(ReadError::TooManyPages(1)));
+    }
+}
