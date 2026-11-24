@@ -91,7 +91,7 @@ fn is_email_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '%' | '+' | '-')
 }
 
-/// Email-shaped words: `local@domain.tld`.
+/// Email-shaped words: `local@domain.tld`. // privacy:allow
 fn emails_in(line: &str) -> Vec<String> {
     let mut out = Vec::new();
     let chars: Vec<char> = line.chars().collect();
@@ -132,7 +132,7 @@ fn home_paths_in(line: &str) -> Vec<String> {
             let start = from + i + prefix.len();
             let name: String = line[start..].chars().take_while(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.' | '<' | '>')).collect();
             from = start;
-            if name.is_empty() || ALLOWED_HOMES.contains(&name.as_str()) {
+            if name.is_empty() || name.starts_with('<') || ALLOWED_HOMES.contains(&name.as_str()) {
                 continue;
             }
             out.push(format!("{}{name}", prefix));
@@ -231,20 +231,20 @@ mod tests {
 
     #[test]
     fn finds_personal_emails_but_not_noreply_ones() {
-        assert_eq!(line_problems("contact: someone@company.co.uk").len(), 1);
+        assert_eq!(line_problems("contact: someone@company.co.uk").len(), 1); // privacy:allow
         assert!(line_problems("123+name@users.noreply.github.com").is_empty());
         assert!(line_problems("Co-Authored-By: Claude <noreply@anthropic.com>").is_empty());
         assert!(line_problems("a@example.com").is_empty());
         assert!(line_problems("git@github.com:org/repo.git").is_empty());
         assert!(line_problems("serde = \"1\" # x@1.2").is_empty());
-        assert!(line_problems(&format!("person@company.com {ALLOW_MARKER}")).is_empty());
+        assert!(line_problems(&format!("person@company.com {ALLOW_MARKER}")).is_empty()); // privacy:allow
     }
 
     #[test]
     fn finds_home_folders() {
-        assert_eq!(line_problems("see /home/alice/project").len(), 1);
+        assert_eq!(line_problems("see /home/alice/project").len(), 1); // privacy:allow
         assert_eq!(line_problems("C:\\Users\\bob\\file").len(), 1);
-        assert_eq!(line_problems("/Users/carol/x").len(), 1);
+        assert_eq!(line_problems("/Users/carol/x").len(), 1); // privacy:allow
         assert!(line_problems("/home/runner/work").is_empty());
         assert!(line_problems("~/project and /usr/home").is_empty());
     }
