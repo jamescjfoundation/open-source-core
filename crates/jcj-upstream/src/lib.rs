@@ -39,6 +39,9 @@ pub use craft_update as update;
 #[cfg(feature = "print")]
 pub use craft_print as print;
 
+#[cfg(feature = "pdf-read")]
+pub use craft_pdf as pdf_read;
+
 /// The WordCraft release the core is built on (our fork's `jcj` branch is this tag plus our
 /// patches; docs/UPSTREAM.md).
 pub const WORDCRAFT_RELEASE: &str = "v0.18.1";

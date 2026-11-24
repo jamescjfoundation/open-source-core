@@ -71,6 +71,9 @@ craft-atomic = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65
 craft-dialogs = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf45181db77ba6229716e6624db9eb25b", version = "=0.1.0" }
 craft-update = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf45181db77ba6229716e6624db9eb25b", version = "=0.1.0" }
 craft-print = { git = "https://github.com/storytold/craft-libs", rev = "a3e0b5a9440d18f19422a9dca13516747b7d3181" }
+# Reading PDFs (text and where each glyph lands). It reads through craft-libs' patched Hayro
+# snapshot, which the patch block below brings in.
+craft-pdf = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf45181db77ba6229716e6624db9eb25b", version = "=0.1.0", default-features = false, features = ["read", "interpret"] }
 
 # Foundation (versions as WordCraft pins them)
 serde = { version = "1", features = ["derive", "rc"] }
@@ -84,6 +87,8 @@ sha2 = "0.11"
 quick-xml = "0.41"
 # PNG files of the interface drawn offscreen (jcj-shell snapshots).
 image = { version = "0.25", default-features = false, features = ["png"] }
+# 2D transforms for reading PDF pages (the version Hayro uses).
+kurbo = "0.13"
 
 # Interface: egui 0.37 on storytold's fork, as WordCraft v0.18.1 uses it (patched below).
 # No `default_fonts`: their Ubuntu Font Licence is outside the allowlist (decision 0001);
@@ -145,6 +150,13 @@ wordcraft-formats = { git = "https://github.com/jamescjfoundation/wordcraft", re
 [patch.crates-io]
 # Required by craft-pdf: the backend rejects writers that failed during unwinding (as WordCraft).
 krilla = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf45181db77ba6229716e6624db9eb25b" }
+# Required by craft-pdf's reader: craft-libs' Hayro snapshot with its input limits and fixes for
+# malformed files (as craft-libs builds it).
+hayro-syntax = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf45181db77ba6229716e6624db9eb25b" }
+hayro-interpret = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf45181db77ba6229716e6624db9eb25b" }
+hayro-cmap = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf45181db77ba6229716e6624db9eb25b" }
+hayro-postscript = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf45181db77ba6229716e6624db9eb25b" }
+hayro-jbig2 = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf45181db77ba6229716e6624db9eb25b" }
 # egui 0.37 and winit on storytold's forks, at the commits WordCraft v0.18.1 pins.
 ecolor = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
 emath = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }

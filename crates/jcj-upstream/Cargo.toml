@@ -17,6 +17,8 @@ default = []
 shell = ["dep:craft-dialogs", "dep:craft-update"]
 # The system print spooler (CUPS, Windows).
 print = ["dep:craft-print"]
+# Reading PDFs: text and where each glyph lands (craft-pdf's reader and interpreter).
+pdf-read = ["dep:craft-pdf"]
 
 [dependencies]
 wordcraft-geom = { workspace = true }
@@ -35,3 +37,4 @@ craft-atomic = { workspace = true }
 craft-dialogs = { workspace = true, optional = true }
 craft-update = { workspace = true, optional = true, features = ["egui"] }
 craft-print = { workspace = true, optional = true }
+craft-pdf = { workspace = true, optional = true }

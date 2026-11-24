@@ -17,7 +17,8 @@ default = []
 print = ["jcj-upstream/print"]
 
 [dependencies]
-jcj-upstream = { workspace = true }
+jcj-upstream = { workspace = true, features = ["pdf-read"] }
 jcj-doc = { workspace = true }
 jcj-layout = { workspace = true }
+kurbo = { workspace = true }
 

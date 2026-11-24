@@ -72,3 +72,93 @@ fn an_area_image_has_the_area_size() {
     assert_eq!((img.width, img.height), (200, 100));
     assert_eq!(img.pixel(200, 0), None);
 }
+
+mod read {
+    use jcj_layout::{LayoutCache, print_layout};
+
+    use super::doc;
+    use crate::{GlyphMode, PdfPage, PdfSettings, ReadError, ReadLimits, export_pdf_with_layout, read_pages};
+
+    /// A page's lines: glyphs grouped by where they land (y), in drawing order.
+    fn lines(page: &PdfPage) -> Vec<(f64, String)> {
+        let mut out: Vec<(f64, String)> = Vec::new();
+        for g in page.glyphs.iter().filter(|g| g.mode == GlyphMode::Fill) {
+            let text = g.text.as_deref().unwrap_or("\u{FFFD}");
+            match out.last_mut() {
+                Some((y, line)) if (*y - g.y).abs() < 1.0 => line.push_str(text),
+                _ => out.push((g.y, text.to_owned())),
+            }
+        }
+        out
+    }
+
+    fn squash(s: &str) -> String {
+        s.chars().filter(|c| !c.is_whitespace()).collect()
+    }
+
+    #[test]
+    fn an_exported_pdf_reads_back_as_its_text() {
+        let d = doc();
+        let bytes = export_pdf_with_layout(&d, &PdfSettings::deterministic()).unwrap();
+        let pages = read_pages(&bytes, &ReadLimits::default()).unwrap();
+        assert_eq!(pages.len(), print_layout(&d, &mut LayoutCache::new()).pages.len());
+        let mut all = Vec::new();
+        for page in &pages {
+            assert!((page.width - f64::from(d.last_section.page_w)).abs() < 0.5);
+            assert!(page.height > page.width);
+            let lines = lines(page);
+            // Top to bottom: PDF y grows upward.
+            assert!(lines.windows(2).all(|w| w[1].0 < w[0].0), "lines go down the page");
+            for g in &page.glyphs {
+                assert!(g.x >= 0.0 && g.x <= page.width && g.y >= 0.0 && g.y <= page.height);
+            }
+            all.extend(lines.into_iter().map(|(_, l)| l));
+        }
+        let want: Vec<String> = (0..70).map(|i| squash(&format!("Paragraph number {i} of the sample."))).collect();
+        assert_eq!(all.iter().map(|l| squash(l)).collect::<Vec<_>>(), want);
+    }
+
+    #[test]
+    fn glyphs_on_a_line_move_right() {
+        let bytes = export_pdf_with_layout(&doc(), &PdfSettings::deterministic()).unwrap();
+        let pages = read_pages(&bytes, &ReadLimits::default()).unwrap();
+        let first: Vec<_> = pages[0].glyphs.iter().take_while(|g| (g.y - pages[0].glyphs[0].y).abs() < 1.0).collect();
+        assert!(first.len() > 10);
+        assert!(first.windows(2).all(|w| w[1].x > w[0].x));
+        // The core's export draws every glyph from the page's own transform, so they share it.
+        assert!(pages[0].glyphs.iter().all(|g| g.line_y == pages[0].glyphs[0].line_y));
+    }
+
+    #[test]
+    fn bad_input_is_an_error_not_a_panic() {
+        let limits = ReadLimits::default();
+        assert!(matches!(read_pages(b"", &limits), Err(ReadError::NotPdf(_))));
+        assert!(matches!(read_pages(b"not a pdf at all, just words", &limits), Err(ReadError::NotPdf(_))));
+        let bytes = export_pdf_with_layout(&doc(), &PdfSettings::deterministic()).unwrap();
+        // Cut short: an error when too little is left, never a panic (the reader repairs what it can).
+        assert!(read_pages(&bytes[..8], &limits).is_err());
+        assert!(read_pages(&bytes[..100], &limits).is_err());
+        for n in [bytes.len() / 3, bytes.len() / 2, bytes.len() - 10] {
+            let _ = read_pages(&bytes[..n], &limits);
+        }
+        // Bytes changed in the middle.
+        let mut broken = bytes.clone();
+        for b in broken.iter_mut().skip(bytes.len() / 4).step_by(97) {
+            *b ^= 0x5a;
+        }
+        let _ = read_pages(&broken, &limits);
+    }
+
+    #[test]
+    fn limits_are_errors() {
+        let bytes = export_pdf_with_layout(&doc(), &PdfSettings::deterministic()).unwrap();
+        let small = ReadLimits { max_input_bytes: 100, ..ReadLimits::default() };
+        assert_eq!(read_pages(&bytes, &small), Err(ReadError::TooLarge(100)));
+        let one_page = ReadLimits { max_pages: 1, ..ReadLimits::default() };
+        assert_eq!(read_pages(&bytes, &one_page), Err(ReadError::TooManyPages(1)));
+        let few = ReadLimits { max_glyphs_per_page: 5, ..ReadLimits::default() };
+        let err = read_pages(&bytes, &few).unwrap_err();
+        assert_eq!(err, ReadError::TooManyGlyphs { page: 1, limit: 5 });
+        assert!(!err.to_string().is_empty());
+    }
+}
