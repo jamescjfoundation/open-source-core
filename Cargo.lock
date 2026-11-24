@@ -1667,6 +1667,16 @@ version = "0.1.0"
 [[package]]
 name = "jcj-shell"
 version = "0.1.0"
+dependencies = [
+ "egui",
+ "egui_kittest",
+ "image",
+ "jcj-theme",
+ "jcj-upstream",
+ "log",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "jcj-theme"
