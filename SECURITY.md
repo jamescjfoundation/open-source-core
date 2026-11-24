@@ -1,0 +1,46 @@
+# Security
+
+## Reporting a problem
+
+Report security problems privately, not in a public issue, pull request or
+discussion. Use GitHub's private reporting: the **Security** tab of this
+repository, then **Report a vulnerability**. Only the maintainers see the
+report.
+
+Include what you ran, what happened and what you expected. If you attach a file
+to show the problem, remove anything personal from it first; a small made-up
+example is best.
+
+We aim to reply within seven days, tell you when a fix is ready, and credit you
+in the advisory and the changelog unless you ask us not to.
+
+## What counts
+
+Anything that lets a file, an agent or a network peer do more than the user
+asked for, in the core or in an app because of the core. For example:
+
+- a document, project or imported file (DOCX, ODT, RTF, Markdown, HTML, text,
+  EPUB, a project container) that crashes, hangs, or makes the app write
+  somewhere unexpected when opened;
+- an agent (MCP) command reading or writing outside the folders it was given;
+- the update check installing anything that is not a verified release file;
+- auto-save, recovery or backup files readable by other users;
+- a release whose files do not match the source they claim to be built from.
+
+Only the latest core release is supported.
+
+## How we handle a report
+
+1. **Keep it private until the fix ships.** Not in a public issue, pull
+   request, commit message, branch name, code comment or file in the
+   repository. Discuss it in the private advisory; working notes go in
+   `.private/` (ignored by Git).
+2. **Fix it in the open, quietly.** The pull request says what the code now
+   does, not how the old code could be abused, and adds a test that would have
+   caught it.
+3. **Release** the core, and move every app to it.
+4. **Disclose:** publish the advisory and add a **Security** entry to
+   `CHANGELOG.md`.
+
+If a problem is already public or being exploited, go straight to a fix and an
+advisory.
