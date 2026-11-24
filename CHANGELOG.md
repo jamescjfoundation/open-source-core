@@ -7,6 +7,19 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 Nothing yet.
 
+## 0.1.5 (2026-11-24)
+
+### Changed
+
+- `deny.toml`: `allow-git` also lists `https://github.com/jamescjfoundation/wordsmith-manuscript`,
+  so an app may depend on Wordsmith Manuscript's published crates at a tag (core issue #15). No
+  other source changes; the core's own `cargo deny check sources` passes.
+
+### What apps must do
+
+- Nothing. Move every `jcj-` dependency to `tag = "v0.1.5"` when convenient and run
+  `cargo xtask sync` to take the new `deny.toml` (the patch block is unchanged).
+
 ## 0.1.4 (2026-11-24)
 
 ### Added
