@@ -340,21 +340,36 @@ fn check_licenses(root: &Path) -> TaskResult {
 
 /// `cargo xtask vendor [out]`: every dependency's source, for rebuilding a release even if a git
 /// host or repository disappears (plan, "Nothing can be taken away from us").
+///
+/// `cargo vendor` cannot hold two commits of the same crate version, and WordCraft pins some
+/// craft-libs crates at two commits, so the archive is a fresh Cargo home filled by
+/// `cargo fetch --locked` (crates.io archives, the index entries used, and every git source).
+/// To rebuild: unpack it, then `CARGO_HOME=<unpacked>/cargo-home cargo build --offline --locked`.
 fn vendor(root: &Path, out: Option<&str>) -> TaskResult {
     let dist = root.join("dist");
-    let dir = dist.join("vendor");
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dist).map_err(|e| format!("{}: {e}", dist.display()))?;
-    let config = cargo_output(root, &["vendor", "--locked", "--versioned-dirs", "dist/vendor"])?;
-    std::fs::write(dist.join("vendor-config.toml"), config).map_err(|e| format!("vendor-config.toml: {e}"))?;
-    let out = out.map_or_else(|| dist.join("vendored-sources.tar.gz"), PathBuf::from);
-    let status = Command::new("tar")
-        .current_dir(&dist)
-        .arg("-czf")
-        .arg(&out)
-        .args(["vendor", "vendor-config.toml"])
+    let home = dist.join("cargo-home");
+    let _ = std::fs::remove_dir_all(&home);
+    std::fs::create_dir_all(&home).map_err(|e| format!("{}: {e}", home.display()))?;
+    let status = Command::new(util::cargo_bin())
+        .current_dir(root)
+        .env("CARGO_HOME", &home)
+        .args(["fetch", "--locked"])
         .status()
-        .map_err(|e| format!("could not run tar: {e}"))?;
+        .map_err(|e| format!("could not run cargo: {e}"))?;
+    if !status.success() {
+        return Err(format!("cargo fetch exited with {status}"));
+    }
+    // Extracted sources are rebuilt from the archives; leave them out.
+    let _ = std::fs::remove_dir_all(home.join("registry").join("src"));
+    std::fs::write(
+        home.join("README.txt"),
+        "Every dependency of this open-source-core release, as a Cargo home.\n\
+         Rebuild without network: CARGO_HOME=<this folder> cargo build --offline --locked\n",
+    )
+    .map_err(|e| format!("README.txt: {e}"))?;
+    let out = out.map_or_else(|| dist.join("vendored-sources.tar.gz"), PathBuf::from);
+    let status =
+        Command::new("tar").current_dir(&dist).arg("-czf").arg(&out).arg("cargo-home").status().map_err(|e| format!("could not run tar: {e}"))?;
     if !status.success() {
         return Err(format!("tar exited with {status}"));
     }

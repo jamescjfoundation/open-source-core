@@ -21,7 +21,9 @@ Date: 2026-11-24 · Status: accepted · Ported from Wordsmith Script decisions 0
   `ZipStreamReader`, which is what lets us carry the zip 3 advisories while WordCraft does.
 - **Exact toolchain** in `rust-toolchain.toml` (decision 0003).
 - **Vendored sources.** Each release attaches `cargo xtask vendor`'s archive of every dependency's
-  source, so a release can be rebuilt if a host or repository disappears.
+  source (a Cargo home filled by `cargo fetch --locked`; `cargo vendor` cannot hold the two
+  craft-libs commits WordCraft pins for one crate), so a release can be rebuilt offline if a host
+  or repository disappears.
 - **Third-party license texts** for shipped binaries come from `cargo xtask third-party-licenses`
   (shared with every app through the template).
 - **Assets** (fonts, images, data) are listed in `ATTRIBUTION.md` with their license.
