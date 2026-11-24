@@ -109,6 +109,12 @@ pub fn add_word(word: &str) {
     up::add_word(word);
 }
 
+/// A number that changes whenever the user dictionary or the dictionaries in use change (a word
+/// added or removed). Keep it with cached spelling results and check again when it moves.
+pub fn dictionary_generation() -> u64 {
+    up::dictionary_generation()
+}
+
 /// Take `word` out of the user dictionary. Returns whether it was there.
 pub fn remove_word(word: &str) -> bool {
     up::remove_word(word)
@@ -157,6 +163,14 @@ pub fn hyphenate(word: &str, tag: Option<&str>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_dictionary_generation_moves_when_a_word_is_added() {
+        let before = dictionary_generation();
+        add_word("zzqxgenerationword");
+        assert_ne!(dictionary_generation(), before);
+        remove_word("zzqxgenerationword");
+    }
 
     #[test]
     fn english_is_always_checked() {

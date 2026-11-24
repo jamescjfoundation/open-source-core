@@ -133,3 +133,17 @@ fn recovery_starts_with_nothing_to_recover() {
     crate::recovery::finish(&mut s);
     let _ = std::fs::remove_dir_all(dir);
 }
+
+#[test]
+fn file_access_reports_the_folders_in_force() {
+    use crate::file_access::{AutomationRoots, confine, current, unconfined};
+    assert!(current().is_none(), "nothing is confined by default");
+    let dir = std::env::temp_dir();
+    let roots = AutomationRoots::new(Some(&dir), None).ok().flatten();
+    assert!(roots.is_some());
+    confine(roots.as_ref(), || {
+        assert!(current().is_some(), "inside confine the roots are in force");
+        unconfined(|| assert!(current().is_none(), "unconfined lifts them"));
+    });
+    assert!(current().is_none());
+}

@@ -60,8 +60,10 @@ pub mod params {
 }
 
 /// Confining the files commands read and write to chosen folders (agents, the command line).
+/// `current` says which folders are in force (a command that hands a file to another program,
+/// such as printing, refuses while they are); `unconfined` runs code with none.
 pub mod file_access {
-    pub use jcj_upstream::engine::file_access::{AutomationRoots, check_read, check_write, confine, confine_process};
+    pub use jcj_upstream::engine::file_access::{AutomationRoots, check_read, check_write, confine, confine_process, current, unconfined};
 }
 
 /// The engine's own commands (the full upstream catalog), in registry order.
