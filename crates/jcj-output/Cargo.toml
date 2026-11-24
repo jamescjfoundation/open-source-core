@@ -11,4 +11,13 @@ publish.workspace = true
 [lints]
 workspace = true
 
+[features]
+default = []
+# Printing through the system spooler (CUPS, Windows).
+print = ["jcj-upstream/print"]
+
 [dependencies]
+jcj-upstream = { workspace = true }
+jcj-doc = { workspace = true }
+jcj-layout = { workspace = true }
+

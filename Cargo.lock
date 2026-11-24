@@ -1631,6 +1631,11 @@ dependencies = [
 [[package]]
 name = "jcj-output"
 version = "0.1.0"
+dependencies = [
+ "jcj-doc",
+ "jcj-layout",
+ "jcj-upstream",
+]
 
 [[package]]
 name = "jcj-project"
