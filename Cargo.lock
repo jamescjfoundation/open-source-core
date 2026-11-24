@@ -910,6 +910,7 @@ dependencies = [
  "jcj-board",
  "jcj-doc",
  "jcj-engine",
+ "jcj-features",
  "jcj-interchange",
  "jcj-layout",
  "jcj-output",

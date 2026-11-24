@@ -20,6 +20,17 @@ pub const VERSION: ExtKey<u32> = ExtKey::new("testbed.version");
 /// The test app's identity in project files.
 pub const APP: jcj_project::App = jcj_project::App::new("org.jcj.core-testbed", 1);
 
+/// The test app's command registry: the engine's commands, the core's general editing commands
+/// and the document features, as an app assembles it.
+pub fn registry() -> std::sync::Arc<jcj_engine::Registry> {
+    std::sync::Arc::new(jcj_engine::registry_with(jcj_engine::commands::merged(jcj_features::commands())))
+}
+
+/// A session on `doc` with [`registry`].
+pub fn session(doc: Document) -> jcj_engine::Session {
+    jcj_engine::session_with(doc, registry())
+}
+
 /// One step's outcome.
 #[derive(Debug, Clone)]
 pub struct Step {
@@ -70,7 +81,7 @@ pub fn run() -> Result<Vec<Step>, String> {
     step("doc", format!("{} paragraphs, extension data on document, paragraph and run", paras.len()));
 
     // jcj-engine: a session, a command, undo and redo.
-    let mut session = jcj_engine::session(doc.clone());
+    let mut session = self::session(doc.clone());
     let before = jcj_doc::plain_text(paras[1].1);
     session.run("text.insert", &json!({"text": "Inserted. "})).map_err(|e| format!("text.insert: {e:?}"))?;
     let changed = session.doc.body.len();
@@ -78,6 +89,20 @@ pub fn run() -> Result<Vec<Step>, String> {
     check(session.doc.same_content(&doc), "undo restores the document")?;
     session.run("edit.redo", &json!({})).map_err(|e| format!("edit.redo: {e:?}"))?;
     step("engine", format!("insert, undo, redo ({changed} blocks; first body paragraph starts {:?})", before.get(..12).unwrap_or("")));
+
+    // jcj-engine's general commands and jcj-features: find, a bookmark, a note, undo.
+    let found = session.run("find.all", &json!({"query": "Second"})).map_err(|e| format!("find.all: {e:?}"))?;
+    let hits = found.get("matches").and_then(|m| m.as_array()).map_or(0, Vec::len);
+    check(hits == 2, "find.all finds both matches")?;
+    session.run("bookmark.add", &json!({"name": "Start"})).map_err(|e| format!("bookmark.add: {e:?}"))?;
+    let marks = session.run("bookmark.list", &json!({})).map_err(|e| format!("bookmark.list: {e:?}"))?;
+    check(marks.to_string().contains("Start"), "the bookmark is listed")?;
+    session.run("note.add", &json!({"text": "A note on the caret's paragraph."})).map_err(|e| format!("note.add: {e:?}"))?;
+    session.run("edit.undo", &json!({})).map_err(|e| format!("edit.undo: {e:?}"))?;
+    session.run("edit.undo", &json!({})).map_err(|e| format!("edit.undo: {e:?}"))?;
+    let marks = session.run("bookmark.list", &json!({})).map_err(|e| format!("bookmark.list: {e:?}"))?;
+    check(!marks.to_string().contains("Start"), "undo removes the bookmark")?;
+    step("features", format!("find.all: {hits} matches; bookmark and note added and undone"));
 
     // jcj-layout: pages.
     let mut cache = jcj_layout::LayoutCache::new();
@@ -140,7 +165,7 @@ pub fn run() -> Result<Vec<Step>, String> {
 
     // jcj-agents: an MCP server over a session.
     let info = jcj_agents::AgentInfo::new("core-testbed", "Core testbed", env!("CARGO_PKG_VERSION"), "The core's test app.");
-    let mut server = jcj_agents::AgentServer::headless(jcj_engine::session(doc), jcj_agents::AgentConfig::new(info));
+    let mut server = jcj_agents::AgentServer::headless(self::session(doc), jcj_agents::AgentConfig::new(info));
     let init = server.handle(json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})).ok_or("initialize answers")?;
     check(init.pointer("/result/serverInfo/name").and_then(|v| v.as_str()) == Some("core-testbed"), "the server names the app")?;
     let tools = server.handle(json!({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})).ok_or("tools/list answers")?;
@@ -157,6 +182,6 @@ mod tests {
     fn the_self_test_passes() {
         let steps = super::run().unwrap();
         let names: Vec<&str> = steps.iter().map(|s| s.name).collect();
-        assert_eq!(names, ["doc", "engine", "layout", "output", "interchange", "proof", "project", "board", "theme", "agents"]);
+        assert_eq!(names, ["doc", "engine", "features", "layout", "output", "interchange", "proof", "project", "board", "theme", "agents"]);
     }
 }

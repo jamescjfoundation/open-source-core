@@ -46,7 +46,7 @@ impl Testbed {
     pub fn new(path: PathBuf) -> Testbed {
         let doc = sample_document().unwrap_or_default();
         Testbed {
-            session: jcj_engine::session(doc),
+            session: crate::selftest::session(doc),
             board: Board::default(),
             selection: Selection::default(),
             path,
@@ -162,7 +162,7 @@ impl App for Testbed {
     fn run(&mut self, c: &Cmd, _shell: &mut Shell) -> Result<(), String> {
         match c.id.as_str() {
             ids::NEW => {
-                self.session = jcj_engine::session(jcj_doc::new_document());
+                self.session = crate::selftest::session(jcj_doc::new_document());
                 self.changed();
             }
             ids::SAVE => self.save()?,
@@ -171,7 +171,7 @@ impl App for Testbed {
                 self.changed();
             }
             cmd::SAMPLE => {
-                self.session = jcj_engine::session(sample_document()?);
+                self.session = crate::selftest::session(sample_document()?);
                 self.changed();
             }
             cmd::INSERT => {

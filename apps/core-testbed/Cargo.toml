@@ -23,5 +23,6 @@ jcj-theme = { workspace = true }
 jcj-board = { workspace = true }
 jcj-shell = { workspace = true }
 jcj-agents = { workspace = true }
+jcj-features = { workspace = true }
 eframe = { workspace = true }
 serde_json = { workspace = true }

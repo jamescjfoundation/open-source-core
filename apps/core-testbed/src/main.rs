@@ -40,7 +40,7 @@ fn main() -> ExitCode {
         Some("mcp") => {
             let doc = core_testbed::selftest::sample_document().unwrap_or_default();
             let info = jcj_agents::AgentInfo::new("core-testbed", "Core testbed", env!("CARGO_PKG_VERSION"), "The core's test app.");
-            let mut server = jcj_agents::AgentServer::headless(jcj_engine::session(doc), jcj_agents::AgentConfig::new(info));
+            let mut server = jcj_agents::AgentServer::headless(core_testbed::selftest::session(doc), jcj_agents::AgentConfig::new(info));
             match server.serve_stdio() {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(e) => {
