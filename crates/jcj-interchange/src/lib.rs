@@ -40,6 +40,7 @@
 pub mod emphasis;
 mod epub;
 mod format;
+mod rtf_direct;
 
 pub use format::Format;
 
@@ -116,4 +117,19 @@ pub fn export(format: Format, doc: &Document) -> Result<Vec<u8>, Error> {
         },
         failed("the writer stopped unexpectedly".into()),
     )
+}
+
+/// Write `doc` as RTF with each paragraph's formatting written out in full, for apps that lay out
+/// their own paragraphs (each kind of paragraph at its own indent).
+///
+/// [`export`] with [`Format::Rtf`] writes paragraph kinds (headings, quotes, lists) and leaves
+/// indents and fonts to the reader's defaults. This writes, for every body paragraph, its
+/// resolved alignment, left, right and first-line indents, space before and after, and page
+/// break before; and for every run its resolved font, size, bold, italic and underline (any
+/// underline is written as a single one). The page size and margins are the last section's.
+/// Tables are written as their cells' paragraphs, one after another. No styles, lists, fields,
+/// pictures or other objects are written.
+pub fn export_rtf_direct(doc: &Document) -> Result<Vec<u8>, Error> {
+    let failed = |reason: String| Error::Failed { format: Format::Rtf, reason };
+    guarded(|| Ok(rtf_direct::write(doc).into_bytes()), failed("the writer stopped unexpectedly".into()))
 }
