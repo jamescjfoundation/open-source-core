@@ -1611,6 +1611,15 @@ version = "0.1.0"
 [[package]]
 name = "jcj-interchange"
 version = "0.1.0"
+dependencies = [
+ "chrono",
+ "jcj-doc",
+ "jcj-upstream",
+ "quick-xml 0.41.0",
+ "sha2 0.11.1",
+ "thiserror",
+ "zip 3.0.0",
+]
 
 [[package]]
 name = "jcj-layout"
@@ -1623,6 +1632,16 @@ version = "0.1.0"
 [[package]]
 name = "jcj-project"
 version = "0.1.0"
+dependencies = [
+ "chrono",
+ "jcj-doc",
+ "jcj-upstream",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "thiserror",
+ "zip 3.0.0",
+]
 
 [[package]]
 name = "jcj-proof"
