@@ -7,6 +7,24 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 Nothing yet.
 
+## 0.1.9 (2026-11-24)
+
+### Added
+
+- `jcj-features`: `verify` (`words`, `paragraph_words`, `document_words`, `compare`, `Difference`,
+  `Check`, `CONTEXT`): the word-for-word check of an import or export against its source, the
+  first difference reported with the words around it. Promoted from Wordsmith Manuscript (core
+  issue #10). `core-testbed` checks that every format it exports and imports keeps every word.
+- `jcj-features`: `wordiff` (`tokens`, `paragraph`, `paragraphs`, `documents`, `Diff`, `Segment`,
+  `Change`): two versions of a text compared paragraph by paragraph, then word by word, beside
+  the paragraph-level `compare`. Promoted from Wordsmith Manuscript (core issue #17).
+  `core-testbed` shows a changed word.
+
+### What apps must do
+
+- Nothing. Move every `jcj-` dependency to `tag = "v0.1.9"` when convenient (the patch block is
+  unchanged). Apps with their own copies can move to these in follow-up changes.
+
 ## 0.1.8 (2026-11-24)
 
 ### Added
