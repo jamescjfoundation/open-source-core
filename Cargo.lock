@@ -1644,6 +1644,9 @@ version = "0.1.0"
 [[package]]
 name = "jcj-proof"
 version = "0.1.0"
+dependencies = [
+ "jcj-upstream",
+]
 
 [[package]]
 name = "jcj-shell"
