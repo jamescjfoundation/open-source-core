@@ -1,0 +1,20 @@
+[package]
+name = "jcj-features"
+description = "Document features every app shares: bookmarks, notes, revisions, change tracking, page locks, watermarks, headers and footers, comparison"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+jcj-doc = { workspace = true }
+jcj-engine = { workspace = true }
+jcj-layout = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }

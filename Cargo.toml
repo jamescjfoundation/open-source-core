@@ -13,6 +13,7 @@ members = [
     "crates/jcj-board",
     "crates/jcj-shell",
     "crates/jcj-agents",
+    "crates/jcj-features",
     "apps/core-testbed",
     "contract-tests",
     "xtask",
@@ -42,6 +43,7 @@ jcj-theme = { path = "crates/jcj-theme" }
 jcj-board = { path = "crates/jcj-board" }
 jcj-shell = { path = "crates/jcj-shell" }
 jcj-agents = { path = "crates/jcj-agents" }
+jcj-features = { path = "crates/jcj-features" }
 
 # ---------------------------------------------------------------------------------------------
 # Upstream. Only crates/jcj-upstream may use these (`cargo xtask layers`). Pins and patches are

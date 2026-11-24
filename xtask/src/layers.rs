@@ -24,6 +24,8 @@ pub const LAYERS: &[(&str, u8)] = &[
     ("jcj-project", 4),
     ("jcj-interchange", 4),
     ("jcj-agents", 4),
+    // Document features (bookmarks, notes, revisions, page locks, ...)
+    ("jcj-features", 4),
     // Interface building blocks
     ("jcj-theme", 5),
     ("jcj-board", 5),
