@@ -7,6 +7,21 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 Nothing yet.
 
+## 0.1.10 (2026-11-24)
+
+### Added
+
+- `jcj-output`: `facts` (`read_facts`, `PdfFacts`, `PageFacts`, `PageBox`, `PdfImage`, `PdfFont`):
+  a PDF's page boxes (media, crop, trim, bleed), rotation, annotations, images with their pixel
+  and placed size (so their resolution), fonts with whether each is embedded, and bookmarks,
+  read with the same bounds as `read_pages` (core issue #23). `core-testbed` checks that its PDF
+  embeds every font.
+
+### What apps must do
+
+- Nothing. Move every `jcj-` dependency to `tag = "v0.1.10"` when convenient (the patch block is
+  unchanged).
+
 ## 0.1.9 (2026-11-24)
 
 ### Added
