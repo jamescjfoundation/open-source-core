@@ -78,7 +78,6 @@ log = "0.4"
 chrono = { version = "0.4.45", default-features = false, features = ["std"] }
 zip = { version = "3", default-features = false, features = ["deflate"] }
 sha2 = "0.11"
-proptest = "1"
 # XML well-formedness checks in tests (as WordCraft pins it).
 quick-xml = "0.41"
 # PNG files of the interface drawn offscreen (jcj-shell snapshots).

@@ -12,3 +12,16 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+jcj-doc = { workspace = true }
+jcj-layout = { workspace = true }
+jcj-engine = { workspace = true }
+jcj-output = { workspace = true }
+jcj-interchange = { workspace = true }
+jcj-proof = { workspace = true }
+jcj-project = { workspace = true }
+jcj-theme = { workspace = true }
+jcj-board = { workspace = true }
+jcj-shell = { workspace = true }
+jcj-agents = { workspace = true }
+eframe = { workspace = true }
+serde_json = { workspace = true }

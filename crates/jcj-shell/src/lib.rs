@@ -51,5 +51,7 @@ pub use shell::{Shell, ShellOptions};
 pub use sidebar::RAIL_W;
 pub use workspace::{Layout, PanelSpec, Side};
 
+/// egui, at the version the core pins, so apps draw with the same one the shell uses.
+pub use egui;
 /// The theme crate, for apps that build a shell.
 pub use jcj_theme as theme;
