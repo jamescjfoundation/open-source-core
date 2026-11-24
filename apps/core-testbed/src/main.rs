@@ -55,7 +55,11 @@ fn main() -> ExitCode {
         }
         file => {
             let path = file.map_or_else(|| std::path::PathBuf::from("untitled.jcjtest"), std::path::PathBuf::from);
-            let window = Window { shell: Shell::new("Core testbed", env!("CARGO_PKG_VERSION"), Tokens::default()), app: Testbed::new(path) };
+            let window = Window {
+                shell: Shell::new("Core testbed", env!("CARGO_PKG_VERSION"), Tokens::default())
+                    .with_options(jcj_shell::ShellOptions { start_window: true, ..jcj_shell::ShellOptions::default() }),
+                app: Testbed::new(path),
+            };
             let options = eframe::NativeOptions::default();
             match eframe::run_native("Core testbed", options, Box::new(|_cc| Ok(Box::new(window)))) {
                 Ok(()) => ExitCode::SUCCESS,

@@ -44,6 +44,9 @@ pub struct ShellOptions {
     /// Command parameters that follow the window's state rather than tell controls apart, so a
     /// control keeps its key tip letters as they change.
     pub keytip_ignored_params: Vec<String>,
+    /// Show the start window (templates, Open, recent files) in place of the document while the
+    /// app has none open (off).
+    pub start_window: bool,
 }
 
 impl Default for ShellOptions {
@@ -58,6 +61,7 @@ impl Default for ShellOptions {
             file_pages: Page::BUILT_IN.to_vec(),
             tour: Vec::new(),
             keytip_ignored_params: ["on", "id", "ids"].map(String::from).to_vec(),
+            start_window: false,
         }
     }
 }
@@ -300,7 +304,9 @@ impl Shell {
             egui::CentralPanel::default().show(ui, |ui| crate::backstage::show(self, ui, app));
         } else {
             crate::sidebar::show(self, ui, app);
-            let doc = egui::CentralPanel::default().show(ui, |ui| app.document_ui(ui, self));
+            let start = self.options.start_window && !app.has_document();
+            let doc = egui::CentralPanel::default()
+                .show(ui, |ui| if start { crate::start::start_window(ui, self, app) } else { app.document_ui(ui, self) });
             self.close_floating_on_press(&ctx, doc.response.rect, &floating);
         }
         crate::dialogs::show(self, &ctx, app);

@@ -92,6 +92,8 @@ pub mod ids {
     pub const NEW: &str = "file.new";
     /// Open a document (the app shows its file dialog).
     pub const OPEN: &str = "file.open";
+    /// Start a new document from one of the app's templates: `{"template": id}`.
+    pub const NEW_FROM_TEMPLATE: &str = "file.newFromTemplate";
     /// Open the document at `{"path": "..."}` (recent files).
     pub const OPEN_PATH: &str = "file.openPath";
     /// Save.

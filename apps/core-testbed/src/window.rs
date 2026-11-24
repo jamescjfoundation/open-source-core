@@ -39,6 +39,11 @@ pub struct Testbed {
     revision: u64,
     page: Option<(u64, egui::TextureHandle)>,
     pub log: Vec<String>,
+    /// Whether the user started a document (the start window shows until then, unless the
+    /// file already exists).
+    pub started: bool,
+    /// Words written this session, toward a session target (the core's writing statistics).
+    pub writing: jcj_shell::writing::Writing,
 }
 
 impl Testbed {
@@ -49,9 +54,11 @@ impl Testbed {
             session: crate::selftest::session(doc),
             board: Board::default(),
             selection: Selection::default(),
-            path,
+            path: path.clone(),
             saved_revision: 0,
             revision: 0,
+            started: path.is_file(),
+            writing: jcj_shell::writing::Writing::new(0).with_target(Some(500)),
             page: None,
             log: Vec::new(),
         }
@@ -59,6 +66,8 @@ impl Testbed {
 
     fn changed(&mut self) {
         self.revision += 1;
+        let words = self.session.doc.body.iter().filter_map(|b| b.as_para()).map(|p| jcj_doc::count_words(&p.plain_text())).sum();
+        self.writing.observe(words, jcj_shell::writing::Day::of(std::time::SystemTime::now(), 0));
     }
 
     fn save(&mut self) -> Result<(), String> {
@@ -120,6 +129,7 @@ impl Commands for Testbed {
     fn all_commands(&self) -> Vec<CommandInfo> {
         vec![
             CommandInfo { icon: "new".into(), ..CommandInfo::new(ids::NEW, "New", "Mod+N") },
+            CommandInfo::new(ids::NEW_FROM_TEMPLATE, "New from Template", ""),
             CommandInfo { icon: "save".into(), ..CommandInfo::new(ids::SAVE, "Save", "Mod+S") },
             CommandInfo { icon: "undo".into(), ..CommandInfo::new(ids::UNDO, "Undo", "Mod+Z") },
             CommandInfo { icon: "redo".into(), ..CommandInfo::new(ids::REDO, "Redo", "Mod+Shift+Z") },
@@ -159,8 +169,33 @@ impl App for Testbed {
         self.save()
     }
 
+    fn status_ui(&mut self, ui: &mut egui::Ui, _shell: &mut Shell) {
+        let words = self.writing.session_words();
+        jcj_shell::writing::progress_bar(ui, &format!("{words} of 500 words this session"), self.writing.progress().unwrap_or(0.0), 80.0);
+    }
+
+    fn has_document(&self) -> bool {
+        self.started
+    }
+
+    fn templates(&self) -> Vec<jcj_shell::TemplateSpec> {
+        vec![
+            jcj_shell::TemplateSpec::new("blank", "Blank", "An empty document.").in_group("Documents"),
+            jcj_shell::TemplateSpec::new("sample", "Sample", "A document using every feature the testbed shows.").in_group("Documents"),
+        ]
+    }
+
     fn run(&mut self, c: &Cmd, _shell: &mut Shell) -> Result<(), String> {
+        self.started = true;
         match c.id.as_str() {
+            ids::NEW_FROM_TEMPLATE => {
+                let doc = match c.params.get("template").and_then(|t| t.as_str()) {
+                    Some("sample") => sample_document()?,
+                    _ => jcj_doc::new_document(),
+                };
+                self.session = crate::selftest::session(doc);
+                self.changed();
+            }
             ids::NEW => {
                 self.session = crate::selftest::session(jcj_doc::new_document());
                 self.changed();
@@ -306,6 +341,9 @@ mod tests {
         let project = jcj_project::files::open(&app.path, &APP).unwrap();
         assert_eq!(project.document_count(), 1);
         assert!(project.app_data().contains_key("board"));
+        app.run(&Cmd::with(ids::NEW_FROM_TEMPLATE, json!({ "template": "sample" })), &mut shell).unwrap();
+        assert!(app.writing.session_words() > 0, "the sample's words count as written this session");
+        assert!(app.has_document() && !app.templates().is_empty());
         app.run(&Cmd::new(cmd::EXPORT_ALL), &mut shell).unwrap();
         assert!(dir.join("test.epub").is_file() && dir.join("test.docx").is_file());
         let _ = std::fs::remove_dir_all(&dir);

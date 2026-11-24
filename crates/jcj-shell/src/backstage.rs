@@ -266,6 +266,11 @@ fn file_name(path: &str) -> String {
 fn new<A: App>(shell: &mut Shell, ui: &mut Ui, app: &mut A) {
     heading(ui, "New");
     action(ui, shell, &*app, &Control::new(ids::NEW).icon("file").label("New document").about("Start an empty document."));
+    let templates = app.templates();
+    if !templates.is_empty() {
+        sub(ui, "Templates");
+        crate::start::chooser(ui, shell, &templates);
+    }
     if !shell.recent.is_empty() {
         sub(ui, "Recent");
         let cmds: &dyn Commands = &*app;

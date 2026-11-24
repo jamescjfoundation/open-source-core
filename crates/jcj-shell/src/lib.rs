@@ -39,8 +39,10 @@ pub mod ribbon_fit;
 mod shell;
 mod sidebar;
 pub mod snapshot;
+pub mod start;
 pub mod updates;
 pub mod workspace;
+pub mod writing;
 
 pub use app::{About, App};
 pub use backstage::{Page, PageSpec};
@@ -49,6 +51,7 @@ pub use ribbon::TabSpec;
 pub use ribbon::widgets::{self, Control};
 pub use shell::{Shell, ShellOptions};
 pub use sidebar::RAIL_W;
+pub use start::TemplateSpec;
 pub use workspace::{Layout, PanelSpec, Side};
 
 /// egui, at the version the core pins, so apps draw with the same one the shell uses.

@@ -113,6 +113,20 @@ pub trait App: Commands {
         About::default()
     }
 
+    /// Whether a document is open. When it is not and the app turned on
+    /// [`crate::ShellOptions::start_window`], the shell shows the start window instead of
+    /// [`App::document_ui`].
+    fn has_document(&self) -> bool {
+        true
+    }
+
+    /// The templates new documents can start from. When there are any, the File page's New page
+    /// and the start window show them; picking one runs `file.newFromTemplate` with
+    /// `{"template": id}` ([`crate::start`]).
+    fn templates(&self) -> Vec<crate::start::TemplateSpec> {
+        Vec::new()
+    }
+
     /// The width of the app's mark at `height` points (0: no mark).
     fn mark_width(&self, height: f32) -> f32 {
         let _ = height;
