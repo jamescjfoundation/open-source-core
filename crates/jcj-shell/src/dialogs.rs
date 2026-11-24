@@ -117,7 +117,8 @@ fn palette_window(shell: &mut Shell, ctx: &Context, cmds: &dyn Commands) {
     let mut chosen = None;
     let all = all_commands(cmds);
     egui::Window::new("Commands").open(&mut open).collapsible(false).resizable(false).show(ctx, |ui| {
-        let edit = ui.text_edit_singleline(&mut palette.query);
+        let label = ui.label("Find a command");
+        let edit = ui.add(egui::TextEdit::singleline(&mut palette.query)).labelled_by(label.id);
         edit.request_focus();
         let matches = palette_matches(&all, &palette.query, PALETTE_ROWS);
         if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
@@ -243,8 +244,8 @@ pub fn prefs_body(shell: &mut Shell, ui: &mut Ui) {
     ui.separator();
     ui.heading("You");
     ui.horizontal(|ui| {
-        ui.label("Your name (notes and tracked changes)");
-        ui.text_edit_singleline(&mut shell.user_name);
+        let label = ui.label("Your name (notes and tracked changes)");
+        ui.text_edit_singleline(&mut shell.user_name).labelled_by(label.id);
     });
 }
 
@@ -256,8 +257,8 @@ pub fn keys_body(shell: &mut Shell, ui: &mut Ui, cmds: &dyn Commands) {
     let mut clear: Option<String> = None;
     let all: Vec<CommandInfo> = all_commands(cmds).into_iter().filter(|c| !c.takes_params).collect();
     ui.horizontal(|ui| {
-        ui.label("Find");
-        ui.text_edit_singleline(&mut page.filter);
+        let label = ui.label("Find");
+        ui.text_edit_singleline(&mut page.filter).labelled_by(label.id);
     });
     if let Some(id) = &page.capturing {
         ui.colored_label(Color32::from_rgb(200, 120, 30), format!("Press the new key for {id} (Escape to cancel)"));

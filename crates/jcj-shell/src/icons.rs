@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// Derived from WordCraft's icon set (storytold/wordcraft, MIT OR Apache-2.0), as Script carried it; modified.
+// Derived from WordCraft's icon set (storytold/wordcraft, MIT OR Apache-2.0); modified.
 //! Generic icons drawn in code (original artwork; no external icon assets): clipboard, text,
 //! paragraphs, insert, review, view, tables, files and shapes.
 //!

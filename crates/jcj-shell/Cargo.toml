@@ -22,3 +22,4 @@ image = { workspace = true }
 
 [dev-dependencies]
 egui_kittest = { workspace = true }
+serde_json = { workspace = true }

@@ -91,6 +91,8 @@ impl Corkboard {
                     resp.dnd_set_drag_payload(CardDrag(i));
                 }
                 let selected = selection.contains(c.id);
+                let name = if c.title.is_empty() { "Untitled card".to_string() } else { c.title.clone() };
+                resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, selected, &name));
                 if resp.dragged() {
                     // Faded where it was, and following the pointer.
                     paint_card(ui.painter(), r, c, selected, &t);

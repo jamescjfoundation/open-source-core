@@ -82,12 +82,22 @@ pub(crate) fn strip(shell: &mut Shell, ui: &mut Ui, tabs: &[TabSpec]) {
             }
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let label = if shell.chrome.collapsed { "▾ Show ribbon" } else { "▴ Hide ribbon" };
-            if ui
-                .add(egui::Button::new(egui::RichText::new(label).font(regular(11.5)).color(t.text_dim)).frame(false))
-                .on_hover_text("Ribbon: show the groups, or the tabs only (double-click a tab too)")
-                .clicked()
-            {
+            let (label, icon) = if shell.chrome.collapsed { ("Show ribbon", "chevronDown") } else { ("Hide ribbon", "chevronUp") };
+            let g = ui.painter().layout_no_wrap(label.to_string(), regular(11.5), t.text_dim);
+            let (r, resp) = ui.allocate_exact_size(vec2(g.size().x + 22.0, 22.0), Sense::click());
+            if resp.hovered() {
+                ui.painter().rect_filled(r, f32::from(t.radius.control), t.hover);
+            }
+            crate::icons::paint(
+                ui.painter(),
+                egui::Rect::from_center_size(pos2(r.min.x + 9.0, r.center().y), vec2(12.0, 12.0)),
+                icon,
+                t.text_dim,
+                t.accent,
+            );
+            ui.painter().galley(pos2(r.min.x + 18.0, r.center().y - g.size().y / 2.0), g, t.text_dim);
+            resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, label));
+            if resp.on_hover_text("Ribbon: show the groups, or the tabs only (double-click a tab too)").clicked() {
                 shell.chrome.collapsed = !shell.chrome.collapsed;
                 shell.chrome.peek = false;
             }

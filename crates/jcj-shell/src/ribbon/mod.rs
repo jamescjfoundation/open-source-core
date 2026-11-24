@@ -299,17 +299,17 @@ fn quick_row<A: App>(shell: &mut Shell, ui: &mut Ui, app: &A) {
                     continue;
                 }
                 let open = shell.layout.open_on(side).is_some();
-                let text = match (side, open) {
-                    (Side::Left, true) => "◂ Left panel",
-                    (Side::Left, false) => "Left panel ▸",
-                    (Side::Right, true) => "Right panel ▸",
-                    (Side::Right, false) => "◂ Right panel",
-                    (Side::Bottom, true) => "▾ Bottom panel",
-                    (Side::Bottom, false) => "▴ Bottom panel",
+                let (label, icon) = match side {
+                    Side::Left => ("Left panel", "chevronLeft"),
+                    Side::Right => ("Right panel", "chevronRight"),
+                    Side::Bottom => ("Bottom panel", "chevronDown"),
                 };
-                let c =
-                    widgets::Control::with(shell_ids::SIDE, serde_json::json!({"side": side.key()})).about("Show or hide the panel on this side.");
-                widgets::link(ui, shell, cmds, &c, egui::RichText::new(text).font(regular(11.5)).color(t.text_dim));
+                let c = widgets::Control::with(shell_ids::SIDE, serde_json::json!({"side": side.key()}))
+                    .icon(icon)
+                    .label(label)
+                    .on(open)
+                    .about("Show or hide the panel on this side.");
+                widgets::small(ui, shell, cmds, &c);
             }
             // The command search box: the palette.
             let key = widgets::key_for(shell, cmds, shell_ids::PALETTE);

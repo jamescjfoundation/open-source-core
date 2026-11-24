@@ -143,7 +143,7 @@ pub mod shell_ids {
 
 /// The shell's own commands as the palette and Keys page list them.
 pub fn shell_commands() -> Vec<CommandInfo> {
-    use shell_ids::{ABOUT, CHECK_FOR_UPDATES, FILE_PAGE, KEYS, KEYTIPS, PALETTE, PREFERENCES, RIBBON, THEME, TOUR};
+    use shell_ids::{ABOUT, CHECK_FOR_UPDATES, CLOSE_FILE_PAGE, FILE_PAGE, KEYS, KEYTIPS, PALETTE, PANEL, PREFERENCES, RIBBON, SIDE, THEME, TOUR};
     let c = |id: &str, label: &str, shortcut: &str, icon: &str| CommandInfo {
         id: id.into(),
         label: label.into(),
@@ -163,6 +163,9 @@ pub fn shell_commands() -> Vec<CommandInfo> {
         c(CHECK_FOR_UPDATES, "Check for Updates", "", "recover"),
         c(THEME, "Light or Dark Theme", "", "darkMode"),
         c(TOUR, "Show the Tour", "", "help"),
+        c(CLOSE_FILE_PAGE, "Close the File Page", "", "close"),
+        CommandInfo { takes_params: true, ..c(PANEL, "Show or Hide a Panel", "", "navPane") },
+        CommandInfo { takes_params: true, ..c(SIDE, "Show or Hide a Side's Panel", "", "navPane") },
     ]
 }
 

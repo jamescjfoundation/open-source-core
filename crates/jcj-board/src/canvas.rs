@@ -123,6 +123,8 @@ impl Canvas {
                 let r = shown(c);
                 let resp = ui.interact(r, self.id.with(("card", c.id.0)), Sense::click_and_drag());
                 paint_card(&painter, r, c, selection.contains(c.id), &t);
+                let name = if c.title.is_empty() { "Untitled card".to_string() } else { c.title.clone() };
+                resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, selection.contains(c.id), &name));
                 if self.links {
                     let handle = pos2(r.max.x, r.center().y);
                     painter.circle_filled(handle, 5.0, t.accent);

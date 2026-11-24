@@ -189,6 +189,8 @@ fn bg(ui: &Ui, r: Rect, hovered: bool, on: bool, t: &Theme) {
 /// After drawing a control at `r`: record it, note its key tip, give it its tooltip and queue
 /// its command when clicked. Returns whether it was clicked.
 fn finish(ui: &Ui, shell: &mut Shell, cmds: &dyn Commands, c: &Control, r: Rect, resp: Response, ok: bool) -> bool {
+    let label = c.label_or_name(cmds);
+    resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, ok, c.on, &label));
     record(shell, Some(&c.cmd.id), r);
     note_keytip(ui, shell, r, Keytip::Run(c.cmd.clone()), "");
     let resp = resp.on_hover_text(tip(shell, cmds, &c.cmd.id, &c.about));
@@ -329,7 +331,13 @@ pub fn group(ui: &mut Ui, shell: &mut Shell, title: &str, add: impl FnOnce(&mut 
     if level == ribbon_fit::COLLAPSED {
         let (r, resp) = ui.allocate_exact_size(vec2(62.0, CONTENT_H + TITLE_H), Sense::click());
         bg(ui, r, resp.hovered(), false, &t);
-        ui.painter().text(pos2(r.center().x, r.min.y + 26.0), Align2::CENTER_CENTER, "▾", regular(16.0), t.text_dim);
+        crate::icons::paint(
+            ui.painter(),
+            Rect::from_center_size(pos2(r.center().x, r.min.y + 26.0), vec2(16.0, 16.0)),
+            "chevronDown",
+            t.text_dim,
+            t.accent,
+        );
         ui.painter().text(pos2(r.center().x, r.max.y - 8.0), Align2::CENTER_CENTER, title, regular(t.type_sizes.caption), t.text_dim);
         let popup = ui.make_persistent_id(("ribbon-group", title));
         record(shell, None, r);

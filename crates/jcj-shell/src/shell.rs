@@ -314,6 +314,10 @@ impl Shell {
         {
             self.close_requested = true;
         }
+        if !self.queue.is_empty() {
+            // What the commands change shows in the next frame.
+            ctx.request_repaint();
+        }
         self.run_queue(app);
         self.tick_autosave(&ctx, app, Instant::now());
     }

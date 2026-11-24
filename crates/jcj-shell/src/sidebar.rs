@@ -43,6 +43,7 @@ fn rail(shell: &Shell, ui: &mut Ui, items: &[&PanelSpec], side: Side, acts: &mut
             if open { t.accent } else { t.text },
             t.accent,
         );
+        resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, open, &p.title));
         if resp.on_hover_text(p.title.as_str()).clicked() {
             acts.push(Act::Toggle(p.id.clone()));
         }
@@ -63,12 +64,13 @@ fn title_bar(ui: &mut Ui, spec: &PanelSpec, pinned: bool, side: Side, acts: &mut
             if resp.hovered() {
                 ui.painter().rect_filled(r, 4.0, t.hover);
             }
+            resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, pinned, "Pin"));
             crate::icons::paint(ui.painter(), r.shrink(2.0), "pin", if pinned { t.accent } else { t.text_dim }, t.accent);
             let tip = if pinned { "Unpin: float over the document" } else { "Pin beside the document" };
             if resp.on_hover_text(tip).clicked() {
                 acts.push(Act::Pin(spec.id.clone(), !pinned));
             }
-            ui.menu_button("⋯", |ui| {
+            ui.menu_button("Move", |ui| {
                 for to in Side::ALL {
                     if to != side && ui.button(format!("Move to the {}", to.label().to_lowercase())).clicked() {
                         acts.push(Act::Move(spec.id.clone(), to));

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// Derived from WordCraft's ribbon_fit.rs (storytold/wordcraft, MIT OR Apache-2.0), as Script carried it; modified.
+// Derived from WordCraft's ribbon_fit.rs (storytold/wordcraft, MIT OR Apache-2.0); modified.
 //! Ribbon groups that shrink to fit the window (storytold/wordcraft#662), the way Word's ribbon does: when a tab is
 //! wider than the window, groups give up their small buttons' labels and the Styles gallery shows
 //! fewer tiles (compact), then fold into a single drop-down button that opens the whole group
@@ -31,7 +31,9 @@ const COLLAPSED_W: f32 = 64.0;
 /// One group of a tab in drawing order: its title and measured widths at each level.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct GroupWidths {
+    /// The group's title.
     pub title: String,
+    /// Its width drawn full, compact and collapsed, where measured.
     pub widths: [Option<f32>; 3],
 }
 

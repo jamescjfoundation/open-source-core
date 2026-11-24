@@ -144,7 +144,15 @@ fn draw<A: App>(shell: &mut Shell, ui: &mut Ui, app: &mut A, page: Page) {
         if resp.hovered() {
             ui.painter().rect_filled(r, 6.0, Color32::from_white_alpha(30));
         }
-        ui.painter().text(pos2(r.min.x + 10.0, r.center().y), Align2::LEFT_CENTER, "←  Back", medium(t.type_sizes.body), ink);
+        crate::icons::paint(
+            ui.painter(),
+            egui::Rect::from_center_size(pos2(r.min.x + 18.0, r.center().y), vec2(16.0, 16.0)),
+            "chevronLeft",
+            ink,
+            ink,
+        );
+        ui.painter().text(pos2(r.min.x + 36.0, r.center().y), Align2::LEFT_CENTER, "Back", medium(t.type_sizes.body), ink);
+        resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "Back"));
         back = resp.on_hover_text("Escape").clicked();
         ui.add_space(10.0);
         for (p, label, icon) in &list {
@@ -158,6 +166,7 @@ fn draw<A: App>(shell: &mut Shell, ui: &mut Ui, app: &mut A, page: Page) {
             }
             crate::icons::paint(ui.painter(), egui::Rect::from_center_size(pos2(r.min.x + 18.0, r.center().y), vec2(18.0, 18.0)), icon, ink, ink);
             ui.painter().text(pos2(r.min.x + 36.0, r.center().y), Align2::LEFT_CENTER, label, medium(13.5), ink);
+            resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Tab, true, *p == page, label));
             widgets::record(shell, Some(crate::commands::shell_ids::FILE_PAGE), r);
             if resp.clicked() {
                 picked = Some(p.clone());
@@ -291,6 +300,8 @@ fn open<A: App>(shell: &mut Shell, ui: &mut Ui, app: &mut A) {
         ui.painter().text(pos2(rect.min.x + 10.0, rect.min.y + 12.0), Align2::LEFT_CENTER, file_name(&r), medium(13.0), t.text);
         ui.painter().text(pos2(rect.min.x + 10.0, rect.min.y + 28.0), Align2::LEFT_CENTER, &r, regular(10.5), t.text_dim);
         widgets::record(shell, Some(ids::OPEN_PATH), rect);
+        let name = file_name(&r);
+        resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &name));
         if resp.clicked() {
             pick = Some(r);
         }

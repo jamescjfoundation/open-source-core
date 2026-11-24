@@ -11,7 +11,7 @@
 //!   drag from a card's handle to another card to link them, double-click the canvas to add one.
 //! - [`card_window`]: a card's title and body to edit, Tab moving between them.
 //!
-//! What the cards stand for (scenes, chapters, ideas) is the app's business.
+//! What the cards stand for (chapters, ideas, steps of a plan) is the app's business.
 
 #![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
