@@ -12,3 +12,13 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+jcj-doc = { workspace = true }
+# WordCraft's DOCX and format crates (wordcraft-docx, wordcraft-formats) and its zip guard.
+jcj-upstream = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+zip = { workspace = true }
+sha2 = { workspace = true }
+
+[dev-dependencies]
+quick-xml = { workspace = true }
