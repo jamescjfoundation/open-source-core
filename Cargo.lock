@@ -1607,6 +1607,12 @@ dependencies = [
 [[package]]
 name = "jcj-engine"
 version = "0.1.0"
+dependencies = [
+ "jcj-doc",
+ "jcj-upstream",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "jcj-interchange"
