@@ -7,6 +7,22 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 Nothing yet.
 
+## 0.1.3 (2026-11-24)
+
+### Added
+
+- `jcj-shell`: `split` (`Split`, `SplitState`, `split`, `panes`, `tabs`, `TabEvent`): two panes
+  side by side or stacked with a draggable divider, and a strip of document tabs. Promoted for
+  Wordsmith Manuscript's split editor (core issue #4).
+- `jcj-interchange`: `epub_read`, and `import(Format::Epub, ..)` now reads an EPUB's chapters in
+  spine order (core issue #13). `Format::Epub.can_import()` still returns false, so apps that list
+  importable formats show the same list; an app that wants EPUB import asks for it by name.
+
+### What apps must do
+
+- Nothing. Move every `jcj-` dependency to `tag = "v0.1.3"` when convenient (the patch block is
+  unchanged).
+
 ## 0.1.2 (2026-11-24)
 
 ### Added
