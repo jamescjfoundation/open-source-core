@@ -23,6 +23,7 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
+pub mod commands;
 pub mod native;
 pub mod recovery;
 
@@ -35,9 +36,22 @@ use jcj_upstream::engine as up;
 // The engine types apps hold. Each name is part of the core's interface.
 pub use up::{CmdError, CmdResult, CommandSpec, Registry, Selection, Session};
 
-/// Helpers for writing commands: results and positions as JSON, the time.
+/// Helpers for writing commands: results and positions as JSON, the time, inserting text.
 pub mod cmd {
     pub use jcj_upstream::engine::cmd::{civil_from_days, now_unix, parse_pos, pos_json, sel_result};
+
+    /// Insert `text` at the caret, replacing the selection, as typing does: with the formatting
+    /// waiting at the caret, a tracked change while changes are tracked, a line break (`\n`) as
+    /// a new paragraph.
+    pub fn type_text(s: &mut crate::Session, text: &str) -> Result<(), crate::CmdError> {
+        jcj_upstream::engine::cmd::type_text(s, text)
+    }
+
+    /// [`type_text`] for text that was not typed (pasted, replaced): no typing rules such as
+    /// ending a list on an empty paragraph.
+    pub fn paste_text(s: &mut crate::Session, text: &str) -> Result<(), crate::CmdError> {
+        jcj_upstream::engine::cmd::paste_text(s, text)
+    }
 }
 
 /// Reading command parameters (`params::str(v, "name")`, `params::bool`, ...).
