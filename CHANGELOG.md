@@ -7,6 +7,23 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 Nothing yet.
 
+## 0.1.15 (2026-11-25)
+
+### Added
+
+- `jcj-output`: `conformance` (`declare`, `Conformance`, `ConformanceError`, `srgb_profile`):
+  PDF/A-2b and PDF/UA-1 declared on a tagged export as an incremental update: the
+  identifications in the XMP metadata (PDF/UA's schema declared for PDF/A), an output intent
+  with an sRGB profile made in code, `DisplayDocTitle`, and the language and author kept the
+  same in the XMP and the information dictionary (core issue #27). Checked with the standard
+  validator where it is installed (`JCJ_PDF_VALIDATOR`): both standards pass. `core-testbed`
+  declares both on its sample.
+
+### What apps must do
+
+- Nothing. Move every `jcj-` dependency to `tag = "v0.1.15"` when convenient (the patch block is
+  unchanged).
+
 ## 0.1.14 (2026-11-25)
 
 ### Fixed
