@@ -917,12 +917,14 @@ name = "core-testbed"
 version = "0.1.12"
 dependencies = [
  "eframe",
+ "egui_kittest",
  "jcj-agents",
  "jcj-board",
  "jcj-doc",
  "jcj-engine",
  "jcj-entries",
  "jcj-features",
+ "jcj-i18n",
  "jcj-interchange",
  "jcj-layout",
  "jcj-output",
@@ -2582,6 +2584,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "jcj-i18n"
+version = "0.1.12"
+dependencies = [
+ "toml",
+]
+
+[[package]]
 name = "jcj-interchange"
 version = "0.1.12"
 dependencies = [
@@ -2642,6 +2651,7 @@ dependencies = [
  "egui",
  "egui_kittest",
  "image",
+ "jcj-i18n",
  "jcj-theme",
  "jcj-upstream",
  "log",

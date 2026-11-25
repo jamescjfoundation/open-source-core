@@ -18,6 +18,8 @@ pub const LAYERS: &[(&str, u8)] = &[
     ("jcj-proof", 2),
     // Entries (typed records beside documents)
     ("jcj-entries", 2),
+    // Interface translation catalogs
+    ("jcj-i18n", 2),
     // Layout and the editing engine
     ("jcj-layout", 3),
     ("jcj-engine", 3),

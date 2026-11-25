@@ -4,6 +4,7 @@
 //! commands through [`Commands`]; the shell's own commands (ids starting `shell.`) it handles
 //! itself.
 
+use jcj_i18n::tl;
 use serde_json::{Value, json};
 
 /// A command to run: its id and parameters.
@@ -155,19 +156,19 @@ pub fn shell_commands() -> Vec<CommandInfo> {
         takes_params: false,
     };
     vec![
-        c(FILE_PAGE, "File Page", "", "file"),
-        c(RIBBON, "Show or Hide the Ribbon", "Mod+F1", "chevronUp"),
-        c(KEYTIPS, "Key Tips", "F10", "launcher"),
-        c(PALETTE, "Command Palette", "Mod+Shift+P", "search"),
-        c(PREFERENCES, "Preferences", "Mod+,", "options"),
-        c(KEYS, "Keys", "", "macros"),
-        c(ABOUT, "About", "", "help"),
-        c(CHECK_FOR_UPDATES, "Check for Updates", "", "recover"),
-        c(THEME, "Light or Dark Theme", "", "darkMode"),
-        c(TOUR, "Show the Tour", "", "help"),
-        c(CLOSE_FILE_PAGE, "Close the File Page", "", "close"),
-        CommandInfo { takes_params: true, ..c(PANEL, "Show or Hide a Panel", "", "navPane") },
-        CommandInfo { takes_params: true, ..c(SIDE, "Show or Hide a Side's Panel", "", "navPane") },
+        c(FILE_PAGE, tl("File Page"), "", "file"),
+        c(RIBBON, tl("Show or Hide the Ribbon"), "Mod+F1", "chevronUp"),
+        c(KEYTIPS, tl("Key Tips"), "F10", "launcher"),
+        c(PALETTE, tl("Command Palette"), "Mod+Shift+P", "search"),
+        c(PREFERENCES, tl("Preferences"), "Mod+,", "options"),
+        c(KEYS, tl("Keys"), "", "macros"),
+        c(ABOUT, tl("About"), "", "help"),
+        c(CHECK_FOR_UPDATES, tl("Check for Updates"), "", "recover"),
+        c(THEME, tl("Light or Dark Theme"), "", "darkMode"),
+        c(TOUR, tl("Show the Tour"), "", "help"),
+        c(CLOSE_FILE_PAGE, tl("Close the File Page"), "", "close"),
+        CommandInfo { takes_params: true, ..c(PANEL, tl("Show or Hide a Panel"), "", "navPane") },
+        CommandInfo { takes_params: true, ..c(SIDE, tl("Show or Hide a Side's Panel"), "", "navPane") },
     ]
 }
 

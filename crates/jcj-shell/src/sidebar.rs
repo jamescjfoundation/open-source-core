@@ -5,6 +5,7 @@
 //! takes its room beside the document; an unpinned one floats over it.
 
 use egui::{Area, Id, Order, Rect, RichText, Sense, Stroke, Ui, pos2, vec2};
+use jcj_i18n::tr;
 use jcj_theme::{Theme, semibold};
 
 use crate::app::App;
@@ -43,8 +44,9 @@ fn rail(shell: &Shell, ui: &mut Ui, items: &[&PanelSpec], side: Side, acts: &mut
             if open { t.accent } else { t.text },
             t.accent,
         );
-        resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, open, &p.title));
-        if resp.on_hover_text(p.title.as_str()).clicked() {
+        let title = tr(&p.title);
+        resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, open, &title));
+        if resp.on_hover_text(title.as_str()).clicked() {
             acts.push(Act::Toggle(p.id.clone()));
         }
         ui.add_space(2.0);
@@ -55,24 +57,29 @@ fn rail(shell: &Shell, ui: &mut Ui, items: &[&PanelSpec], side: Side, acts: &mut
 fn title_bar(ui: &mut Ui, spec: &PanelSpec, pinned: bool, side: Side, acts: &mut Vec<Act>) {
     let t = Theme::get(ui.ctx());
     ui.horizontal(|ui| {
-        ui.label(RichText::new(spec.title.as_str()).font(semibold(t.type_sizes.title)).color(t.text));
+        ui.label(RichText::new(tr(&spec.title)).font(semibold(t.type_sizes.title)).color(t.text));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.add(egui::Button::new("×").frame(false)).on_hover_text("Close").clicked() {
+            if ui.add(egui::Button::new("×").frame(false)).on_hover_text(tr("Close")).clicked() {
                 acts.push(Act::Hide(spec.id.clone()));
             }
             let (r, resp) = ui.allocate_exact_size(vec2(20.0, 20.0), Sense::click());
             if resp.hovered() {
                 ui.painter().rect_filled(r, 4.0, t.hover);
             }
-            resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, pinned, "Pin"));
+            resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, pinned, tr("Pin")));
             crate::icons::paint(ui.painter(), r.shrink(2.0), "pin", if pinned { t.accent } else { t.text_dim }, t.accent);
-            let tip = if pinned { "Unpin: float over the document" } else { "Pin beside the document" };
+            let tip = if pinned { tr("Unpin: float over the document") } else { tr("Pin beside the document") };
             if resp.on_hover_text(tip).clicked() {
                 acts.push(Act::Pin(spec.id.clone(), !pinned));
             }
-            ui.menu_button("Move", |ui| {
+            ui.menu_button(tr("Move"), |ui| {
                 for to in Side::ALL {
-                    if to != side && ui.button(format!("Move to the {}", to.label().to_lowercase())).clicked() {
+                    let label = match to {
+                        Side::Left => tr("Move to the left"),
+                        Side::Right => tr("Move to the right"),
+                        Side::Bottom => tr("Move to the bottom"),
+                    };
+                    if to != side && ui.button(label).clicked() {
                         acts.push(Act::Move(spec.id.clone(), to));
                         ui.close();
                     }

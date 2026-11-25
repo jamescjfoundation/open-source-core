@@ -3,6 +3,7 @@
 //! message (a command's error, a failed auto-save), and at the right the theme switch.
 
 use egui::{RichText, Ui};
+use jcj_i18n::{tl, tr};
 use jcj_theme::{Mode, Theme, regular};
 use serde_json::json;
 
@@ -27,8 +28,8 @@ pub(crate) fn status_bar<A: App>(shell: &mut Shell, ui: &mut Ui, app: &mut A) {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.spacing_mut().item_spacing.x = 4.0;
                 let cmds: &dyn Commands = &*app;
-                let (text, to) = if shell.mode == Mode::Light { ("Dark", Mode::Dark) } else { ("Light", Mode::Light) };
-                let c = Control::with(shell_ids::THEME, json!({"mode": to})).about("Switch theme.");
+                let (text, to) = if shell.mode == Mode::Light { (tr("Dark"), Mode::Dark) } else { (tr("Light"), Mode::Light) };
+                let c = Control::with(shell_ids::THEME, json!({"mode": to})).about(tl("Switch theme."));
                 widgets::link(ui, shell, cmds, &c, RichText::new(text).font(regular(12.0)).color(t.text_dim));
             });
         });

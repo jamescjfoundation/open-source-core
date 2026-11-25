@@ -237,13 +237,16 @@ fn install(
 fn describe(phase: &JobPhase) -> String {
     let mb = |b: u64| b as f64 / 1_048_576.0;
     match phase {
-        JobPhase::Downloading { done, total } if *total > 0 => format!("Downloading… {:.1} of {:.1} MB", mb(*done), mb(*total)),
-        JobPhase::Downloading { .. } => "Downloading…".into(),
-        JobPhase::Reconnecting { .. } => "The connection dropped; trying again…".into(),
-        JobPhase::Verifying => "Checking the download…".into(),
-        JobPhase::Waiting => "Waiting for the system installer…".into(),
-        JobPhase::Installing => "Installing…".into(),
-        JobPhase::Removing => "Removing the old version…".into(),
+        JobPhase::Downloading { done, total } if *total > 0 => {
+            let (done, total) = (format!("{:.1}", mb(*done)), format!("{:.1}", mb(*total)));
+            jcj_i18n::tr_with("Downloading… {done} of {total} MB", &[("done", &done), ("total", &total)])
+        }
+        JobPhase::Downloading { .. } => jcj_i18n::tr("Downloading…"),
+        JobPhase::Reconnecting { .. } => jcj_i18n::tr("The connection dropped; trying again…"),
+        JobPhase::Verifying => jcj_i18n::tr("Checking the download…"),
+        JobPhase::Waiting => jcj_i18n::tr("Waiting for the system installer…"),
+        JobPhase::Installing => jcj_i18n::tr("Installing…"),
+        JobPhase::Removing => jcj_i18n::tr("Removing the old version…"),
     }
 }
 

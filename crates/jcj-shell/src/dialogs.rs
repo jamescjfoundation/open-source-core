@@ -4,6 +4,7 @@
 //! commands, so undo and agents work the same.
 
 use egui::{Color32, Context, RichText, Ui};
+use jcj_i18n::{tr, tr_with};
 use jcj_theme::Mode;
 use serde_json::json;
 
@@ -115,9 +116,16 @@ fn palette_window(shell: &mut Shell, ctx: &Context, cmds: &dyn Commands) {
     let Some(mut palette) = shell.dialogs.palette.take() else { return };
     let mut open = true;
     let mut chosen = None;
-    let all = all_commands(cmds);
-    egui::Window::new("Commands").open(&mut open).collapsible(false).resizable(false).show(ctx, |ui| {
-        let label = ui.label("Find a command");
+    // Found and shown by their labels in the language in use.
+    let all: Vec<CommandInfo> = all_commands(cmds)
+        .into_iter()
+        .map(|mut c| {
+            c.label = tr(&c.label);
+            c
+        })
+        .collect();
+    egui::Window::new(tr("Commands")).open(&mut open).collapsible(false).resizable(false).show(ctx, |ui| {
+        let label = ui.label(tr("Find a command"));
         let edit = ui.add(egui::TextEdit::singleline(&mut palette.query)).labelled_by(label.id);
         edit.request_focus();
         let matches = palette_matches(&all, &palette.query, PALETTE_ROWS);
@@ -158,19 +166,19 @@ fn recovery_window(shell: &mut Shell, ctx: &Context) {
     let can_restore = shell.dialogs.can_restore;
     let mut open = true;
     let mut action = None;
-    egui::Window::new("Recover Unsaved Documents").open(&mut open).show(ctx, |ui| {
+    egui::Window::new(tr("Recover Unsaved Documents")).open(&mut open).show(ctx, |ui| {
         if copies.is_empty() {
-            ui.label("There are no unsaved documents to recover.");
+            ui.label(tr("There are no unsaved documents to recover."));
         } else if !can_restore {
-            ui.label("Start a new document to restore one into it.");
+            ui.label(tr("Start a new document to restore one into it."));
         }
         for c in &copies {
             ui.horizontal(|ui| {
                 ui.label(format!("{} — {}", c.name, c.saved_at));
-                if ui.add_enabled(can_restore, egui::Button::new("Restore")).clicked() {
+                if ui.add_enabled(can_restore, egui::Button::new(tr("Restore"))).clicked() {
                     action = Some(json!({"restore": c.id}));
                 }
-                if ui.button("Discard").clicked() {
+                if ui.button(tr("Discard")).clicked() {
                     action = Some(json!({"discard": c.id}));
                 }
             });
@@ -185,17 +193,17 @@ fn recovery_window(shell: &mut Shell, ctx: &Context) {
 fn unsaved_window(shell: &mut Shell, ctx: &Context) {
     let Some(q) = shell.dialogs.unsaved.clone() else { return };
     let mut answer = None;
-    egui::Window::new("Unsaved Changes").collapsible(false).resizable(false).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]).show(ctx, |ui| {
-        ui.label(format!("Save the changes to “{}” before {}?", q.name, q.doing));
-        ui.label("If you don't save, your changes since the last save are lost.");
+    egui::Window::new(tr("Unsaved Changes")).collapsible(false).resizable(false).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]).show(ctx, |ui| {
+        ui.label(tr_with("Save the changes to “{name}” before {doing}?", &[("name", &q.name), ("doing", &tr(&q.doing))]));
+        ui.label(tr("If you don't save, your changes since the last save are lost."));
         ui.horizontal(|ui| {
-            if ui.button("Save").clicked() {
+            if ui.button(tr("Save")).clicked() {
                 answer = Some(UnsavedAnswer::Save);
             }
-            if ui.button("Don't Save").clicked() {
+            if ui.button(tr("Don't Save")).clicked() {
                 answer = Some(UnsavedAnswer::DontSave);
             }
-            if ui.button("Cancel").clicked() {
+            if ui.button(tr("Cancel")).clicked() {
                 answer = Some(UnsavedAnswer::Cancel);
             }
         });
@@ -212,39 +220,39 @@ fn unsaved_window(shell: &mut Shell, ctx: &Context) {
 /// The shell's preferences, on the Preferences page: auto-save, the theme, starting, the user's
 /// name.
 pub fn prefs_body(shell: &mut Shell, ui: &mut Ui) {
-    ui.heading("Auto-save");
-    ui.checkbox(&mut shell.autosave.enabled, "Save documents automatically");
+    ui.heading(tr("Auto-save"));
+    ui.checkbox(&mut shell.autosave.enabled, tr("Save documents automatically"));
     let mut minutes = shell.autosave.every.as_secs() / 60;
     ui.horizontal(|ui| {
-        ui.label("Every");
+        ui.label(tr("Every"));
         if ui.add(egui::DragValue::new(&mut minutes).range(1..=u64::from(MAX_AUTOSAVE_MINUTES))).changed() {
             shell.autosave.every = std::time::Duration::from_secs(minutes * 60);
         }
-        ui.label("minutes, once typing pauses for");
+        ui.label(tr("minutes, once typing pauses for"));
         let mut idle = shell.autosave.idle.as_secs();
         if ui.add(egui::DragValue::new(&mut idle).range(1..=u64::from(MAX_IDLE_SECONDS))).changed() {
             shell.autosave.idle = std::time::Duration::from_secs(idle);
         }
-        ui.label("seconds");
+        ui.label(tr("seconds"));
     });
-    ui.label("Only documents saved to a file are saved automatically; crash recovery keeps the others.");
+    ui.label(tr("Only documents saved to a file are saved automatically; crash recovery keeps the others."));
     ui.separator();
-    ui.heading("Theme");
+    ui.heading(tr("Theme"));
     ui.horizontal(|ui| {
-        for (mode, label) in [(Mode::Light, "Light"), (Mode::Dark, "Dark"), (Mode::ExtraDark, "Extra dark")] {
+        for (mode, label) in [(Mode::Light, tr("Light")), (Mode::Dark, tr("Dark")), (Mode::ExtraDark, tr("Extra dark"))] {
             if ui.selectable_label(shell.mode == mode, label).clicked() {
                 shell.mode = mode;
             }
         }
     });
     ui.separator();
-    ui.heading("Starting");
-    ui.checkbox(&mut shell.reopen_last, "Open the documents that were open when the app last closed");
-    ui.checkbox(&mut shell.updates.check_at_start, "Check for updates when the app starts");
+    ui.heading(tr("Starting"));
+    ui.checkbox(&mut shell.reopen_last, tr("Open the documents that were open when the app last closed"));
+    ui.checkbox(&mut shell.updates.check_at_start, tr("Check for updates when the app starts"));
     ui.separator();
-    ui.heading("You");
+    ui.heading(tr("You"));
     ui.horizontal(|ui| {
-        let label = ui.label("Your name (notes and tracked changes)");
+        let label = ui.label(tr("Your name (notes and tracked changes)"));
         ui.text_edit_singleline(&mut shell.user_name).labelled_by(label.id);
     });
 }
@@ -257,11 +265,11 @@ pub fn keys_body(shell: &mut Shell, ui: &mut Ui, cmds: &dyn Commands) {
     let mut clear: Option<String> = None;
     let all: Vec<CommandInfo> = all_commands(cmds).into_iter().filter(|c| !c.takes_params).collect();
     ui.horizontal(|ui| {
-        let label = ui.label("Find");
+        let label = ui.label(tr("Find"));
         ui.text_edit_singleline(&mut page.filter).labelled_by(label.id);
     });
     if let Some(id) = &page.capturing {
-        ui.colored_label(Color32::from_rgb(200, 120, 30), format!("Press the new key for {id} (Escape to cancel)"));
+        ui.colored_label(Color32::from_rgb(200, 120, 30), tr_with("Press the new key for {command} (Escape to cancel)", &[("command", id)]));
         let pressed = ui.input(|i| {
             i.events.iter().find_map(|e| match e {
                 egui::Event::Key { key, pressed: true, modifiers, .. } => Some((*key, *modifiers)),
@@ -282,19 +290,20 @@ pub fn keys_body(shell: &mut Shell, ui: &mut Ui, cmds: &dyn Commands) {
         egui::Grid::new("jcj-keys").striped(true).num_columns(4).show(ui, |ui| {
             let f = page.filter.to_lowercase();
             for c in &all {
-                if !f.is_empty() && !format!("{} {} {}", c.id, c.label, c.location).to_lowercase().contains(&f) {
+                let label = tr(&c.label);
+                if !f.is_empty() && !format!("{} {} {} {}", c.id, c.label, label, c.location).to_lowercase().contains(&f) {
                     continue;
                 }
-                ui.label(c.label.as_str()).on_hover_text(c.id.as_str());
+                ui.label(label).on_hover_text(c.id.as_str());
                 ui.label(RichText::new(crate::keys::display(c.first_shortcut(), shell.mac)).weak());
                 let mine: Vec<String> =
                     shell.keys.user().iter().filter(|(_, x)| x.as_str() == c.id).map(|(k, _)| crate::keys::display(k, shell.mac)).collect();
                 ui.label(mine.join(", "));
                 ui.horizontal(|ui| {
-                    if ui.small_button("Set…").clicked() {
+                    if ui.small_button(tr("Set…")).clicked() {
                         page.capturing = Some(c.id.clone());
                     }
-                    if !mine.is_empty() && ui.small_button("Reset").clicked() {
+                    if !mine.is_empty() && ui.small_button(tr("Reset")).clicked() {
                         clear = Some(c.id.clone());
                     }
                 });

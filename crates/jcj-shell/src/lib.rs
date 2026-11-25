@@ -31,6 +31,7 @@ pub mod backstage;
 mod chrome;
 pub mod commands;
 pub mod dialogs;
+pub mod i18n;
 pub mod icons;
 pub mod keys;
 pub mod prefs;

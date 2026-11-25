@@ -96,7 +96,7 @@ pub fn split(ui: &mut Ui, id: Id, how: Split, state: &mut SplitState, first: imp
         state.fraction = if how == Split::Side { (p.x - area.min.x) / area.width().max(1.0) } else { (p.y - area.min.y) / area.height().max(1.0) }
             .clamp(0.15, 0.85);
     }
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Splitter, true, "Pane divider"));
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Splitter, true, jcj_i18n::tr("Pane divider")));
     ui.scope_builder(UiBuilder::new().max_rect(b).id_salt((id, 1)), |ui| {
         ui.set_clip_rect(b);
         second(ui);
@@ -151,7 +151,7 @@ pub fn tabs(ui: &mut Ui, id: Id, titles: &[String], current: usize) -> Option<Ta
         ui.painter().text(close.center(), Align2::CENTER_CENTER, "×", regular(t.type_sizes.body), if cresp.hovered() { t.text } else { t.text_dim });
         let title = title.clone();
         resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Tab, true, on, &title));
-        cresp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "Close tab"));
+        cresp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, jcj_i18n::tr("Close tab")));
         if cresp.clicked() {
             event = Some(TabEvent::Close(i));
         } else if resp.clicked() {

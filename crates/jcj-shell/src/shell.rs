@@ -5,6 +5,7 @@
 use std::time::Instant;
 
 use egui::{Event, Rect, Ui};
+use jcj_i18n::{tl, tr_with};
 use jcj_theme::{FontFace, Mode, Theme, Tokens};
 use serde_json::Value;
 
@@ -57,7 +58,7 @@ impl Default for ShellOptions {
             ribbon: true,
             ribbon_fit: true,
             status_bar: true,
-            file_label: "File".into(),
+            file_label: tl("File").into(),
             file_pages: Page::BUILT_IN.to_vec(),
             tour: Vec::new(),
             keytip_ignored_params: ["on", "id", "ids"].map(String::from).to_vec(),
@@ -454,7 +455,7 @@ impl Shell {
                     self.chrome.tour = Some(0);
                 }
             }
-            other => self.message = format!("There is no command {other}."),
+            other => self.message = tr_with("There is no command {command}.", &[("command", other)]),
         }
     }
 
@@ -462,7 +463,7 @@ impl Shell {
         self.autosave.observe(app.revision(), now);
         match self.autosave.tick(now, app.is_dirty(), app.has_file(), || app.autosave()) {
             Tick::Waiting(at) => ctx.request_repaint_after(at.saturating_duration_since(now)),
-            Tick::Failed(why) => self.message = format!("Auto-save failed: {why}"),
+            Tick::Failed(why) => self.message = tr_with("Auto-save failed: {why}", &[("why", &why)]),
             Tick::Saved | Tick::Idle => {}
         }
     }

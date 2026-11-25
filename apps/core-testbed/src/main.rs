@@ -54,6 +54,10 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         file => {
+            // The interface language, when asked for (English otherwise).
+            if let Ok(code) = std::env::var("CORE_TESTBED_LANG") {
+                core_testbed::languages::set(&code);
+            }
             let path = file.map_or_else(|| std::path::PathBuf::from("untitled.jcjtest"), std::path::PathBuf::from);
             let window = Window {
                 shell: Shell::new("Core testbed", env!("CARGO_PKG_VERSION"), Tokens::default())

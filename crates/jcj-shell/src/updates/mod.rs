@@ -8,6 +8,7 @@
 //! [`Status::Idle`] and has nothing to run.
 
 use egui::{Context, RichText, Ui};
+use jcj_i18n::{tr, tr_with};
 use jcj_theme::Theme;
 
 use crate::commands::{Cmd, shell_ids};
@@ -100,16 +101,24 @@ impl Updates {
     pub fn describe(&self, name: &str, version: &str) -> (String, bool) {
         match &self.status {
             Status::Idle => (format!("{name} {version}."), false),
-            Status::Checking => ("Checking for updates…".into(), false),
-            Status::Current => (format!("{name} {version} is the latest version."), false),
-            Status::Available(o) if o.installs => (format!("{name} {} is available. You have {version}.", o.version), false),
-            Status::Available(o) => {
-                (format!("{name} {} is available. You have {version}. Download it from the release page and replace this copy.", o.version), false)
+            Status::Checking => (tr("Checking for updates…"), false),
+            Status::Current => (tr_with("{app} {version} is the latest version.", &[("app", name), ("version", version)]), false),
+            Status::Available(o) if o.installs => {
+                (tr_with("{app} {new} is available. You have {version}.", &[("app", name), ("new", &o.version), ("version", version)]), false)
             }
+            Status::Available(o) => (
+                tr_with(
+                    "{app} {new} is available. You have {version}. Download it from the release page and replace this copy.",
+                    &[("app", name), ("new", &o.version), ("version", version)],
+                ),
+                false,
+            ),
             Status::Installing(what) => (what.clone(), false),
-            Status::Ready(v) => (format!("{name} {v} is installed. Restart to use it; your documents are kept."), false),
-            Status::Failed(why) => (format!("The update did not finish: {why}"), true),
-            Status::Updated(v) => (format!("{name} was updated to {v}."), false),
+            Status::Ready(v) => {
+                (tr_with("{app} {new} is installed. Restart to use it; your documents are kept.", &[("app", name), ("new", v)]), false)
+            }
+            Status::Failed(why) => (tr_with("The update did not finish: {why}", &[("why", why)]), true),
+            Status::Updated(v) => (tr_with("{app} was updated to {new}.", &[("app", name), ("new", v)]), false),
             Status::Unsupported(why) => (why.clone(), false),
         }
     }
@@ -124,16 +133,16 @@ pub fn actions(shell: &mut Shell, ui: &mut Ui) {
     ui.add_space(6.0);
     ui.horizontal(|ui| match shell.updates.status.clone() {
         Status::Available(offer) => {
-            if offer.installs && ui.button("Install and Restart").clicked() {
+            if offer.installs && ui.button(tr("Install and Restart")).clicked() {
                 shell.updates.requests.push(Request::Install);
-                shell.updates.status = Status::Installing("Downloading…".into());
+                shell.updates.status = Status::Installing(tr("Downloading…"));
             }
-            if ui.button(if offer.installs { "Release Notes" } else { "Open Release Page" }).clicked() {
+            if ui.button(if offer.installs { tr("Release Notes") } else { tr("Open Release Page") }).clicked() {
                 ui.ctx().open_url(egui::OpenUrl::new_tab(&offer.page));
             }
         }
         Status::Ready(_) => {
-            if ui.button("Restart Now").clicked() {
+            if ui.button(tr("Restart Now")).clicked() {
                 shell.updates.requests.push(Request::Restart);
             }
         }
@@ -142,7 +151,7 @@ pub fn actions(shell: &mut Shell, ui: &mut Ui) {
         }
         Status::Unsupported(_) => {}
         _ => {
-            if ui.button("Check for Updates").clicked() {
+            if ui.button(tr("Check for Updates")).clicked() {
                 shell.run(Cmd::new(shell_ids::CHECK_FOR_UPDATES));
             }
         }
@@ -155,7 +164,7 @@ pub(crate) fn window(shell: &mut Shell, ctx: &Context) {
         return;
     }
     let mut open = true;
-    egui::Window::new("Software Update").open(&mut open).collapsible(false).resizable(false).show(ctx, |ui| {
+    egui::Window::new(tr("Software Update")).open(&mut open).collapsible(false).resizable(false).show(ctx, |ui| {
         ui.set_max_width(380.0);
         actions(shell, ui);
     });

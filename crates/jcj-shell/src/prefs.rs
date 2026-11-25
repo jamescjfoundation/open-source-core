@@ -182,7 +182,7 @@ impl<P: Serialize + DeserializeOwned + Default + PartialEq + Clone> PrefsFile<P>
             Ok(p) => (p.unwrap_or_default(), None),
             Err(e) => {
                 let _ = std::fs::rename(&path, dir.join(format!("{}.damaged", Self::NAME)));
-                (P::default(), Some(format!("Preferences could not be read ({e}); the defaults are used.")))
+                (P::default(), Some(jcj_i18n::tr_with("Preferences could not be read ({why}); the defaults are used.", &[("why", &e.to_string())])))
             }
         };
         (PrefsFile { path, written: prefs.clone(), last_write: None }, prefs, problem)

@@ -9,6 +9,7 @@
 //! `{"template": id}`; the app builds the new document.
 
 use egui::{Align2, Rect, RichText, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
+use jcj_i18n::tr;
 use jcj_theme::{Theme, medium, regular, semibold};
 use serde_json::json;
 
@@ -59,17 +60,23 @@ pub fn chooser(ui: &mut Ui, shell: &mut Shell, templates: &[TemplateSpec]) -> Op
     for group in groups {
         if !group.is_empty() {
             ui.add_space(6.0);
-            ui.label(RichText::new(group).font(medium(t.type_sizes.body)).color(t.text_dim));
+            ui.label(RichText::new(tr(group)).font(medium(t.type_sizes.body)).color(t.text_dim));
         }
         ui.horizontal_wrapped(|ui| {
             for tpl in templates.iter().filter(|x| x.group == group) {
                 let (rect, resp) = ui.allocate_exact_size(TILE, Sense::click());
                 let fill = if resp.hovered() { t.hover } else { t.surface_high };
                 ui.painter().rect(rect, t.radius.card, fill, Stroke::new(1.0, t.border), StrokeKind::Inside);
-                ui.painter().text(pos2(rect.min.x + 12.0, rect.min.y + 18.0), Align2::LEFT_CENTER, &tpl.name, semibold(t.type_sizes.title), t.text);
-                let about = ui.painter().layout(tpl.about.clone(), regular(t.type_sizes.caption), t.text_dim, rect.width() - 24.0);
+                ui.painter().text(
+                    pos2(rect.min.x + 12.0, rect.min.y + 18.0),
+                    Align2::LEFT_CENTER,
+                    tr(&tpl.name),
+                    semibold(t.type_sizes.title),
+                    t.text,
+                );
+                let about = ui.painter().layout(tr(&tpl.about), regular(t.type_sizes.caption), t.text_dim, rect.width() - 24.0);
                 ui.painter().with_clip_rect(rect.shrink(4.0)).galley(pos2(rect.min.x + 12.0, rect.min.y + 34.0), about, t.text_dim);
-                let name = tpl.name.clone();
+                let name = tr(&tpl.name);
                 resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &name));
                 crate::widgets::record(shell, Some(ids::NEW_FROM_TEMPLATE), rect);
                 if resp.clicked() {
@@ -104,15 +111,15 @@ pub fn start_window<A: App>(ui: &mut Ui, shell: &mut Shell, app: &mut A) {
             ui.add_space(14.0);
             let templates = app.templates();
             if !templates.is_empty() {
-                ui.label(RichText::new("Start something new").font(medium(t.type_sizes.title)).color(t.text));
+                ui.label(RichText::new(tr("Start something new")).font(medium(t.type_sizes.title)).color(t.text));
                 ui.add_space(4.0);
                 chooser(ui, shell, &templates);
                 ui.add_space(16.0);
             }
             ui.horizontal(|ui| {
-                ui.label(RichText::new("Open").font(medium(t.type_sizes.title)).color(t.text));
+                ui.label(RichText::new(tr("Open")).font(medium(t.type_sizes.title)).color(t.text));
                 ui.add_space(8.0);
-                let b = ui.button("Open…");
+                let b = ui.button(tr("Open…"));
                 crate::widgets::record(shell, Some(ids::OPEN), b.rect);
                 if b.clicked() {
                     shell.run(Cmd::new(ids::OPEN));
@@ -120,7 +127,7 @@ pub fn start_window<A: App>(ui: &mut Ui, shell: &mut Shell, app: &mut A) {
             });
             ui.add_space(6.0);
             if shell.recent.is_empty() {
-                ui.label(RichText::new("Files you open or save show here.").color(t.text_dim));
+                ui.label(RichText::new(tr("Files you open or save show here.")).color(t.text_dim));
             }
             for r in shell.recent.clone().into_iter().take(10) {
                 let name = std::path::Path::new(&r).file_name().and_then(|n| n.to_str()).unwrap_or(&r).to_string();

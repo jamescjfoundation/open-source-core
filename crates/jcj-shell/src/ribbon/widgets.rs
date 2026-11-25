@@ -6,6 +6,7 @@
 //! the command; the shell runs it once the frame is drawn.
 
 use egui::{Align2, Color32, Rect, Response, Sense, Stroke, Ui, pos2, vec2};
+use jcj_i18n::{tr, tr_with};
 use jcj_theme::{Theme, medium, regular};
 use serde_json::Value;
 
@@ -97,7 +98,7 @@ impl Control {
     }
 
     fn label_or_name(&self, cmds: &dyn Commands) -> String {
-        if self.label.is_empty() { info(cmds, &self.cmd.id).map_or_else(|| self.cmd.id.clone(), |c| c.label) } else { self.label.clone() }
+        tr(&if self.label.is_empty() { info(cmds, &self.cmd.id).map_or_else(|| self.cmd.id.clone(), |c| c.label) } else { self.label.clone() })
     }
 
     fn icon_name(&self, cmds: &dyn Commands) -> String {
@@ -114,17 +115,19 @@ pub fn key_for(shell: &Shell, cmds: &dyn Commands, id: &str) -> String {
 
 /// The tooltip for command `id`: its name and key, then `about`, then why it cannot run now.
 pub fn tip(shell: &Shell, cmds: &dyn Commands, id: &str, about: &str) -> String {
-    let name = info(cmds, id).map_or_else(|| id.to_string(), |c| c.label);
+    let name = info(cmds, id).map_or_else(|| id.to_string(), |c| tr(&c.label));
     let key = key_for(shell, cmds, id);
     let mut out = if key.is_empty() { name } else { format!("{name}   {key}") };
     if !about.is_empty() {
         out.push('\n');
-        out.push_str(about);
+        out.push_str(&tr(about));
     }
     if info(cmds, id).is_none() {
-        out.push_str("\n(Not available)");
+        out.push('\n');
+        out.push_str(&tr("(Not available)"));
     } else if let Some(why) = cmds.why_disabled(id) {
-        out.push_str(&format!("\n(Not now: {why})"));
+        out.push('\n');
+        out.push_str(&tr_with("(Not now: {why})", &[("why", &why)]));
     }
     out
 }
@@ -224,7 +227,8 @@ pub fn small(ui: &mut Ui, shell: &mut Shell, cmds: &dyn Commands, c: &Control) -
     let t = Theme::get(ui.ctx());
     let ok = enabled(cmds, &c.cmd.id);
     let compact = ribbon_fit::compact(ui.ctx());
-    let label = c.label.as_str();
+    let label = tr(&c.label);
+    let label = label.as_str();
     let galley = ui.painter().layout_no_wrap(label.to_string(), regular(BODY_SMALL), t.text);
     let label_w = galley.size().x + 8.0;
     if !compact && !label.is_empty() {
@@ -338,7 +342,7 @@ pub fn group(ui: &mut Ui, shell: &mut Shell, title: &str, add: impl FnOnce(&mut 
             t.text_dim,
             t.accent,
         );
-        ui.painter().text(pos2(r.center().x, r.max.y - 8.0), Align2::CENTER_CENTER, title, regular(t.type_sizes.caption), t.text_dim);
+        ui.painter().text(pos2(r.center().x, r.max.y - 8.0), Align2::CENTER_CENTER, tr(title), regular(t.type_sizes.caption), t.text_dim);
         let popup = ui.make_persistent_id(("ribbon-group", title));
         record(shell, None, r);
         note_keytip(ui, shell, r, Keytip::Open(popup), title);
@@ -364,7 +368,7 @@ pub fn group(ui: &mut Ui, shell: &mut Shell, title: &str, add: impl FnOnce(&mut 
     });
     let w = inner.response.rect.width().max(40.0);
     let title_rect = Rect::from_min_size(pos2(top.x, top.y + CONTENT_H), vec2(w, TITLE_H));
-    ui.painter().text(title_rect.center(), Align2::CENTER_CENTER, title, regular(t.type_sizes.caption), t.text_dim);
+    ui.painter().text(title_rect.center(), Align2::CENTER_CENTER, tr(title), regular(t.type_sizes.caption), t.text_dim);
     // Reserve the title row's height beside the band.
     ui.allocate_space(vec2(0.0, CONTENT_H + TITLE_H - inner.response.rect.height()));
     ribbon_fit::end_compact(ui.ctx());
@@ -394,7 +398,7 @@ pub fn tile(ui: &mut Ui, shell: &mut Shell, cmds: &dyn Commands, c: &Control) ->
         ui.painter().text(pos2(r.min.x + 23.0, r.center().y), Align2::LEFT_CENTER, name, regular(11.0), ink);
     } else {
         ui.painter().text(pos2(r.min.x + 25.0, r.min.y + 9.5), Align2::LEFT_CENTER, name, medium(11.5), ink);
-        ui.painter().text(pos2(r.min.x + 25.0, r.min.y + 21.5), Align2::LEFT_CENTER, &c.second, regular(9.5), t.text_dim);
+        ui.painter().text(pos2(r.min.x + 25.0, r.min.y + 21.5), Align2::LEFT_CENTER, tr(&c.second), regular(9.5), t.text_dim);
     }
     finish(ui, shell, cmds, c, r, resp, ok)
 }

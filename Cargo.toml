@@ -12,6 +12,7 @@ members = [
     "crates/jcj-theme",
     "crates/jcj-board",
     "crates/jcj-entries",
+    "crates/jcj-i18n",
     "crates/jcj-shell",
     "crates/jcj-agents",
     "crates/jcj-features",
@@ -43,6 +44,7 @@ jcj-project = { path = "crates/jcj-project" }
 jcj-theme = { path = "crates/jcj-theme" }
 jcj-board = { path = "crates/jcj-board" }
 jcj-entries = { path = "crates/jcj-entries" }
+jcj-i18n = { path = "crates/jcj-i18n" }
 jcj-shell = { path = "crates/jcj-shell" }
 jcj-agents = { path = "crates/jcj-agents" }
 jcj-features = { path = "crates/jcj-features" }
@@ -79,6 +81,7 @@ craft-pdf = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf4
 
 # Foundation (versions as WordCraft pins them)
 serde = { version = "1", features = ["derive", "rc"] }
+toml = "1"
 serde_json = { version = "1", features = ["float_roundtrip"] }
 thiserror = "2"
 log = "0.4"

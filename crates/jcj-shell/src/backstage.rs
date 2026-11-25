@@ -6,6 +6,7 @@
 //! adds its own to each page ([`crate::App::file_page_ui`]). Every button runs a command.
 
 use egui::{Align2, Color32, RichText, Sense, Stroke, Ui, pos2, vec2};
+use jcj_i18n::{tl, tr};
 use jcj_theme::{Theme, medium, regular, semibold};
 use serde_json::json;
 
@@ -64,14 +65,14 @@ impl Page {
 
     fn label_and_icon(&self) -> (&'static str, &'static str) {
         match self {
-            Page::New => ("New", "plus"),
-            Page::Open => ("Open", "open"),
-            Page::Save => ("Save", "save"),
-            Page::Export => ("Export", "export"),
-            Page::Print => ("Print", "print"),
-            Page::Preferences => ("Preferences", "options"),
-            Page::Keys => ("Keys", "macros"),
-            Page::About => ("About", "help"),
+            Page::New => (tl("New"), "plus"),
+            Page::Open => (tl("Open"), "open"),
+            Page::Save => (tl("Save"), "save"),
+            Page::Export => (tl("Export"), "export"),
+            Page::Print => (tl("Print"), "print"),
+            Page::Preferences => (tl("Preferences"), "options"),
+            Page::Keys => (tl("Keys"), "macros"),
+            Page::About => (tl("About"), "help"),
             Page::App(_) => ("", ""),
         }
     }
@@ -151,9 +152,9 @@ fn draw<A: App>(shell: &mut Shell, ui: &mut Ui, app: &mut A, page: Page) {
             ink,
             ink,
         );
-        ui.painter().text(pos2(r.min.x + 36.0, r.center().y), Align2::LEFT_CENTER, "Back", medium(t.type_sizes.body), ink);
-        resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "Back"));
-        back = resp.on_hover_text("Escape").clicked();
+        ui.painter().text(pos2(r.min.x + 36.0, r.center().y), Align2::LEFT_CENTER, tr("Back"), medium(t.type_sizes.body), ink);
+        resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tr("Back")));
+        back = resp.on_hover_text(tr("Escape")).clicked();
         ui.add_space(10.0);
         for (p, label, icon) in &list {
             let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 34.0), Sense::click());
@@ -165,8 +166,9 @@ fn draw<A: App>(shell: &mut Shell, ui: &mut Ui, app: &mut A, page: Page) {
                 ui.painter().rect_filled(r, 6.0, Color32::from_white_alpha(25));
             }
             crate::icons::paint(ui.painter(), egui::Rect::from_center_size(pos2(r.min.x + 18.0, r.center().y), vec2(18.0, 18.0)), icon, ink, ink);
-            ui.painter().text(pos2(r.min.x + 36.0, r.center().y), Align2::LEFT_CENTER, label, medium(13.5), ink);
-            resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Tab, true, *p == page, label));
+            let label = tr(label);
+            ui.painter().text(pos2(r.min.x + 36.0, r.center().y), Align2::LEFT_CENTER, &label, medium(13.5), ink);
+            resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Tab, true, *p == page, &label));
             widgets::record(shell, Some(crate::commands::shell_ids::FILE_PAGE), r);
             if resp.clicked() {
                 picked = Some(p.clone());
@@ -194,21 +196,21 @@ fn draw<A: App>(shell: &mut Shell, ui: &mut Ui, app: &mut A, page: Page) {
             Page::Open => open(shell, ui, app),
             Page::Save => save(shell, ui, app),
             Page::Export => {
-                heading(ui, "Export");
+                heading(ui, tl("Export"));
                 app.file_page_ui(&page, ui, shell);
             }
             Page::Print => {
-                heading(ui, "Print");
+                heading(ui, tl("Print"));
                 app.file_page_ui(&page, ui, shell);
-                action(ui, shell, &*app, &Control::new(ids::PRINT).label("Print").about("Send the pages to the printer."));
+                action(ui, shell, &*app, &Control::new(ids::PRINT).label(tl("Print")).about(tl("Send the pages to the printer.")));
             }
             Page::Preferences => {
-                heading(ui, "Preferences");
+                heading(ui, tl("Preferences"));
                 crate::dialogs::prefs_body(shell, ui);
                 app.preferences_ui(ui, shell);
             }
             Page::Keys => {
-                heading(ui, "Keys");
+                heading(ui, tl("Keys"));
                 crate::dialogs::keys_body(shell, ui, &*app);
             }
             Page::About => about(shell, ui, app),
@@ -220,7 +222,7 @@ fn draw<A: App>(shell: &mut Shell, ui: &mut Ui, app: &mut A, page: Page) {
 /// A page's heading.
 pub fn heading(ui: &mut Ui, text: &str) {
     let t = Theme::get(ui.ctx());
-    ui.label(RichText::new(text).font(semibold(t.type_sizes.heading)).color(t.text));
+    ui.label(RichText::new(tr(text)).font(semibold(t.type_sizes.heading)).color(t.text));
     ui.add_space(12.0);
 }
 
@@ -228,7 +230,7 @@ pub fn heading(ui: &mut Ui, text: &str) {
 pub fn sub(ui: &mut Ui, text: &str) {
     let t = Theme::get(ui.ctx());
     ui.add_space(10.0);
-    ui.label(RichText::new(text).font(semibold(15.0)).color(t.text));
+    ui.label(RichText::new(tr(text)).font(semibold(15.0)).color(t.text));
     ui.add_space(4.0);
 }
 
@@ -246,8 +248,8 @@ pub fn action(ui: &mut Ui, shell: &mut Shell, cmds: &dyn Commands, c: &Control) 
     crate::icons::paint(ui.painter(), egui::Rect::from_center_size(pos2(r.min.x + 26.0, r.center().y), vec2(24.0, 24.0)), &icon, ink, t.accent);
     let title =
         if c.label.is_empty() { crate::commands::info(cmds, &c.cmd.id).map_or_else(|| c.cmd.id.clone(), |i| i.label) } else { c.label.clone() };
-    ui.painter().text(pos2(r.min.x + 50.0, r.min.y + 17.0), Align2::LEFT_CENTER, title, medium(13.5), ink);
-    ui.painter().text(pos2(r.min.x + 50.0, r.min.y + 35.0), Align2::LEFT_CENTER, &c.about, regular(t.type_sizes.caption), t.text_dim);
+    ui.painter().text(pos2(r.min.x + 50.0, r.min.y + 17.0), Align2::LEFT_CENTER, tr(&title), medium(13.5), ink);
+    ui.painter().text(pos2(r.min.x + 50.0, r.min.y + 35.0), Align2::LEFT_CENTER, tr(&c.about), regular(t.type_sizes.caption), t.text_dim);
     ui.add_space(6.0);
     widgets::record(shell, Some(&c.cmd.id), r);
     let resp = resp.on_hover_text(widgets::tip(shell, cmds, &c.cmd.id, ""));
@@ -264,15 +266,15 @@ fn file_name(path: &str) -> String {
 }
 
 fn new<A: App>(shell: &mut Shell, ui: &mut Ui, app: &mut A) {
-    heading(ui, "New");
-    action(ui, shell, &*app, &Control::new(ids::NEW).icon("file").label("New document").about("Start an empty document."));
+    heading(ui, tl("New"));
+    action(ui, shell, &*app, &Control::new(ids::NEW).icon("file").label(tl("New document")).about(tl("Start an empty document.")));
     let templates = app.templates();
     if !templates.is_empty() {
-        sub(ui, "Templates");
+        sub(ui, tl("Templates"));
         crate::start::chooser(ui, shell, &templates);
     }
     if !shell.recent.is_empty() {
-        sub(ui, "Recent");
+        sub(ui, tl("Recent"));
         let cmds: &dyn Commands = &*app;
         ui.horizontal_wrapped(|ui| {
             for r in shell.recent.clone().into_iter().take(6) {
@@ -290,11 +292,11 @@ fn new<A: App>(shell: &mut Shell, ui: &mut Ui, app: &mut A) {
 
 fn open<A: App>(shell: &mut Shell, ui: &mut Ui, app: &mut A) {
     let t = Theme::get(ui.ctx());
-    heading(ui, "Open");
-    action(ui, shell, &*app, &Control::new(ids::OPEN).label("Open…").about("A document from a file."));
-    sub(ui, "Recent");
+    heading(ui, tl("Open"));
+    action(ui, shell, &*app, &Control::new(ids::OPEN).label(tl("Open…")).about(tl("A document from a file.")));
+    sub(ui, tl("Recent"));
     if shell.recent.is_empty() {
-        ui.label(RichText::new("Documents you open or save show here.").color(t.text_dim));
+        ui.label(RichText::new(tr("Documents you open or save show here.")).color(t.text_dim));
     }
     let mut pick = None;
     for r in shell.recent.clone() {
@@ -312,8 +314,8 @@ fn open<A: App>(shell: &mut Shell, ui: &mut Ui, app: &mut A) {
         }
     }
     if !shell.dialogs.recovery.is_empty() {
-        sub(ui, "Unsaved work");
-        if ui.button("Recover Unsaved Documents…").clicked() {
+        sub(ui, tl("Unsaved work"));
+        if ui.button(tr("Recover Unsaved Documents…")).clicked() {
             shell.dialogs.show_recovery = true;
         }
     }
@@ -326,12 +328,12 @@ fn open<A: App>(shell: &mut Shell, ui: &mut Ui, app: &mut A) {
 
 fn save<A: App>(shell: &mut Shell, ui: &mut Ui, app: &mut A) {
     let t = Theme::get(ui.ctx());
-    heading(ui, "Save");
-    let where_ = app.document_path().unwrap_or_else(|| "Not saved to a file yet.".to_string());
+    heading(ui, tl("Save"));
+    let where_ = app.document_path().unwrap_or_else(|| tr("Not saved to a file yet."));
     ui.label(RichText::new(where_).color(t.text_dim));
     ui.add_space(8.0);
-    action(ui, shell, &*app, &Control::new(ids::SAVE).label("Save").about("Keep the changes in the document's file."));
-    action(ui, shell, &*app, &Control::new(ids::SAVE_AS).icon("saveAs").label("Save As…").about("Keep the document in a new file."));
+    action(ui, shell, &*app, &Control::new(ids::SAVE).label(tl("Save")).about(tl("Keep the changes in the document's file.")));
+    action(ui, shell, &*app, &Control::new(ids::SAVE_AS).icon("saveAs").label(tl("Save As…")).about(tl("Keep the document in a new file.")));
     app.file_page_ui(&Page::Save, ui, shell);
 }
 
@@ -343,7 +345,7 @@ fn about<A: App>(shell: &mut Shell, ui: &mut Ui, app: &mut A) {
         app.paint_mark(ui.painter(), r, t.text);
         ui.add_space(16.0);
     }
-    heading(ui, "About");
+    heading(ui, tl("About"));
     let info = app.about();
     ui.label(RichText::new(format!("{} {}", shell.name, shell.version)).font(medium(15.0)).color(t.text));
     if !info.summary.is_empty() {
@@ -357,12 +359,12 @@ fn about<A: App>(shell: &mut Shell, ui: &mut Ui, app: &mut A) {
         ui.hyperlink(site);
     }
     if !info.acknowledgments.is_empty() {
-        sub(ui, "Acknowledgments");
+        sub(ui, tl("Acknowledgments"));
         ui.label(RichText::new(&info.acknowledgments).font(regular(t.type_sizes.body)).color(t.text));
     }
-    sub(ui, "Updates");
+    sub(ui, tl("Updates"));
     crate::updates::actions(shell, ui);
-    ui.checkbox(&mut shell.updates.check_at_start, "Check for updates when the app starts");
+    ui.checkbox(&mut shell.updates.check_at_start, tr("Check for updates when the app starts"));
     app.file_page_ui(&Page::About, ui, shell);
 }
 

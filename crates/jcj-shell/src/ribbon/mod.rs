@@ -8,6 +8,7 @@
 use std::collections::HashMap;
 
 use egui::{Align2, Event, Key, Rect, Sense, Stroke, Ui, pos2, vec2};
+use jcj_i18n::{tl, tr, tr_with};
 use jcj_theme::{Theme, regular, semibold};
 
 use crate::app::App;
@@ -283,11 +284,11 @@ fn quick_row<A: App>(shell: &mut Shell, ui: &mut Ui, app: &A) {
         }
         ui.add_space(10.0);
         let state = if app.is_dirty() {
-            "Not saved"
+            tr("Not saved")
         } else if app.has_file() {
-            "Saved"
+            tr("Saved")
         } else {
-            "Not saved yet"
+            tr("Not saved yet")
         };
         ui.add(egui::Label::new(egui::RichText::new(app.document_name()).font(semibold(t.type_sizes.body)).color(t.text)).selectable(false));
         ui.add(egui::Label::new(egui::RichText::new(format!("— {state}")).font(regular(t.type_sizes.body)).color(t.text_dim)).selectable(false));
@@ -300,15 +301,15 @@ fn quick_row<A: App>(shell: &mut Shell, ui: &mut Ui, app: &A) {
                 }
                 let open = shell.layout.open_on(side).is_some();
                 let (label, icon) = match side {
-                    Side::Left => ("Left panel", "chevronLeft"),
-                    Side::Right => ("Right panel", "chevronRight"),
-                    Side::Bottom => ("Bottom panel", "chevronDown"),
+                    Side::Left => (tl("Left panel"), "chevronLeft"),
+                    Side::Right => (tl("Right panel"), "chevronRight"),
+                    Side::Bottom => (tl("Bottom panel"), "chevronDown"),
                 };
                 let c = widgets::Control::with(shell_ids::SIDE, serde_json::json!({"side": side.key()}))
                     .icon(icon)
                     .label(label)
                     .on(open)
-                    .about("Show or hide the panel on this side.");
+                    .about(tl("Show or hide the panel on this side."));
                 widgets::small(ui, shell, cmds, &c);
             }
             // The command search box: the palette.
@@ -324,10 +325,10 @@ fn quick_row<A: App>(shell: &mut Shell, ui: &mut Ui, app: &A) {
                 t.text_dim,
                 t.accent,
             );
-            ui.painter().text(pos2(r.min.x + 26.0, r.center().y), Align2::LEFT_CENTER, "Search commands", regular(12.0), t.text_dim);
+            ui.painter().text(pos2(r.min.x + 26.0, r.center().y), Align2::LEFT_CENTER, tr("Search commands"), regular(12.0), t.text_dim);
             ui.painter().text(pos2(r.max.x - 8.0, r.center().y), Align2::RIGHT_CENTER, key, regular(11.0), t.text_dim);
             widgets::record(shell, Some(shell_ids::PALETTE), r);
-            if resp.on_hover_text(widgets::tip(shell, cmds, shell_ids::PALETTE, "Find any command by name.")).clicked() {
+            if resp.on_hover_text(widgets::tip(shell, cmds, shell_ids::PALETTE, tl("Find any command by name."))).clicked() {
                 shell.run(Cmd::new(shell_ids::PALETTE));
             }
         });
@@ -365,13 +366,14 @@ pub(crate) fn tour(shell: &mut Shell, ctx: &egui::Context) {
         .frame(egui::Frame::popup(&ctx.style_of(ctx.theme())).fill(t.surface_high).inner_margin(14))
         .show(ctx, |ui| {
             ui.set_max_width(380.0);
-            ui.label(egui::RichText::new(format!("{} of {count}", step + 1)).font(regular(11.0)).color(t.text_dim));
-            ui.label(egui::RichText::new(head).font(semibold(16.0)).color(t.text));
-            ui.label(egui::RichText::new(body).font(regular(12.5)).color(t.text));
+            let (at, of) = ((step + 1).to_string(), count.to_string());
+            ui.label(egui::RichText::new(tr_with("{step} of {count}", &[("step", &at), ("count", &of)])).font(regular(11.0)).color(t.text_dim));
+            ui.label(egui::RichText::new(tr(&head)).font(semibold(16.0)).color(t.text));
+            ui.label(egui::RichText::new(tr(&body)).font(regular(12.5)).color(t.text));
             ui.add_space(6.0);
             ui.horizontal(|ui| {
-                next = ui.button(if step + 1 == count { "Done" } else { "Next" }).clicked();
-                skip = ui.button("Skip the tour").clicked();
+                next = ui.button(if step + 1 == count { tr("Done") } else { tr("Next") }).clicked();
+                skip = ui.button(tr("Skip the tour")).clicked();
             });
         });
     if skip || (next && step + 1 == count) {

@@ -12,6 +12,7 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+jcj-i18n = { workspace = true }
 jcj-theme = { workspace = true }
 jcj-upstream = { workspace = true, features = ["shell"] }
 egui = { workspace = true }
