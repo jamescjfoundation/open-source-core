@@ -32,6 +32,8 @@ use zip::{CompressionMethod, ZipWriter};
 
 /// Deeper table nesting than this is written as text only.
 const MAX_DEPTH: usize = 16;
+/// Most notes written in one chapter.
+const MAX_NOTES: usize = 10_000;
 
 const XHTML_NS: &str = "http://www.w3.org/1999/xhtml";
 const OPS_NS: &str = "http://www.idpf.org/2007/ops";
@@ -80,6 +82,10 @@ fn text_xhtml(s: &str) -> String {
 #[derive(Default)]
 struct Images {
     files: Vec<(String, &'static str, Arc<Vec<u8>>)>,
+    /// The current chapter's notes, in the order they are called: (mark, blocks).
+    notes: Vec<(String, Vec<FBlock>)>,
+    /// Writing a note's own text (notes inside notes are not followed).
+    in_note: bool,
 }
 
 impl Images {
@@ -159,6 +165,17 @@ fn inlines(out: &mut String, items: &[Inline], images: &mut Images) {
             }
             Inline::Field { result, fmt, .. } => styled(out, &text_xhtml(result), fmt),
             Inline::Control { text, fmt, .. } => styled(out, &text_xhtml(text), fmt),
+            // A note: a numbered reference here, the note at the chapter's end (numbered per
+            // chapter; a custom mark is kept).
+            Inline::Note { custom, blocks, .. } if !images.in_note && images.notes.len() < MAX_NOTES => {
+                let n = images.notes.len() + 1;
+                let mark = if custom.trim().is_empty() { n.to_string() } else { custom.trim().to_string() };
+                out.push_str(&format!(
+                    "<a class=\"noteref\" epub:type=\"noteref\" role=\"doc-noteref\" id=\"noteref-{n}\" href=\"#note-{n}\"><sup>{}</sup></a>",
+                    esc(&mark)
+                ));
+                images.notes.push((mark, blocks.clone()));
+            }
             _ => {}
         }
     }
@@ -277,6 +294,26 @@ fn blocks_xhtml(out: &mut String, blocks: &[&FBlock], images: &mut Images, depth
     lists.close_to(out, 0);
 }
 
+/// The chapter's notes as an endnote list, each linked back to its reference. Notes inside notes
+/// are not followed.
+fn notes_xhtml(out: &mut String, images: &mut Images) {
+    let notes = std::mem::take(&mut images.notes);
+    if notes.is_empty() {
+        return;
+    }
+    out.push_str("<section class=\"notes\" epub:type=\"endnotes\" role=\"doc-endnotes\">\n<ol>\n");
+    for (i, (mark, blocks)) in notes.iter().enumerate() {
+        let n = i + 1;
+        out.push_str(&format!("<li id=\"note-{n}\" epub:type=\"endnote\"><span class=\"mark\">{}</span>", esc(mark)));
+        let refs: Vec<&FBlock> = blocks.iter().collect();
+        images.in_note = true;
+        blocks_xhtml(out, &refs, images, MAX_DEPTH - 1);
+        images.in_note = false;
+        out.push_str(&format!("<p><a href=\"#noteref-{n}\" role=\"doc-backlink\">Back</a></p></li>\n"));
+    }
+    out.push_str("</ol>\n</section>\n");
+}
+
 fn table_xhtml(out: &mut String, t: &FTable, images: &mut Images, depth: usize) {
     if depth >= MAX_DEPTH {
         return;
@@ -369,7 +406,7 @@ fn xhtml_page(lang: &str, title: &str, body: &str) -> String {
 
 /// The EPUB file for `doc`.
 pub(crate) fn write(doc: &Document) -> Result<Vec<u8>, String> {
-    let flow = model::from_doc(doc);
+    let flow = model::from_doc_with(doc, model::FlowOpts { notes: true, ..model::FlowOpts::default() });
     let lang = language(doc);
     let book_title = Some(doc.core.title.trim()).filter(|t| !t.is_empty()).map(str::to_string);
     let mut images = Images::default();
@@ -378,6 +415,7 @@ pub(crate) fn write(doc: &Document) -> Result<Vec<u8>, String> {
         let title = Some(ch.title).filter(|t| !t.is_empty()).or_else(|| book_title.clone()).unwrap_or_else(|| format!("Chapter {}", n + 1));
         let mut body = String::from("<section epub:type=\"chapter\">\n");
         blocks_xhtml(&mut body, &ch.blocks, &mut images, 0);
+        notes_xhtml(&mut body, &mut images);
         body.push_str("</section>\n");
         pages.push((format!("chapter-{:03}.xhtml", n + 1), title.clone(), xhtml_page(&lang, &title, &body)));
     }
@@ -485,5 +523,44 @@ mod tests {
         assert_eq!(out.matches("<ul>").count(), out.matches("</ul>").count(), "{out}");
         assert_eq!(out.matches("<ol").count(), out.matches("</ol>").count(), "{out}");
         assert!(out.contains("<ol start=\"3\">"), "{out}");
+    }
+
+    #[test]
+    fn notes_are_written_at_the_chapter_end_and_linked_both_ways() {
+        use jcj_doc::para::{InlineObject, NoteKind};
+        use jcj_doc::props::CharProps;
+        use jcj_doc::{Paragraph, PartKind, para_block};
+        let mut d = Document::new();
+        let note = |d: &mut Document, t: &str| d.add_part(PartKind::Footnote, vec![para_block(Paragraph::with_text(t, CharProps::default()))]);
+        let (a, b) = (note(&mut d, "The first note."), note(&mut d, "The second note."));
+        let mut p = Paragraph::with_text("Words that call two notes.", CharProps::default());
+        p.insert_object(5, InlineObject::NoteRef { kind: NoteKind::Footnote, id: a, custom: String::new() }, &CharProps::default()).unwrap();
+        let end = p.text.len();
+        p.insert_object(end, InlineObject::NoteRef { kind: NoteKind::Endnote, id: b, custom: "*".into() }, &CharProps::default()).unwrap();
+        let mut h = Paragraph::with_text("One", CharProps::default());
+        h.props.outline_level = Some(1);
+        d.body = vec![para_block(h), para_block(p)];
+        let bytes = write(&d).unwrap();
+        let mut z = zip::ZipArchive::new(Cursor::new(bytes)).unwrap();
+        let mut chapter = String::new();
+        for i in 0..z.len() {
+            let mut f = z.by_index(i).unwrap();
+            if f.name().ends_with("chapter-001.xhtml") {
+                std::io::Read::read_to_string(&mut f, &mut chapter).unwrap();
+            }
+        }
+        assert!(
+            chapter.contains("epub:type=\"noteref\"") && chapter.contains("href=\"#note-1\"") && chapter.contains("href=\"#note-2\""),
+            "{chapter}"
+        );
+        assert!(chapter.contains("<sup>*</sup>"), "a custom mark is kept");
+        assert!(
+            chapter.contains("id=\"note-1\" epub:type=\"endnote\"") && chapter.contains("The first note.") && chapter.contains("The second note.")
+        );
+        assert!(chapter.contains("href=\"#noteref-1\" role=\"doc-backlink\"") && chapter.contains("href=\"#noteref-2\""));
+        // The words come back through the core's reader, notes included.
+        let back = crate::import(crate::Format::Epub, &write(&d).unwrap()).unwrap();
+        let text: String = jcj_doc::walk::body_paragraphs(&back).iter().map(|(_, p)| jcj_doc::plain_text(p)).collect::<Vec<_>>().join(" ");
+        assert!(text.contains("The first note.") && text.contains("The second note."), "{text}");
     }
 }

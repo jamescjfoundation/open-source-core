@@ -124,6 +124,11 @@ pub fn run() -> Result<Vec<Step>, String> {
     }
     check(jcj_layout::page_count(&jcj_layout::print_layout(&sectioned, &mut jcj_layout::LayoutCache::new())) == 3, "a footnote keeps its page")?;
     step("sections", format!("{sectioned_pages} pages: a section on an odd page, numbered in roman, with a footnote"));
+    // The EPUB writer keeps the footnote, as an endnote linked both ways.
+    let epub = jcj_interchange::export(Format::Epub, &sectioned).map_err(|e| format!("export EPUB: {e}"))?;
+    let back = jcj_interchange::import(Format::Epub, &epub).map_err(|e| format!("import EPUB: {e}"))?;
+    let text: String = jcj_doc::walk::body_paragraphs(&back).iter().map(|(_, p)| jcj_doc::plain_text(p)).collect();
+    check(text.contains("A footnote."), "the EPUB keeps the footnote")?;
 
     // jcj-layout: pages.
     let mut cache = jcj_layout::LayoutCache::new();
