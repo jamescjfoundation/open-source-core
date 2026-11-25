@@ -224,13 +224,14 @@ pub fn prefs_body(shell: &mut Shell, ui: &mut Ui) {
     ui.checkbox(&mut shell.autosave.enabled, tr("Save documents automatically"));
     let mut minutes = shell.autosave.every.as_secs() / 60;
     ui.horizontal(|ui| {
-        ui.label(tr("Every"));
-        if ui.add(egui::DragValue::new(&mut minutes).range(1..=u64::from(MAX_AUTOSAVE_MINUTES))).changed() {
+        // Each number is named by the words before it, for screen readers.
+        let every = ui.label(tr("Every"));
+        if ui.add(egui::DragValue::new(&mut minutes).range(1..=u64::from(MAX_AUTOSAVE_MINUTES))).labelled_by(every.id).changed() {
             shell.autosave.every = std::time::Duration::from_secs(minutes * 60);
         }
-        ui.label(tr("minutes, once typing pauses for"));
+        let pause = ui.label(tr("minutes, once typing pauses for"));
         let mut idle = shell.autosave.idle.as_secs();
-        if ui.add(egui::DragValue::new(&mut idle).range(1..=u64::from(MAX_IDLE_SECONDS))).changed() {
+        if ui.add(egui::DragValue::new(&mut idle).range(1..=u64::from(MAX_IDLE_SECONDS))).labelled_by(pause.id).changed() {
             shell.autosave.idle = std::time::Duration::from_secs(idle);
         }
         ui.label(tr("seconds"));

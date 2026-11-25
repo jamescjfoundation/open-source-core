@@ -208,6 +208,33 @@ fn the_file_page_shows_recent_files_and_the_credit_line() {
 }
 
 #[test]
+fn every_control_on_the_file_pages_has_a_name() {
+    use egui::accesskit::Role;
+    use egui_kittest::kittest::NodeT;
+    let mut h = harness();
+    let mut seen = 0;
+    for page in [Page::New, Page::Open, Page::Save, Page::Preferences, Page::Keys, Page::About] {
+        h.state_mut().0.open_file_page(page.clone());
+        h.run();
+        for n in h.root().children_recursive() {
+            let a = n.accesskit_node();
+            let control = [Role::Button, Role::CheckBox, Role::TextInput, Role::SpinButton, Role::Slider, Role::Link, Role::Tab];
+            if a.is_hidden() || !control.contains(&a.role()) {
+                continue;
+            }
+            seen += 1;
+            let name = a.label().unwrap_or_default();
+            assert!(
+                !name.trim().is_empty() || a.value().is_some_and(|v| !v.trim().is_empty() && a.role() == Role::Button),
+                "{page:?}: a {:?} has no name",
+                a.role()
+            );
+        }
+    }
+    assert!(seen > 20, "{seen} controls");
+}
+
+#[test]
 fn key_tips_open_a_tab_and_run_a_control() {
     let mut h = harness();
     h.run();
