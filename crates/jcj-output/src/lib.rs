@@ -24,6 +24,7 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
 pub mod boxes;
+pub mod conformance;
 pub mod facts;
 pub mod image;
 pub mod pdf;
@@ -32,6 +33,7 @@ pub mod print;
 pub mod read;
 
 pub use boxes::{BoxError, Boxes, set_page_boxes};
+pub use conformance::{Conformance, ConformanceError, declare, srgb_profile};
 pub use facts::{PageBox, PageFacts, PdfFacts, PdfFont, PdfImage, read_facts};
 pub use image::{PageImage, RenderSettings, render_area, render_page};
 pub use pdf::{OutputError, PdfSettings, export_pdf, export_pdf_with_layout};

@@ -61,7 +61,7 @@ fn rect(b: &PageBox) -> String {
 }
 
 /// The last `startxref` offset and the trailer dictionary's text before it.
-fn trailer(bytes: &[u8]) -> Option<(usize, String)> {
+pub(crate) fn trailer(bytes: &[u8]) -> Option<(usize, String)> {
     let tail_from = bytes.len().saturating_sub(4096);
     let tail = &bytes[tail_from..];
     let sx = tail.windows(9).rposition(|w| w == b"startxref")?;
@@ -74,7 +74,7 @@ fn trailer(bytes: &[u8]) -> Option<(usize, String)> {
 }
 
 /// The trailer's entries without `/Prev` (its number dropped too).
-fn without_prev(dict: &str) -> Option<String> {
+pub(crate) fn without_prev(dict: &str) -> Option<String> {
     let inner = dict.trim().strip_prefix("<<")?.strip_suffix(">>")?;
     match inner.find("/Prev") {
         None => Some(inner.trim().to_owned()),

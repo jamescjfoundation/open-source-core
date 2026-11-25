@@ -159,6 +159,16 @@ pub fn run() -> Result<Vec<Step>, String> {
     let boxed = jcj_output::set_page_boxes(&pdf, &boxes, &jcj_output::ReadLimits::default()).map_err(|e| format!("pdf boxes: {e}"))?;
     let boxed_facts = jcj_output::read_facts(&boxed, &jcj_output::ReadLimits::default()).map_err(|e| format!("pdf facts: {e}"))?;
     check(boxed_facts.pages.iter().all(|p| p.trim == Some(p.media)), "the PDF's trim boxes read back")?;
+    // PDF/A-2b and PDF/UA-1 declared on a tagged export; the text reads back the same.
+    let tagged = jcj_output::export_pdf(&doc, &layout, &jcj_output::PdfSettings { tagged: true, ..jcj_output::PdfSettings::deterministic() })
+        .map_err(|e| format!("pdf: {e}"))?;
+    let conformance = jcj_output::Conformance { pdf_a: true, pdf_ua: true, author: "The testbed".into(), language: "en".into() };
+    let declared = jcj_output::declare(&tagged, &conformance, &jcj_output::ReadLimits::default()).map_err(|e| format!("pdf standards: {e}"))?;
+    let declared_text = String::from_utf8_lossy(&declared);
+    check(declared_text.contains("<pdfaid:part>2</pdfaid:part>") && declared_text.contains("/OutputIntents"), "the PDF declares PDF/A-2b")?;
+    check(declared_text.contains("<pdfuaid:part>1</pdfuaid:part>") && declared_text.contains("/DisplayDocTitle true"), "the PDF declares PDF/UA-1")?;
+    let again = jcj_output::read_pages(&declared, &jcj_output::ReadLimits::default()).map_err(|e| format!("pdf read: {e}"))?;
+    check(again.len() == pages, "the declared PDF reads back with every page")?;
     step(
         "output",
         format!(

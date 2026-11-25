@@ -303,3 +303,55 @@ mod boxes {
         assert!(read_facts(&out, &limits).unwrap().pages.iter().all(|p| p.bleed.is_none() && p.trim.is_some()));
     }
 }
+
+mod conformance {
+    use super::doc;
+    use crate::{Conformance, ConformanceError, PdfSettings, ReadLimits, declare, export_pdf_with_layout, read_facts, read_pages};
+
+    fn tagged() -> Vec<u8> {
+        export_pdf_with_layout(&doc(), &PdfSettings { tagged: true, ..PdfSettings::deterministic() }).unwrap()
+    }
+
+    #[test]
+    fn the_standards_are_declared_and_the_pdf_reads_as_before() {
+        let pdf = tagged();
+        let limits = ReadLimits::default();
+        let c = Conformance { pdf_a: true, pdf_ua: true, author: "A. Writer".into(), language: "en-GB".into() };
+        let out = declare(&pdf, &c, &limits).unwrap();
+        assert!(out.starts_with(&pdf), "the original bytes are kept");
+        assert_eq!(out, declare(&pdf, &c, &limits).unwrap(), "the same bytes every time");
+        let text = String::from_utf8_lossy(&out);
+        for want in [
+            "<pdfaid:part>2</pdfaid:part>",
+            "<pdfaid:conformance>B</pdfaid:conformance>",
+            "<pdfuaid:part>1</pdfuaid:part>",
+            "/OutputIntents",
+            "/GTS_PDFA1",
+            "/DisplayDocTitle true",
+            "/Lang (en-GB)",
+            "<rdf:li>en-GB</rdf:li>",
+            "/Author (A. Writer)",
+            "<rdf:li>A. Writer</rdf:li>",
+        ] {
+            assert!(text.contains(want), "{want}");
+        }
+        assert_eq!(read_pages(&out, &limits).unwrap(), read_pages(&pdf, &limits).unwrap());
+        assert_eq!(read_facts(&out, &limits).unwrap().fonts, read_facts(&pdf, &limits).unwrap().fonts);
+        // Only what is asked for.
+        let ua = String::from_utf8_lossy(&declare(&pdf, &Conformance { pdf_ua: true, ..Conformance::default() }, &limits).unwrap()).into_owned();
+        assert!(ua.contains("pdfuaid") && !ua.contains("pdfaid:part") && !ua.contains("/OutputIntents"));
+        assert!(matches!(declare(b"not a pdf", &c, &limits), Err(ConformanceError::Read(_))));
+        // A validator for both standards, where one is installed (JCJ_PDF_VALIDATOR: its
+        // command-line program; it runs with the Java the environment gives it).
+        if let Some(program) = std::env::var_os("JCJ_PDF_VALIDATOR") {
+            let file = std::env::temp_dir().join(format!("jcj-conformance-{}.pdf", std::process::id()));
+            std::fs::write(&file, &out).unwrap();
+            for flavour in ["2b", "ua1"] {
+                let o = std::process::Command::new(&program).args(["-f", flavour, "--format", "text"]).arg(&file).output().unwrap();
+                let report = String::from_utf8_lossy(&o.stdout);
+                assert!(report.trim_start().starts_with("PASS"), "{flavour}: {report}");
+            }
+            let _ = std::fs::remove_file(&file);
+        }
+    }
+}
