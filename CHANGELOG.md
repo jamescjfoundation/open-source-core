@@ -7,6 +7,26 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 Nothing yet.
 
+## 0.1.13 (2026-11-25)
+
+### Added
+
+- `jcj-i18n` (new crate): interface translation catalogs (core issue #18). One TOML file per
+  language maps each text, keyed by its English, to the text shown; plurals take the language's
+  forms (`trn`), `{name}` placeholders are filled (`tr_with`); catalogs are layered, the first
+  that has a text giving it; a text no catalog has stays English. `texts_in`, `singulars_in` and
+  `compare` let a test check that every text is in every catalog and none is unused.
+- `jcj-shell`: `i18n` (`LANGUAGES`, `catalog`, `set_language`): the shell's own texts in Spanish,
+  and a language turned on with the app's catalogs layered over the shell's. The shell shows its
+  texts, and the labels, titles, tooltips, tab and group names apps give it, through the
+  catalogs. `core-testbed` switches its window to Spanish (`CORE_TESTBED_LANG=es`).
+
+### What apps must do
+
+- Nothing. Until an app calls `jcj_shell::i18n::set_language`, every text is shown in English
+  exactly as before. Move every `jcj-` dependency to `tag = "v0.1.13"` when convenient (the patch
+  block is unchanged).
+
 ## 0.1.12 (2026-11-25)
 
 ### Fixed
