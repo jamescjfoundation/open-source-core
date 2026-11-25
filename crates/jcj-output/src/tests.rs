@@ -256,3 +256,50 @@ mod facts {
         assert_eq!(read_facts(&two, &ReadLimits { max_pages: 1, ..limits }), Err(ReadError::TooManyPages(1)));
     }
 }
+
+mod boxes {
+    use super::doc;
+    use crate::{BoxError, Boxes, PageBox, PdfSettings, ReadLimits, export_pdf_with_layout, read_facts, read_pages, set_page_boxes};
+
+    #[test]
+    fn trim_and_bleed_boxes_are_set_and_read_back() {
+        let pdf = export_pdf_with_layout(&doc(), &PdfSettings::deterministic()).unwrap();
+        let limits = ReadLimits::default();
+        let before = read_facts(&pdf, &limits).unwrap();
+        let boxes: Vec<Boxes> = before
+            .pages
+            .iter()
+            .enumerate()
+            .map(|(i, p)| {
+                let m = p.media;
+                // Bleed on the outside, top and bottom: the trim sits against the spine side.
+                let trim = if i % 2 == 0 {
+                    PageBox { x0: m.x0, y0: m.y0 + 9.0, x1: m.x1 - 9.0, y1: m.y1 - 9.0 }
+                } else {
+                    PageBox { x0: m.x0 + 9.0, y0: m.y0 + 9.0, x1: m.x1, y1: m.y1 - 9.0 }
+                };
+                Boxes { trim, bleed: Some(m) }
+            })
+            .collect();
+        let out = set_page_boxes(&pdf, &boxes, &limits).unwrap();
+        assert!(out.starts_with(&pdf), "the original bytes are kept");
+        assert_eq!(out, set_page_boxes(&pdf, &boxes, &limits).unwrap(), "the same bytes every time");
+        let after = read_facts(&out, &limits).unwrap();
+        for (p, b) in after.pages.iter().zip(&boxes) {
+            assert_eq!(p.trim, Some(b.trim));
+            assert_eq!(p.bleed, b.bleed);
+            assert_eq!(p.media, b.bleed.unwrap());
+        }
+        assert_eq!(after.fonts, before.fonts);
+        // The text reads back as before.
+        let (a, b) = (read_pages(&pdf, &limits).unwrap(), read_pages(&out, &limits).unwrap());
+        assert_eq!(a, b);
+        // Not twice, not the wrong count, not on rubbish.
+        assert_eq!(set_page_boxes(&out, &boxes, &limits), Err(BoxError::HasBoxes(1)));
+        assert_eq!(set_page_boxes(&pdf, &boxes[..1], &limits), Err(BoxError::Count(boxes.len(), 1)));
+        assert!(matches!(set_page_boxes(b"not a pdf", &[], &limits), Err(BoxError::Read(_))));
+        let trim_only: Vec<Boxes> = boxes.iter().map(|b| Boxes { bleed: None, ..*b }).collect();
+        let out = set_page_boxes(&pdf, &trim_only, &limits).unwrap();
+        assert!(read_facts(&out, &limits).unwrap().pages.iter().all(|p| p.bleed.is_none() && p.trim.is_some()));
+    }
+}

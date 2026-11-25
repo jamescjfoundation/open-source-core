@@ -149,6 +149,11 @@ pub fn run() -> Result<Vec<Step>, String> {
     let facts = jcj_output::read_facts(&pdf, &jcj_output::ReadLimits::default()).map_err(|e| format!("pdf facts: {e}"))?;
     check(facts.pages.len() == pages, "the PDF's facts cover every page")?;
     check(!facts.fonts.is_empty() && facts.unembedded_fonts().is_empty(), "the PDF embeds every font")?;
+    // Trim boxes for a printer, set on the exported file and read back.
+    let boxes: Vec<jcj_output::Boxes> = facts.pages.iter().map(|p| jcj_output::Boxes { trim: p.media, bleed: None }).collect();
+    let boxed = jcj_output::set_page_boxes(&pdf, &boxes, &jcj_output::ReadLimits::default()).map_err(|e| format!("pdf boxes: {e}"))?;
+    let boxed_facts = jcj_output::read_facts(&boxed, &jcj_output::ReadLimits::default()).map_err(|e| format!("pdf facts: {e}"))?;
+    check(boxed_facts.pages.iter().all(|p| p.trim == Some(p.media)), "the PDF's trim boxes read back")?;
     step(
         "output",
         format!(
