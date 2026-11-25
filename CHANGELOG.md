@@ -7,6 +7,20 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 Nothing yet.
 
+## 0.1.14 (2026-11-25)
+
+### Fixed
+
+- `jcj-shell`: the Preferences page's auto-save interval and idle-time fields are named, for
+  screen readers, by the words beside them (core issue #26). Before, they were unnamed spin
+  buttons. A shell test and a `core-testbed` test check that no control on the File pages or the
+  testbed's window lacks a name.
+
+### What apps must do
+
+- Nothing. Move every `jcj-` dependency to `tag = "v0.1.14"` when convenient (the patch block is
+  unchanged).
+
 ## 0.1.13 (2026-11-25)
 
 ### Added
