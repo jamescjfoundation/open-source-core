@@ -7,6 +7,20 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 Nothing yet.
 
+## 0.1.12 (2026-11-25)
+
+### Fixed
+
+- `jcj-interchange`: the EPUB writer keeps a document's footnotes and endnotes, as numbered
+  endnotes at each chapter's end (custom marks kept), each linked from its reference and back,
+  with `noteref` and `endnote` semantics. Before, they were left out (core issue #21).
+  `core-testbed` checks that a footnote survives EPUB export and import.
+
+### What apps must do
+
+- Nothing. Apps that wrote notes into their EPUBs by hand to work around this can stop when
+  convenient. Move every `jcj-` dependency to `tag = "v0.1.12"` (the patch block is unchanged).
+
 ## 0.1.11 (2026-11-25)
 
 ### Added
