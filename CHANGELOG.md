@@ -7,6 +7,19 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 Nothing yet.
 
+## 0.1.11 (2026-11-25)
+
+### Added
+
+- `jcj-output`: `boxes` (`set_page_boxes`, `Boxes`, `BoxError`): trim and bleed boxes set on an
+  exported PDF's pages as an incremental update (the original bytes kept), deterministic and
+  bounded (core issue #25). `core-testbed` sets trim boxes and reads them back with `read_facts`.
+
+### What apps must do
+
+- Nothing. Move every `jcj-` dependency to `tag = "v0.1.11"` when convenient (the patch block is
+  unchanged).
+
 ## 0.1.10 (2026-11-24)
 
 ### Added
