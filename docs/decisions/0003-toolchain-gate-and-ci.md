@@ -1,6 +1,7 @@
 # 0003: Toolchain, the gate, and CI that rarely makes anyone wait
 
-Date: 2026-11-24 · Status: accepted · Ported from Wordsmith Script decisions 0003 and 0040
+Date: 2026-11-24 · Status: accepted · Amended 2026-11-26 (what `sync` carries) · Ported from
+Wordsmith Script decisions 0003 and 0040
 
 ## Decision
 
@@ -15,6 +16,18 @@ Date: 2026-11-24 · Status: accepted · Ported from Wordsmith Script decisions 0
 - **xtask has no dependencies**, so the gate never depends on a crate the gate must vet. The
   modules apps share (`template/xtask/src/`) are compiled into the core's xtask, so the core tests
   them, and `cargo xtask sync` copies them into each app.
+- **What `sync` carries** (amended 2026-11-26). Whole files the core owns: the toolchain, lint,
+  format and cargo-deny settings, the shared xtask modules, the CI and core-pin workflows, the
+  hooks and the code of conduct (`MANAGED` in `template/xtask/src/sync.rs`). Blocks inside files
+  an app otherwise owns: the patch block in `Cargo.toml`, and the core's rules as marked blocks
+  in `AGENTS.md`, `SECURITY.md` and `CONTRIBUTING.md` (`BLOCKS`), each between a
+  `<!-- BEGIN open-source-core: NAME -->` and an `<!-- END open-source-core: NAME -->` line.
+  The source of a block is the same block under `template/`. `sync` replaces a block where its
+  two lines are and never chooses a place for one; `sync --check`, a task of every app's gate,
+  fails when a file or block differs from the pinned core release. The core carries the blocks
+  that are not only about an app in its own files; its `template` task checks them and
+  `cargo xtask template --write` writes them. Before this the rules were about 115 lines copied
+  by hand into five files, with nothing to notice a copy that had fallen behind.
 - **Only what changed.** `cargo xtask ci --changed --base <ref>` runs clippy and tests only for the
   packages a change touches and everything that depends on them (`template/xtask/src/changed.rs`).
   A change to a manifest, the lock file or the toolchain affects everything; documentation affects

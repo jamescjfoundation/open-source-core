@@ -35,6 +35,8 @@ when present.
 | `docs/UPSTREAM.md` | Pins, carried patches, follow / hold / own |
 | `docs/history/` | Finished plans and published reviews, kept as written and not maintained |
 
+<!-- BEGIN open-source-core: contributing -->
+<!-- Owned by open-source-core (template/CONTRIBUTING.md). Change it there, never in a copy: `cargo xtask sync` rewrites the copies. -->
 ## Rules for a public repository
 
 ### Personal information
@@ -42,8 +44,9 @@ when present.
 Never commit, or paste into an issue or pull request: anyone's name, email address or account
 (other than your commit author line); local paths, user names, host names or machine details;
 files from a real machine (preferences, recovery, auto-save or backup files, logs, desktop
-screenshots); anyone's private writing; passwords, tokens or keys. `cargo xtask privacy` checks
-files and commit identities.
+screenshots); anyone's private writing; passwords, tokens or keys. Test fixtures are
+public-domain texts or written for the test. `cargo xtask privacy` checks files and commit
+identities.
 
 ### Security problems
 
@@ -53,9 +56,31 @@ fixes it.
 ### Private working notes
 
 Reviews, audits and working notes go in `.private/` (ignored by Git). One is published only when
-a maintainer says so, under `docs/history/`, with a first line saying it is history (decision
-0012). Write the public part as a decision record or changelog entry, giving the reason itself
-rather than "as discussed".
+a maintainer says so, under `docs/history/`, with a first line saying it is history
+([core decision 0012](https://github.com/jamescjfoundation/open-source-core/blob/main/docs/decisions/0012-working-in-the-open.md)).
+Write the public part as a decision record or changelog entry, giving the reason itself rather
+than "as discussed".
+
+## Commits, pushes and pull requests
+
+- While no app built on the core has a public release, a push to `main` is allowed once
+  `cargo xtask ci` passes. A pull request is optional; its author may merge it once its checks
+  pass
+  ([core decision 0013](https://github.com/jamescjfoundation/open-source-core/blob/main/docs/decisions/0013-app-and-core.md)).
+- A release is cut, and in the core an upstream pin is moved, only on a commit whose full gate
+  has passed; a person or an agent may do either (core decisions
+  [0004](https://github.com/jamescjfoundation/open-source-core/blob/main/docs/decisions/0004-follow-hold-own.md)
+  and
+  [0011](https://github.com/jamescjfoundation/open-source-core/blob/main/docs/decisions/0011-releases-and-versioning.md)).
+- Contributions are licensed as the project is, MIT OR Apache-2.0, with no extra terms. No CLA.
+- Use your GitHub no-reply address (`git config user.email <id>+<login>@users.noreply.github.com`).
+- One concern per commit or pull request; say what changed, why, and how you checked it.
+- Update `CHANGELOG.md` and the decision records when behavior changes. A core change that apps
+  must act on says so under "What apps must do".
+- AI-assisted contributions are welcome; you are responsible for every line.
+<!-- END open-source-core: contributing -->
+
+## Rules of this repository
 
 ### Upstream code and names
 
@@ -70,19 +95,10 @@ rather than "as discussed".
 Every dependency's license must be on the allowlist (decision 0001). Fonts, images and data must
 be under an allowed license and listed in `ATTRIBUTION.md`.
 
-## Commits, pushes and pull requests
+### The changelog
 
-- While no app built on the core has a public release, a push to `main` is allowed once
-  `cargo xtask ci` passes. A pull request is optional; its author may merge it once its checks
-  pass (decision 0013).
-- A release is cut, and an upstream pin is moved, only on a commit whose full gate has passed; a
-  person or an agent may do either (decisions 0004 and 0011).
-- Contributions are licensed as the project is, MIT OR Apache-2.0, with no extra terms. No CLA.
-- Use your GitHub no-reply address (`git config user.email <id>+<login>@users.noreply.github.com`).
-- One concern per commit or pull request; say what changed, why, and how you checked it.
-- Update `CHANGELOG.md` (with "What apps must do" for anything apps must change) and the decision
-  records when behavior changes.
-- AI-assisted contributions are welcome; you are responsible for every line.
+A change apps can see gets a line in `CHANGELOG.md`, under the next release. Anything an app must
+change to take the release goes under **What apps must do**, as exact steps.
 
 ## Conduct
 

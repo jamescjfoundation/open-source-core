@@ -2,22 +2,39 @@
 
 open-source-core is the J. C. J. Foundation's shared base for its desktop apps. It holds what every
 app needs and none should write twice, and it is the only place that talks to the open-source
-projects we build on (WordCraft, craft-libs). It carries no product name.
+projects we build on (WordCraft, craft-libs). It carries no product name in its code, its
+interface text or the files apps copy from it.
 
-Read `CONTRIBUTING.md`, `SECURITY.md` and `docs/decisions/` before you start. The rules below are
-the ones agents get wrong most often. Every app repository carries this section in substance.
+Read `CONTRIBUTING.md`, `SECURITY.md` and `docs/decisions/` before you start.
+
+**Who builds on the core.** Any project may. Each project keeps its own map of its repositories,
+outside the core. The foundation's own apps are the Wordsmith apps, and their map is the
+[Wordsmith project map](https://github.com/jamescjfoundation/wordsmith/blob/main/project/README.md):
+which repositories there are, how they depend on this one, and the steps for a change that
+crosses them. Read it before a change here that an app must follow.
+
+**The marked blocks.** The blocks below marked `open-source-core` are carried word for word by
+every app. Their source is `template/AGENTS.md` (and `template/SECURITY.md`,
+`template/CONTRIBUTING.md` for the blocks in those files): change a block there, run
+`cargo xtask template --write` to bring this repository's own copies in line, and the next core
+release carries it to every app through `cargo xtask sync`. The `template` task of the gate fails
+when a copy here differs.
 
 ## Before you commit
 
 ```sh
-cargo xtask install-hooks   # once: pre-commit (fmt, privacy) and pre-push (ci --changed)
-cargo xtask ci --changed    # what CI will run for your change; `cargo xtask ci` for everything
+cargo xtask install-hooks     # once: pre-commit (fmt, privacy) and pre-push (ci --changed)
+cargo xtask ci --changed      # what CI will run for your change; `cargo xtask ci` for everything
+cargo xtask template --write  # after changing a shared block or file under template/
 ```
 
+<!-- BEGIN open-source-core: public -->
+<!-- Owned by open-source-core (template/AGENTS.md). Change it there, never in a copy: `cargo xtask sync` rewrites the copies. -->
 ## What is public
 
-This repository is public, history included, forever. Before you write a commit, branch name,
-issue, pull request or comment, check it holds none of:
+This repository is public, history included, forever
+([core decision 0012](https://github.com/jamescjfoundation/open-source-core/blob/main/docs/decisions/0012-working-in-the-open.md)).
+Before you write a commit, branch name, issue, pull request or comment, check it holds none of:
 
 - anyone's name, email, account names, or details of their machine (local paths such as a home
   folder, user names, host names, IP addresses);
@@ -28,10 +45,19 @@ issue, pull request or comment, check it holds none of:
   screenshots of a desktop);
 - anyone's private writing, even as test data. Fixtures are public-domain or written for the test.
 
-Commit with a GitHub no-reply address or a foundation bot identity (`cargo xtask privacy` checks
-every commit). Never push with `--all` or `--mirror`.
+Commit with a GitHub no-reply address or a foundation bot identity. Where a repository has
+`cargo xtask`, `cargo xtask privacy` checks its files and every commit. Never push with `--all`
+or `--mirror`.
+<!-- END open-source-core: public -->
 
+<!-- BEGIN open-source-core: app-and-core -->
+<!-- Owned by open-source-core (template/AGENTS.md). Change it there, never in a copy: `cargo xtask sync` rewrites the copies. -->
 ## Building between an app and the core
+
+"The core" is [open-source-core](https://github.com/jamescjfoundation/open-source-core); "an app"
+is any repository built on it. A record of the core is cited from anywhere as "core decision
+0011", with its repository named, never as a bare number: an app has records with the same
+numbers.
 
 ### Step 1: decide where the change belongs
 
@@ -39,7 +65,8 @@ Ask in order; the first "yes" decides.
 
 1. **Does it change how we use WordCraft, craft-libs or another upstream project?** The core's
    adapters (`jcj-upstream` and the `jcj-` crate that wraps it). If upstream code itself must
-   change, it goes in our fork first (`docs/UPSTREAM.md`, decision 0004).
+   change, it goes in our fork first (the core's `docs/UPSTREAM.md` and
+   [core decision 0004](https://github.com/jamescjfoundation/open-source-core/blob/main/docs/decisions/0004-follow-hold-own.md)).
 2. **Would it look or work the same in any foundation app?** The window, ribbon, panels, dialogs,
    File page, preferences, auto-save, updates, saving and backups, spelling, find and replace,
    undo, format import and export, PDF and printing, cards and boards, theming, agent control: the
@@ -58,13 +85,14 @@ interface back out is not.
 | Faster auto-save, better backups | Core (`jcj-project`, `jcj-shell`) | Same for every app |
 | Index cards a second app also wants | Core (`jcj-board`) once it needs them | Second app |
 | DOCX import fix | Core (`jcj-interchange`), offered upstream too | General |
-| Colors, fonts, logo | The app's own repository | The core holds theming code, never a brand |
+| Colors, fonts, logo | The app's repository or its project's brand kit | The core holds theming code, never a brand |
 
 ### Step 2: build it
 
-- **How a change lands** (decision 0013): while no app has a public release, a push to
-  `main` is allowed once the gate passes; a pull request is optional and its author merges it
-  when its checks pass.
+- **How a change lands**
+  ([core decision 0013](https://github.com/jamescjfoundation/open-source-core/blob/main/docs/decisions/0013-app-and-core.md)):
+  while no app has a public release, a push to `main` is allowed once the gate passes; a pull
+  request is optional and its author merges it when its checks pass.
 - **App-only change:** one change in the app.
 - **Core change an app needs:**
   1. Open a core issue describing the general need, not the app's feature.
@@ -79,19 +107,22 @@ interface back out is not.
 - **Prototype first, promote later.** If the general shape is not clear yet, build it in the app,
   mark it `// core-candidate:` and open a core issue labelled `core-candidate`. Move it once it works
   and a second app wants it. Never copy code between app repositories.
-- **Something one app needs from another app** (decision 0015): open an issue in the
-  providing app's repository. The provider's change lands and is tagged there first; the consumer
-  then moves its pin. Never edit the provider as part of the consumer's change.
+- **Something one app needs from another app**
+  ([core decision 0015](https://github.com/jamescjfoundation/open-source-core/blob/main/docs/decisions/0015-apps-that-depend-on-apps.md)):
+  open an issue in the providing app's repository. The provider's change lands and is tagged
+  there first; the consumer then moves its pin. Never edit the provider as part of the consumer's
+  change.
 
 ### Step 3: let it reach the other apps safely
 
 - Everything in the core is shared by default.
 - A change that alters what users see in other apps goes behind an option (a shell setting or a
   Cargo feature) that defaults to the old behavior; each app turns it on when ready.
-- Versioning (decision 0011): while at 0.x a patch release only adds or fixes; a minor release
-  may break and its changelog says exactly what each app must do. A breaking change to a public
-  `jcj-` interface says so in the title of its commit or pull request, and every app is updated
-  in follow-up changes.
+- Versioning
+  ([core decision 0011](https://github.com/jamescjfoundation/open-source-core/blob/main/docs/decisions/0011-releases-and-versioning.md)):
+  while at 0.x a patch release only adds or fixes; a minor release may break and its changelog
+  says exactly what each app must do. A breaking change to a public `jcj-` interface says so in
+  the title of its commit or pull request, and every app is updated in follow-up changes.
 - A core change that breaks another app is fixed in the core, not worked around in the app.
 - An app moves to the newest core before new work starts on it and before its own release. Every
   `jcj-` line names one tag. `cargo xtask core-pin` says how far behind an app is, and a
@@ -105,21 +136,26 @@ interface back out is not.
 - Change a core interface from a change made in an app repository.
 - Copy code from one app repository into another.
 - Release the core, or move an upstream pin, on a commit whose full gate has not passed. A
-  person or an agent may do either once it has (decisions 0004 and 0011).
+  person or an agent may do either once it has (core decisions
+  [0004](https://github.com/jamescjfoundation/open-source-core/blob/main/docs/decisions/0004-follow-hold-own.md)
+  and
+  [0011](https://github.com/jamescjfoundation/open-source-core/blob/main/docs/decisions/0011-releases-and-versioning.md)).
 - Edit WordCraft or craft-libs code anywhere but our forks' topic branches.
+- Edit a file or a marked block the core owns anywhere but in the core.
 - Commit personal details, private files or secrets.
 
 ### Where each kind of record goes
 
 | Record | Lives in |
 | --- | --- |
-| Decisions about shared interfaces, upstream, tooling | `docs/decisions/` here |
+| Decisions about shared interfaces, upstream, tooling | The core's `docs/decisions/` |
 | Decisions about one app's behavior | That app's `docs/decisions/` |
-| Pins, carried patches, follow / hold / own | `docs/UPSTREAM.md` here |
-| What changed for apps in each core release | `CHANGELOG.md` here, with "What apps must do" |
+| Pins, carried patches, follow / hold / own | The core's `docs/UPSTREAM.md` |
+| What changed for apps in each core release | The core's `CHANGELOG.md`, with "What apps must do" |
 | Ideas waiting to be promoted to the core | Core issues labelled `core-candidate` |
 | A request to another app | An issue in that app's repository |
 | Reviews, audits, working notes | `.private/`, or `docs/history/` once a maintainer publishes one |
+<!-- END open-source-core: app-and-core -->
 
 ## House rules for code
 

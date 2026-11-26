@@ -60,7 +60,7 @@ const TASKS: &[(&str, &str)] = &[
     ("lint-roots", "every crate root forbids unsafe and denies the panicking lints"),
     ("layers", "only jcj-upstream names upstream; dependencies point down"),
     ("pins", "upstream pins, Cargo.lock and docs/UPSTREAM.md agree"),
-    ("template", "the app template carries the core's patch block and shared files"),
+    ("template", "the app template carries the core's patch block and shared files, and the core its own shared blocks"),
     ("privacy", "no personal details or secrets in files or commit identities"),
     ("licenses", "every dependency's license is on the allowlist; legal files exist"),
     ("clippy", "clippy on all targets and features, warnings are errors"),
@@ -69,6 +69,13 @@ const TASKS: &[(&str, &str)] = &[
 
 /// The programs the core ships (for the third-party license file of a release).
 const SHIPPED: &[&str] = &["core-testbed"];
+
+/// The marked blocks of `sync::BLOCKS` the core's own files do not carry: it has its own "Before
+/// you commit" and house rules for code.
+const NOT_IN_THE_CORE: &[&str] = &["app"];
+
+/// (file under `template/`, the core's own file): whole managed files the core itself uses too.
+const SAME_IN_THE_CORE: &[(&str, &str)] = &[("template/CODE_OF_CONDUCT.md", "CODE_OF_CONDUCT.md")];
 
 /// Legal and record files the house rules require.
 const REQUIRED_FILES: &[&str] =
@@ -94,6 +101,7 @@ fn main() -> ExitCode {
         },
         "vendor" => vendor(&root, rest.first().map(String::as_str)),
         "install-hooks" => install_hooks(&root),
+        "template" if rest.iter().any(|a| a == "--write") => write_own_copies(&root),
         "template-check" => template_check(&root),
         "upstream-status" => pins::status(&root),
         "third-party-licenses" => licenses::task(&root, SHIPPED, "open-source-core's test app", rest.first().map(String::as_str)),
@@ -129,7 +137,9 @@ fn print_help() {
     }
     println!("\n  affected [--base <ref>]   print the packages a change affects");
     println!("  deny                      cargo-deny: licenses, advisories, sources");
-    println!("  sync <app dir> [--check]  copy (or compare) shared settings and the patch block into an app");
+    println!("  template --write          copy the shared blocks and files from template/ into the core's own AGENTS.md,");
+    println!("                            SECURITY.md, CONTRIBUTING.md and CODE_OF_CONDUCT.md (after changing one in template/)");
+    println!("  sync <app dir> [--check]  copy (or compare) shared files, marked blocks and the patch block into an app");
     println!("  core-pin <app dir> [--behind] [--max-behind <n>]");
     println!("                            an app names one core release, and Cargo.lock holds one core; --behind");
     println!("                            says how many releases behind the pin is (asks the network)");
@@ -311,7 +321,58 @@ fn check_template(root: &Path) -> TaskResult {
         Some(t) if t == core => {}
         _ => failures.push("template/Cargo.toml: patch block differs from Cargo.toml's (copy it over)".to_owned()),
     }
+    // The rules every app carries are marked blocks in the template's files. The core carries
+    // the ones that are about more than an app, word for word.
+    for (from, own, name) in sync::BLOCKS {
+        let text = read(from)?;
+        let Some(block) = sync::marked_block(&text, name) else {
+            failures.push(format!("{from}: no `{name}` block (the lines `{}` and `{}`)", sync::block_begin(name), sync::block_end(name)));
+            continue;
+        };
+        if NOT_IN_THE_CORE.contains(name) {
+            continue;
+        }
+        match sync::marked_block(&read(own)?, name) {
+            Some(b) if b == block => {}
+            Some(_) => {
+                failures.push(format!("{own}: the `{name}` block differs from {from}'s (change it in {from}, then `cargo xtask template --write`)"))
+            }
+            None => failures.push(format!("{own}: no `{name}` block ({from} shows where it goes)")),
+        }
+    }
+    for (from, own) in SAME_IN_THE_CORE {
+        if std::fs::read(root.join(from)).ok() != std::fs::read(root.join(own)).ok() {
+            failures.push(format!("{own} differs from {from} (change {from}, then `cargo xtask template --write`)"));
+        }
+    }
     report(failures, "the app template is in step with the core")
+}
+
+/// `cargo xtask template --write`: after a change under `template/`, bring the core's own copies
+/// of the shared blocks and files in line. A block is written only where its marker lines are.
+fn write_own_copies(root: &Path) -> TaskResult {
+    let read = |p: &str| std::fs::read_to_string(root.join(p)).map_err(|e| format!("cannot read {p}: {e}"));
+    let mut written = 0usize;
+    for (from, own, name) in sync::BLOCKS.iter().filter(|(_, _, name)| !NOT_IN_THE_CORE.contains(name)) {
+        let template = read(from)?;
+        let block = sync::marked_block(&template, name).ok_or_else(|| format!("{from} has no `{name}` block"))?;
+        let have = read(own)?;
+        let new =
+            sync::replace_marked_block(&have, name, block).ok_or_else(|| format!("{own} has no `{name}` block ({from} shows where it goes)"))?;
+        if new != have {
+            std::fs::write(root.join(own), new).map_err(|e| format!("{own}: {e}"))?;
+            written += 1;
+        }
+    }
+    for (from, own) in SAME_IN_THE_CORE {
+        let want = std::fs::read(root.join(from)).map_err(|e| format!("cannot read {from}: {e}"))?;
+        if std::fs::read(root.join(own)).ok().as_ref() != Some(&want) {
+            std::fs::write(root.join(own), want).map_err(|e| format!("{own}: {e}"))?;
+            written += 1;
+        }
+    }
+    println!("ok: {written} of the core's own copies changed");
+    Ok(())
 }
 
 fn check_licenses(root: &Path) -> TaskResult {

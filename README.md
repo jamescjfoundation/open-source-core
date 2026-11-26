@@ -7,8 +7,13 @@ the apps build on: [WordCraft](https://github.com/storytold/wordcraft) and
 [craft-libs](https://github.com/storytold/craft-libs) by the ArtCraft team, used at pinned
 releases through the foundation's forks.
 
-It carries no product name. Wordsmith Script, Wordsmith Manuscript and Wordsmith Book are its first
-apps; any later foundation app builds on it the same way.
+It carries no product name in its code, its interface text or the files apps copy from it.
+Wordsmith Script, Wordsmith Manuscript and Wordsmith Book are its first apps; any later
+foundation app, or anyone else's, builds on it the same way. A project built on the core keeps its
+own map of its repositories, outside the core. The foundation's own is the
+[Wordsmith project map](https://github.com/jamescjfoundation/wordsmith/blob/main/project/README.md),
+which says how the Wordsmith repositories depend on this one and gives the steps for a change that
+crosses them.
 
 ## The crates
 
@@ -43,9 +48,10 @@ jcj-shell = { git = "https://github.com/jamescjfoundation/open-source-core", tag
 ```
 
 Copy `template/` to start an app; `cargo xtask sync` (in the app) keeps the toolchain, lint,
-cargo-deny settings, shared xtask modules, CI workflow and the core's `[patch]` block identical to
-the pinned core release, and the app's CI checks they stay so. To work on the core and an app
-together, `cargo xtask dev-link ../open-source-core` in the app.
+cargo-deny settings, shared xtask modules, workflows, code of conduct, the core's `[patch]` block
+and the core's rules (marked blocks in the app's `AGENTS.md`, `SECURITY.md` and
+`CONTRIBUTING.md`) identical to the pinned core release, and the app's gate checks they stay so.
+To work on the core and an app together, `cargo xtask dev-link ../open-source-core` in the app.
 
 The rules for deciding whether a change belongs in an app or the core are in
 [AGENTS.md](AGENTS.md), and the reasons in [docs/decisions/](docs/decisions/README.md). Finished

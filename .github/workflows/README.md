@@ -14,8 +14,13 @@ The core also owns the workflows every app runs. They live in `template/.github/
 
 | Workflow | When | What |
 | --- | --- | --- |
-| `ci.yml` | Every push to `main` and pull request in an app | The app's gate, built the same way as the core's: cheap checks, cargo-deny, and clippy and tests for what changed. |
+| `ci.yml` | Every push to `main` and pull request in an app (not documentation-only changes) | The app's gate, built the same way as the core's: cheap checks, cargo-deny, and clippy and tests for what changed. The cheap checks include `sync --check`: the shared files, the patch block and the marked blocks in `AGENTS.md`, `SECURITY.md` and `CONTRIBUTING.md` match the pinned core release. |
 | `core-pin.yml` | Mondays, and on demand | `cargo xtask core-pin --max-behind 3`: when the app's core pin is more than three releases behind the newest, opens an issue in the app ("Move to open-source-core vX.Y.Z"), or brings the open one up to date (decision 0011). |
+
+A push that changes only Markdown runs no workflow, here or in an app. The marked blocks live in
+Markdown files, so for such a push the check is the pre-push hook (`cargo xtask ci --changed` runs
+the `template` task here and the `sync` task in an app whatever changed), and then the next push
+that is not documentation only.
 
 Why it rarely makes anyone wait:
 

@@ -1,8 +1,8 @@
 # Code of conduct
 
-open-source-core is made by volunteers for the foundation's apps and their users. We want everyone who
-takes part, in issues, pull requests, reviews and discussions, to be treated
-with respect.
+This project is made by volunteers for the people who use it. We want everyone
+who takes part, in issues, pull requests, reviews and discussions, to be
+treated with respect.
 
 ## Expected
 

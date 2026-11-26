@@ -5,7 +5,91 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 ## Unreleased
 
-Nothing yet.
+### Added
+
+- **The core's rules reach every app by `cargo xtask sync`, not by hand** (decision 0003,
+  amended). Until now the rules every app carries were about 115 lines copied by hand into five
+  files, and `SECURITY.md`, `CONTRIBUTING.md` and the code of conduct were written separately
+  in each repository; nothing noticed a copy that had fallen behind.
+  - A marked block is the text from a line `<!-- BEGIN open-source-core: NAME -->` to a line
+    `<!-- END open-source-core: NAME -->`. Its source is the same block in a file under
+    `template/`. The text around a block is the app's own.
+  - Five blocks (`BLOCKS` in `template/xtask/src/sync.rs`): in `AGENTS.md`, `app` ("Before you
+    commit", "House rules for code"), `public` ("What is public") and `app-and-core` ("Building
+    between an app and the core"); in `SECURITY.md`, `security` ("Reporting a problem", "How we
+    handle a report"); in `CONTRIBUTING.md`, `contributing` ("Rules for a public repository",
+    "Commits, pushes and pull requests").
+  - `cargo xtask sync` replaces a block where its two marker lines are. A file an app does not
+    have yet is written whole from `template/`. A file an app has without the marker lines is
+    left alone and named in the error, after everything else is written: `sync` never chooses a
+    place for a block.
+  - `cargo xtask sync --check`, a task of every app's gate, names each file or block that is
+    missing or differs from the pinned core release.
+  - `CODE_OF_CONDUCT.md` is a whole managed file, worded for any project
+    (`template/CODE_OF_CONDUCT.md`).
+  - `template/SECURITY.md` and `template/CONTRIBUTING.md` are new: the core's block, and
+    placeholders for the app's own parts.
+- In the core: `cargo xtask template --write` copies the blocks from `template/` into the core's
+  own `AGENTS.md`, `SECURITY.md` and `CONTRIBUTING.md`, and the code of conduct. The `template`
+  task of the gate fails when one of them differs. The core carries every block but `app`: it has
+  its own "Before you commit" and house rules for code.
+
+### Changed
+
+- A record of the core is cited as "core decision NNNN" in everything an app carries: linked in
+  the marked blocks, and with the address of the core's `docs/decisions/` folder in `deny.toml`,
+  `rust-toolchain.toml`, the shared xtask modules and the two workflows. A bare "decision 0003"
+  in a copied file pointed at an app's own record of that number.
+- The wording of the carried rules, so that one text is true in the core and in an app: "the
+  core's `docs/decisions/`" for "here", "an app" for "this app". Three sentences say more than
+  before: the brand "lives in the app's repository or in its project's brand kit, never in the
+  core"; a security problem in the shared parts may be reported in the core or in the app, and
+  the report is moved; "Things agents must not do" names editing a file or block the core owns.
+- `template/AGENTS.md` no longer tells an agent to read the core's `AGENTS.md` as well: the
+  blocks are that text.
+- `README.md` and the opening of `AGENTS.md` say where a project built on the core keeps its map,
+  and link the foundation's own.
+
+### What apps must do
+
+An app that carries the rules as hand copies does this once, after moving its pin to this
+release.
+
+1. Run `cargo xtask sync`. It brings the new `sync.rs` and says to run it again.
+2. In `AGENTS.md`, find the hand copy of the core's rules (from "## Before you commit" to the end
+   of "## House rules for code"). Delete it and put these six lines in its place, in this order,
+   each pair with one empty line after it:
+
+   ```
+   <!-- BEGIN open-source-core: app -->
+   <!-- END open-source-core: app -->
+
+   <!-- BEGIN open-source-core: public -->
+   <!-- END open-source-core: public -->
+
+   <!-- BEGIN open-source-core: app-and-core -->
+   <!-- END open-source-core: app-and-core -->
+   ```
+
+   Keep the app's opening lines, a project block if the app has one, and the app's own rules.
+   Remove "Read the core's AGENTS.md too" from the opening.
+3. In `SECURITY.md`, delete the app's "## Reporting a problem" and "## How we handle a report"
+   and put the pair `<!-- BEGIN open-source-core: security -->`,
+   `<!-- END open-source-core: security -->` under the title. Keep "## What counts" below it.
+4. In `CONTRIBUTING.md`, delete the app's "## Rules for a public repository" and its commit and
+   pull request section, and put the pair `<!-- BEGIN open-source-core: contributing -->`,
+   `<!-- END open-source-core: contributing -->` there. Move any rule that is the app's own
+   (a naming rule, a commit subject form, a progress file) to a section below the pair; do not
+   keep a second copy of a rule the block states.
+5. Run `cargo xtask sync` again. It fills the five blocks and replaces `CODE_OF_CONDUCT.md` with
+   the core's. If it names a block it could not place, the marker lines for that block are
+   missing or misspelled; each must be a line of its own.
+6. Read the three files once through: text outside a block must not contradict the block, and a
+   bare "decision NNNN" in the app's own text that means a core record becomes "core decision
+   NNNN".
+7. `cargo xtask sync --check`, then `cargo xtask ci`.
+
+Nothing changes in an app's `xtask/src/main.rs`, and no code changes.
 
 ## 0.1.16 (2026-11-26)
 

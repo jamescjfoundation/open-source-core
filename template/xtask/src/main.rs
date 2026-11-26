@@ -37,7 +37,7 @@ const TASKS: &[(&str, &str)] = &[
     ("lint-roots", "every crate root forbids unsafe and denies the panicking lints"),
     ("unlinked", "no local core dev-link is left in .cargo/config.toml"),
     ("core-pin", "every jcj- dependency names one core release tag, and Cargo.lock holds one core"),
-    ("sync", "shared settings and the patch block match the pinned core release"),
+    ("sync", "shared files, marked blocks and the patch block match the pinned core release"),
     ("layers", "only jcj- interfaces of the core are used, never upstream crates or jcj-upstream"),
     ("privacy", "no personal details or secrets in files or commit identities"),
     ("licenses", "every dependency's license is on the allowlist"),

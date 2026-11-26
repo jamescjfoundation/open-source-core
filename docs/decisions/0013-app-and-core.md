@@ -35,8 +35,11 @@ How a change lands, while no app built on the core has a public release:
 What "the core carries no product name" covers: code, identifiers, interface text, brand (names,
 colors, logos, fonts) and the instructions an app carries from the core (`template/`). Records of
 history may say which app a thing came from: `CHANGELOG.md`, decision records and `docs/history/`.
+The core's `README.md` and the opening of its `AGENTS.md` may link the map of a project built on
+it, so that someone holding only the core can find who depends on it.
 
-The full rules for agents are in `AGENTS.md`.
+The full rules for agents are in `AGENTS.md`. The part every app carries is the marked blocks
+of `template/AGENTS.md`, copied and checked by `cargo xtask sync` (decision 0003).
 
 ## Why the 2026-11-26 amendment
 
