@@ -5,6 +5,10 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 ## Unreleased
 
+Nothing yet.
+
+## 0.1.16 (2026-11-26)
+
 ### Added
 
 - Shared xtask (`template/xtask/src/corepin.rs`, new, managed): `cargo xtask core-pin` checks
@@ -46,7 +50,7 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 ### What apps must do
 
-- Move every `jcj-` dependency to this release's tag, then run `cargo xtask sync` **twice**: the
+- Move every `jcj-` dependency to `tag = "v0.1.16"`, then run `cargo xtask sync` **twice**: the
   first run brings the new list of managed files, the second the two files it adds
   (`xtask/src/corepin.rs` and `.github/workflows/core-pin.yml`). `cargo xtask sync --check` passes
   after the second. The patch block is unchanged.
