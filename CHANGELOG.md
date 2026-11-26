@@ -61,14 +61,17 @@ minor release may, and then **What apps must do** says exactly what (decision 00
     `then` runs with `"path"` (the file, folder or place to save) and `"paths"` (every file
     chosen) added to its parameters. Closing the dialog runs nothing, unless
     `Shell::ask_file_or(ask, then, cancelled)` named a command for that. One dialog shows at a
-    time; at most `files::MAX_WAITING` wait.
+    time; a shell holds at most `files::MAX_WAITING` for its window.
   - `files::FileAsk`: `open()`, `open_many()`, `save()`, `folder()`, then `.title(..)`,
     `.filter(name, &[extensions])` (any letter case), `.in_folder(..)`, `.file_name(..)`.
-  - `Shell::show_file_dialogs(Some(&*frame))`: the app's window calls it once at the end of
-    every frame, after `Shell::ui`. The shell does not own the window, so without this call a
-    dialog asked for never opens.
-  - `Shell::answer_file_dialogs_with(..)` answers in the system's place (`files::FileAnswer`),
-    for tests and automation; `Shell::file_dialog_pending()` says whether one is up or waiting.
+  - `files::FileDialogs`: the window's part. The app's window keeps one beside its shell and
+    calls `files.show(&mut shell, ui.ctx(), Some(&*frame))` once at the end of every frame,
+    after `Shell::ui`. The shell does not own the window, so without this call a dialog asked
+    for never opens. The dialogs live there and not in the shell because a dialog on screen
+    belongs to the thread that showed it: `Shell` is still `Send`, and a test says so.
+  - `FileDialogs::answer_with(..)` answers in the system's place (`files::FileAnswer`) and
+    `FileDialogs::tick(&mut shell, ctx)` needs no window, for tests and automation;
+    `Shell::file_asks_waiting()`, `FileDialogs::is_open()` and `waiting()` say what is pending.
   - The dialogs are the upstream layer's (craft-dialogs), which keeps the window drawing while
     one is up. `jcj-shell` gains one direct dependency, `raw-window-handle` 0.6.2, for the
     window's handles; it was in every app's lock file already. A dialog that cannot be shown

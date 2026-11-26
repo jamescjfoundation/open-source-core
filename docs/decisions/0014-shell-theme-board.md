@@ -25,8 +25,10 @@ Date: 2026-11-24 · Status: accepted · General parts of Wordsmith Script decisi
   are asked for through the shell (`Shell::ask_file`) and answered as a command, with the path
   chosen in its parameters, on a later frame. They are craft-dialogs' through `jcj-upstream`,
   which never stops the window's event loop: a blocking dialog can crash an app on macOS. The
-  shell draws inside a window it does not own, so the app's window hands itself over once a
-  frame (`Shell::show_file_dialogs`); that is the one call an app adds. `jcj-shell` names
+  shell draws inside a window it does not own, so the app's window keeps the dialogs
+  (`files::FileDialogs`) beside its shell and shows them once a frame, handing itself over;
+  that is the one call an app adds. They are not a field of the shell because a dialog on
+  screen belongs to the thread that showed it, and `Shell` stays `Send`. `jcj-shell` names
   `raw-window-handle`, the traits a window offers, for that signature and nothing else.
 - **Keys** (added 2026-11-26, core issue #29): the shell takes bound keys with Mod, Ctrl or Alt
   and function keys, and leaves every other key to the document. A document view asks the key

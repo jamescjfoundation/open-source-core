@@ -481,22 +481,25 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("core-testbed-files-{}", std::process::id()));
         std::fs::create_dir_all(dir.join("out")).unwrap();
         let app = Testbed::new(dir.join("first.jcjtest"));
-        let mut shell = Shell::new("Core testbed", "0", jcj_shell::theme::Tokens::default());
+        let shell = Shell::new("Core testbed", "0", jcj_shell::theme::Tokens::default());
+        let mut files = jcj_shell::files::FileDialogs::new();
         let answers = dir.clone();
-        shell.answer_file_dialogs_with(Some(Box::new(move |ask| match ask.kind {
+        files.answer_with(Some(Box::new(move |ask| match ask.kind {
             FileKind::Save if ask.file_name.as_deref() == Some("first.jcjtest") => FileAnswer::Chosen(vec![answers.join("second")]),
             FileKind::Save => FileAnswer::Cancelled,
             FileKind::Folder => FileAnswer::Chosen(vec![answers.join("out")]),
             FileKind::Open | FileKind::OpenMany => FileAnswer::Chosen(vec![answers.join("second.jcjtest")]),
         })));
+        type State = (Shell, jcj_shell::files::FileDialogs, Testbed);
         let mut h = Harness::builder().with_size(egui::vec2(1200.0, 800.0)).build_ui_state(
-            |ui, s: &mut (Shell, Testbed)| {
-                let (shell, app) = s;
+            |ui, s: &mut State| {
+                let (shell, files, app) = s;
                 shell.ui(ui, app);
+                files.tick(shell, ui.ctx());
             },
-            (shell, app),
+            (shell, files, app),
         );
-        let run = |h: &mut Harness<'_, (Shell, Testbed)>, id: &str| {
+        let run = |h: &mut Harness<'_, State>, id: &str| {
             h.state_mut().0.run(Cmd::new(id));
             h.run();
             h.run();
@@ -504,18 +507,18 @@ mod tests {
         };
         run(&mut h, cmd::ADD_CARD);
         run(&mut h, ids::SAVE_AS);
-        assert_eq!(h.state().1.path, dir.join("second.jcjtest"), "the extension is added");
-        assert!(dir.join("second.jcjtest").is_file() && !h.state().1.is_dirty());
+        assert_eq!(h.state().2.path, dir.join("second.jcjtest"), "the extension is added");
+        assert!(dir.join("second.jcjtest").is_file() && !h.state().2.is_dirty());
         // Closed without choosing: nothing is saved, and the app is told.
         run(&mut h, ids::SAVE_AS);
-        assert!(h.state().1.log.iter().any(|l| l.contains("without a place chosen")));
+        assert!(h.state().2.log.iter().any(|l| l.contains("without a place chosen")));
         run(&mut h, cmd::EXPORT_TO);
         assert!(dir.join("out/second.epub").is_file() && dir.join("out/second.txt").is_file());
         run(&mut h, ids::NEW);
-        assert!(h.state().1.board.cards.len() == 1 && h.state().1.is_dirty());
+        assert!(h.state().2.board.cards.len() == 1 && h.state().2.is_dirty());
         run(&mut h, cmd::ADD_CARD);
         run(&mut h, ids::OPEN);
-        let app = &h.state().1;
+        let app = &h.state().2;
         assert!(!app.is_dirty() && app.board.cards.len() == 1, "the saved file is open again");
         assert!(app.log.iter().any(|l| l.starts_with("opened ")));
         let _ = std::fs::remove_dir_all(&dir);

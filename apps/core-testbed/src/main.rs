@@ -13,15 +13,17 @@ use jcj_shell::{Shell, theme::Tokens};
 
 struct Window {
     shell: Shell,
+    /// The window's part of the shell's file dialogs.
+    files: jcj_shell::files::FileDialogs,
     app: Testbed,
 }
 
 impl eframe::App for Window {
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         self.shell.ui(ui, &mut self.app);
-        // The window's part of the shell's file dialogs: show the next one asked for, over
-        // this window, once the frame is drawn.
-        self.shell.show_file_dialogs(Some(&*frame));
+        // Show the next file dialog the shell was asked for, over this window, once the frame
+        // is drawn; an answer runs its command in a later frame.
+        self.files.show(&mut self.shell, ui.ctx(), Some(&*frame));
     }
 }
 
@@ -65,6 +67,7 @@ fn main() -> ExitCode {
             let window = Window {
                 shell: Shell::new("Core testbed", env!("CARGO_PKG_VERSION"), Tokens::default())
                     .with_options(jcj_shell::ShellOptions { start_window: true, ..jcj_shell::ShellOptions::default() }),
+                files: jcj_shell::files::FileDialogs::new(),
                 app: Testbed::new(path),
             };
             let options = eframe::NativeOptions::default();

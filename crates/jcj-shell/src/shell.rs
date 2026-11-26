@@ -112,8 +112,8 @@ pub struct Shell {
     /// Whether the platform is macOS (keys show as ⌘; its own text keys apply).
     pub mac: bool,
     queue: Vec<Cmd>,
-    /// The system's file dialogs asked for.
-    files: crate::files::FileDialogs,
+    /// The file dialogs asked for, until the window's [`crate::files::FileDialogs`] takes them.
+    file_asks: Vec<crate::files::Asked>,
     close_requested: bool,
     /// Rails and floating panels drawn this frame (a press elsewhere closes floating panels).
     pub(crate) rails: Vec<Rect>,
@@ -148,7 +148,7 @@ impl Shell {
             options: ShellOptions::default(),
             mac: cfg!(target_os = "macos"),
             queue: Vec::new(),
-            files: crate::files::FileDialogs::default(),
+            file_asks: Vec::new(),
             close_requested: false,
             rails: Vec::new(),
             floating: Vec::new(),
@@ -324,7 +324,6 @@ impl Shell {
         {
             self.close_requested = true;
         }
-        self.take_file_answers(&ctx);
         if !self.queue.is_empty() {
             // What the commands change shows in the next frame.
             ctx.request_repaint();
@@ -402,48 +401,34 @@ impl Shell {
     /// `"path"`, the file, folder or place to save chosen, and `"paths"`, every file chosen
     /// (text; a path that is not Unicode loses the characters that are not). Closing the dialog
     /// without choosing runs nothing. The dialog opens after the frame, when the app's window
-    /// calls [`Shell::show_file_dialogs`]; see [`crate::files`]. `false` when too many dialogs
-    /// wait already ([`crate::files::MAX_WAITING`]) and this one was dropped.
+    /// calls [`crate::files::FileDialogs::show`]; see [`crate::files`]. `false` when too many
+    /// dialogs wait already ([`crate::files::MAX_WAITING`]) and this one was dropped.
     pub fn ask_file(&mut self, ask: crate::files::FileAsk, then: Cmd) -> bool {
-        self.files.ask(ask, then, None)
+        self.push_file_ask(ask, then, None)
     }
 
     /// [`Shell::ask_file`], with a command to run when the dialog is closed without choosing
     /// (a step that waited on the answer can then be given up).
     pub fn ask_file_or(&mut self, ask: crate::files::FileAsk, then: Cmd, cancelled: Cmd) -> bool {
-        self.files.ask(ask, then, Some(cancelled))
+        self.push_file_ask(ask, then, Some(cancelled))
     }
 
-    /// Show the next file dialog asked for, over `parent`. The app's window calls this once at
-    /// the end of every frame, after [`Shell::ui`], on the main thread, with the window itself.
-    /// Without a parent, a Save dialog cannot be shown on macOS (it is a sheet on its window)
-    /// and says so in the status bar.
-    pub fn show_file_dialogs<W: raw_window_handle::HasWindowHandle + raw_window_handle::HasDisplayHandle>(&mut self, parent: Option<&W>) {
-        self.files.show(parent);
+    /// How many file dialogs were asked for and not yet taken by the window to show.
+    pub fn file_asks_waiting(&self) -> usize {
+        self.file_asks.len()
     }
 
-    /// Answer every file dialog with `stand_in` instead of the system's dialogs (tests and
-    /// automation); `None` shows the system's again. The answers come back through
-    /// [`Shell::ui`] like real ones, and [`Shell::show_file_dialogs`] need not be called.
-    pub fn answer_file_dialogs_with(&mut self, stand_in: Option<crate::files::AnswerWith>) {
-        self.files.answer_with(stand_in);
-    }
-
-    /// Whether a file dialog is on screen or waits to be shown.
-    pub fn file_dialog_pending(&self) -> bool {
-        self.files.is_open() || self.files.waiting() > 0
-    }
-
-    /// Queue what the file dialogs answered since the last frame.
-    fn take_file_answers(&mut self, ctx: &egui::Context) {
-        for outcome in self.files.tick(ctx) {
-            match outcome {
-                crate::files::Outcome::Run(cmd) => self.run(cmd),
-                crate::files::Outcome::Unavailable(why) => {
-                    self.message = tr_with("The file dialog could not be shown: {why}", &[("why", &why)]);
-                }
-            }
+    fn push_file_ask(&mut self, ask: crate::files::FileAsk, chosen: Cmd, cancelled: Option<Cmd>) -> bool {
+        if self.file_asks.len() >= crate::files::MAX_WAITING {
+            return false;
         }
+        self.file_asks.push(crate::files::Asked { ask, then: crate::files::Then { chosen, cancelled } });
+        true
+    }
+
+    /// The file dialogs asked for, for the window to show.
+    pub(crate) fn take_file_asks(&mut self) -> Vec<crate::files::Asked> {
+        std::mem::take(&mut self.file_asks)
     }
 
     /// Run the queued commands (and any they queue, a few rounds deep).

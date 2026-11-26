@@ -18,24 +18,32 @@
 //! ```
 //!
 //! **The window's part.** A dialog belongs to a window, and the shell draws inside one without
-//! owning it. So the app's window calls
-//! [`Shell::show_file_dialogs`](crate::Shell::show_file_dialogs) once at the end of every frame,
-//! after [`Shell::ui`](crate::Shell::ui), with the window itself:
+//! owning it. So the app's window keeps a [`FileDialogs`] beside its shell and calls
+//! [`FileDialogs::show`] once at the end of every frame, after
+//! [`Shell::ui`](crate::Shell::ui), with the window itself:
 //!
 //! ```ignore
+//! struct Window {
+//!     shell: Shell,
+//!     files: jcj_shell::files::FileDialogs,
+//!     app: MyApp,
+//! }
+//!
 //! impl eframe::App for Window {
 //!     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
 //!         self.shell.ui(ui, &mut self.app);
-//!         self.shell.show_file_dialogs(Some(&*frame));
+//!         self.files.show(&mut self.shell, ui.ctx(), Some(&*frame));
 //!     }
 //! }
 //! ```
 //!
-//! Without that call a dialog asked for never opens.
+//! Without that call a dialog asked for never opens. The dialogs live with the window, not in
+//! the shell, because the system's dialog on screen belongs to the thread that showed it, and a
+//! shell stays a value that can be moved between threads.
 //!
-//! **Tests and automation** answer in the system's place with
-//! [`Shell::answer_file_dialogs_with`](crate::Shell::answer_file_dialogs_with); the answers then
-//! come back through [`Shell::ui`](crate::Shell::ui) like real ones, and no window is needed.
+//! **Tests and automation** answer in the system's place with [`FileDialogs::answer_with`] and
+//! call [`FileDialogs::tick`], which needs no window; the answers run as commands like real
+//! ones.
 //!
 //! The dialogs are the upstream layer's, which shows them without stopping the window's event
 //! loop on any platform (a dialog that blocks it can crash the app on macOS).
@@ -46,9 +54,12 @@ use jcj_upstream::dialogs as up;
 use raw_window_handle::{DisplayHandle, HandleError, HasDisplayHandle, HasWindowHandle, WindowHandle};
 use serde_json::{Value, json};
 
+use jcj_i18n::tr_with;
+
+use crate::Shell;
 use crate::commands::Cmd;
 
-/// Most file dialogs that wait their turn; one asked beyond that is dropped.
+/// Most file dialogs a shell holds for its window to show; one asked beyond that is dropped.
 pub const MAX_WAITING: usize = 32;
 
 /// Which dialog to show.
@@ -166,7 +177,7 @@ impl FileAsk {
 }
 
 /// How a file dialog ended: what a stand-in for the system's dialogs answers
-/// ([`Shell::answer_file_dialogs_with`](crate::Shell::answer_file_dialogs_with)).
+/// ([`FileDialogs::answer_with`]).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FileAnswer {
     /// Closed without choosing.
@@ -180,16 +191,23 @@ pub enum FileAnswer {
 /// A stand-in for the system's dialogs.
 pub type AnswerWith = Box<dyn FnMut(&FileAsk) -> FileAnswer>;
 
+/// A dialog the shell was asked for, and what its answer runs.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Asked {
+    pub(crate) ask: FileAsk,
+    pub(crate) then: Then,
+}
+
 /// What an answer runs.
 #[derive(Clone, Debug, PartialEq)]
-struct Then {
-    chosen: Cmd,
-    cancelled: Option<Cmd>,
+pub(crate) struct Then {
+    pub(crate) chosen: Cmd,
+    pub(crate) cancelled: Option<Cmd>,
 }
 
 /// What an answered dialog asks the shell to do.
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) enum Outcome {
+enum Outcome {
     /// Run this command.
     Run(Cmd),
     /// Say this in the status bar: no dialog could be shown.
@@ -227,11 +245,10 @@ impl HasDisplayHandle for NoWindow {
     }
 }
 
-/// The shell's file dialogs: those asked for, the one on screen, the answers not yet run.
+/// The file dialogs of one window: the one on screen, those waiting, the answers not yet run.
+/// The app's window keeps one beside its [`Shell`] and calls [`FileDialogs::show`] every frame.
 #[derive(Default)]
-pub(crate) struct FileDialogs {
-    /// Asked before the first frame: there is nothing to wake yet.
-    early: Vec<(FileAsk, Then)>,
+pub struct FileDialogs {
     dialogs: Option<up::Dialogs<Then>>,
     /// A stand-in answers instead of the system.
     stand_in: bool,
@@ -246,29 +263,25 @@ impl std::fmt::Debug for FileDialogs {
 }
 
 impl FileDialogs {
-    /// How many dialogs wait their turn.
-    pub(crate) fn waiting(&self) -> usize {
-        self.early.len() + self.dialogs.as_ref().map_or(0, up::Dialogs::queued)
+    /// No dialog yet.
+    pub fn new() -> Self {
+        FileDialogs::default()
+    }
+
+    /// How many dialogs wait behind the one on screen.
+    pub fn waiting(&self) -> usize {
+        self.dialogs.as_ref().map_or(0, up::Dialogs::queued)
     }
 
     /// Whether a dialog is on screen.
-    pub(crate) fn is_open(&self) -> bool {
+    pub fn is_open(&self) -> bool {
         self.dialogs.as_ref().is_some_and(up::Dialogs::is_open)
     }
 
-    pub(crate) fn ask(&mut self, ask: FileAsk, chosen: Cmd, cancelled: Option<Cmd>) -> bool {
-        if self.waiting() >= MAX_WAITING {
-            return false;
-        }
-        let then = Then { chosen, cancelled };
-        match &mut self.dialogs {
-            Some(d) => d.ask(ask.to_upstream(), then),
-            None => self.early.push((ask, then)),
-        }
-        true
-    }
-
-    pub(crate) fn answer_with(&mut self, stand_in: Option<AnswerWith>) {
+    /// Answer every dialog with `stand_in` instead of the system's dialogs (tests and
+    /// automation); `None` shows the system's again. The answers still come back on a later
+    /// call of [`FileDialogs::show`] or [`FileDialogs::tick`], like real ones.
+    pub fn answer_with(&mut self, stand_in: Option<AnswerWith>) {
         self.stand_in = stand_in.is_some();
         match &mut self.dialogs {
             Some(d) => d.set_override(stand_in.map(upstream_stand_in)),
@@ -276,33 +289,43 @@ impl FileDialogs {
         }
     }
 
-    /// Once a frame, while drawing: take in what was asked before there was a window to wake,
-    /// let a stand-in answer, and give back what the answers ask for.
-    pub(crate) fn tick(&mut self, ctx: &egui::Context) -> Vec<Outcome> {
-        if self.dialogs.is_none() && (self.early.is_empty() && self.early_stand_in.is_none()) {
-            return Vec::new();
+    /// Once a frame, after [`Shell::ui`], on the main thread, with the window as `parent`: take
+    /// the dialogs `shell` was asked for, show the next one, and queue on `shell` the commands
+    /// of those that were answered. Without a parent, a Save dialog cannot be shown on macOS (it
+    /// is a sheet on its window) and the shell's status bar says so.
+    pub fn show<W: HasWindowHandle + HasDisplayHandle>(&mut self, shell: &mut Shell, ctx: &egui::Context, parent: Option<&W>) {
+        let asked = shell.take_file_asks();
+        if self.dialogs.is_none() && asked.is_empty() && self.early_stand_in.is_none() {
+            return;
         }
         let early_stand_in = self.early_stand_in.take();
         let dialogs = self.dialogs.get_or_insert_with(|| {
-            let ctx = ctx.clone();
-            let mut d = up::Dialogs::new(std::sync::Arc::new(move || ctx.request_repaint()));
+            // An answer comes from another thread: it wakes the window to run its command.
+            let wake = ctx.clone();
+            let mut d = up::Dialogs::new(std::sync::Arc::new(move || wake.request_repaint()));
             d.set_override(early_stand_in.map(upstream_stand_in));
             d
         });
-        for (ask, then) in self.early.drain(..) {
+        for Asked { ask, then } in asked {
             dialogs.ask(ask.to_upstream(), then);
         }
-        if self.stand_in {
-            dialogs.show_pending(None::<&NoWindow>);
+        dialogs.show_pending(parent);
+        let answers = dialogs.take_answers();
+        if !answers.is_empty() {
+            ctx.request_repaint();
         }
-        dialogs.take_answers().into_iter().filter_map(|(then, answer)| outcome(then, answer)).collect()
+        for outcome in answers.into_iter().filter_map(|(then, answer)| outcome(then, answer)) {
+            match outcome {
+                Outcome::Run(cmd) => shell.run(cmd),
+                Outcome::Unavailable(why) => shell.message = tr_with("The file dialog could not be shown: {why}", &[("why", &why)]),
+            }
+        }
     }
 
-    /// After the frame, with the window: show the next dialog asked for.
-    pub(crate) fn show<W: HasWindowHandle + HasDisplayHandle>(&mut self, parent: Option<&W>) {
-        if let Some(d) = &mut self.dialogs {
-            d.show_pending(parent);
-        }
+    /// [`FileDialogs::show`] with no window: for tests, where a stand-in answers
+    /// ([`FileDialogs::answer_with`]).
+    pub fn tick(&mut self, shell: &mut Shell, ctx: &egui::Context) {
+        self.show(shell, ctx, None::<&NoWindow>);
     }
 }
 
