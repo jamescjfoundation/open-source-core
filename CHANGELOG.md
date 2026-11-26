@@ -3,7 +3,7 @@
 Each release says what changed for apps. While at 0.x, a patch release never breaks an app; a
 minor release may, and then **What apps must do** says exactly what (decision 0011).
 
-## Unreleased
+## 0.1.17 (2026-11-26)
 
 ### Added
 
