@@ -19,14 +19,13 @@
 //! gate has passed on the commit. Nothing here tags or pushes.
 
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::shared::corepin;
 use crate::shared::link::{self, CORE_GIT};
+// What reads a manifest and a changelog is shared with the apps' own `release` task.
+pub use crate::shared::release::{
+    Section, UNRELEASED, is_date, released_heading, sections, today, version, with_workspace_version, workspace_version,
+};
 use crate::shared::util::{TaskResult, cargo_output};
-
-/// The heading of the section that holds what the next release changes.
-pub const UNRELEASED: &str = "Unreleased";
 /// The heading every section needs before it can be released.
 pub const APPS_MUST_DO: &str = "### What apps must do";
 /// How an override line starts, before the app's repository. The whole line is
@@ -49,71 +48,6 @@ pub fn task(root: &Path, args: &[String]) -> TaskResult {
         [version, "--date", date] if !version.starts_with('-') => cut(root, version, date),
         _ => Err(USAGE.to_owned()),
     }
-}
-
-/// A version as three numbers, when it is written `X.Y.Z` and nothing else.
-pub fn version(text: &str) -> Option<(u64, u64, u64)> {
-    let digits = text.split('.').all(|part| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit()));
-    if digits { corepin::release(&format!("v{text}")) } else { None }
-}
-
-/// Whether `text` is a date written `YYYY-MM-DD`.
-pub fn is_date(text: &str) -> bool {
-    let b = text.as_bytes();
-    b.len() == 10 && b.iter().enumerate().all(|(i, c)| if i == 4 || i == 7 { *c == b'-' } else { c.is_ascii_digit() })
-}
-
-/// The date `days` days after 1970-01-01, as `YYYY-MM-DD`.
-pub fn date_of(days: u64) -> String {
-    // Days to a date of the calendar in use everywhere, by whole 400-year eras from 0000-03-01.
-    let z = days + 719_468;
-    let (era, day_of_era) = (z / 146_097, z % 146_097);
-    let year_of_era = (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
-    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
-    let month_from_march = (5 * day_of_year + 2) / 153;
-    let day = day_of_year - (153 * month_from_march + 2) / 5 + 1;
-    let month = if month_from_march < 10 { month_from_march + 3 } else { month_from_march - 9 };
-    let year = year_of_era + era * 400 + u64::from(month <= 2);
-    format!("{year:04}-{month:02}-{day:02}")
-}
-
-/// Today's date in UTC, the clock GitHub's own dates use.
-fn today() -> String {
-    date_of(SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0) / 86_400)
-}
-
-/// The version under `[workspace.package]` of the root manifest.
-pub fn workspace_version(manifest: &str) -> Option<&str> {
-    let mut in_table = false;
-    for line in manifest.lines().map(str::trim) {
-        if line.starts_with('[') {
-            in_table = line == "[workspace.package]";
-        } else if in_table && line.split('=').next().is_some_and(|key| key.trim() == "version") {
-            return link::value_of(line, "version");
-        }
-    }
-    None
-}
-
-/// The root manifest with `new` as the version under `[workspace.package]`.
-pub fn with_workspace_version(manifest: &str, new: &str) -> Option<String> {
-    let old = workspace_version(manifest)?;
-    let mut in_table = false;
-    let mut out = String::with_capacity(manifest.len());
-    let mut done = false;
-    for line in manifest.split_inclusive('\n') {
-        let trimmed = line.trim();
-        if trimmed.starts_with('[') {
-            in_table = trimmed == "[workspace.package]";
-        }
-        if in_table && !done && trimmed.split('=').next().is_some_and(|key| key.trim() == "version") {
-            out.push_str(&line.replacen(&format!("\"{old}\""), &format!("\"{new}\""), 1));
-            done = true;
-        } else {
-            out.push_str(line);
-        }
-    }
-    done.then_some(out)
 }
 
 /// The tags the template's manifest names on its lines for the core's crates, in order.
@@ -140,49 +74,12 @@ pub fn with_template_tags(manifest: &str, tag: &str) -> (String, usize) {
     (out, lines)
 }
 
-/// One `## ` section of the changelog: the heading without its `## `, the line it is on (from
-/// 0) and the lines below it up to the next section.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Section<'a> {
-    pub heading: &'a str,
-    pub line: usize,
-    pub body: Vec<&'a str>,
-}
-
-/// The sections of a changelog, newest first as written. A `## ` inside a fenced block of code
-/// is code, not a heading.
-pub fn sections(changelog: &str) -> Vec<Section<'_>> {
-    let mut out: Vec<Section> = Vec::new();
-    let mut in_code = false;
-    for (i, line) in changelog.lines().enumerate() {
-        if line.trim_start().starts_with("```") {
-            in_code = !in_code;
-        }
-        match line.strip_prefix("## ").filter(|_| !in_code) {
-            Some(heading) => out.push(Section { heading: heading.trim(), line: i, body: Vec::new() }),
-            None => {
-                if let Some(section) = out.last_mut() {
-                    section.body.push(line);
-                }
-            }
-        }
-    }
-    out
-}
-
 /// Whether a section says what apps must do: the heading, and at least one line of text under
 /// it before the next heading.
 pub fn says_what_apps_must_do(section: &Section) -> bool {
     let Some(at) = section.body.iter().position(|l| l.trim() == APPS_MUST_DO) else { return false };
     let below = section.body.iter().skip(at + 1).take_while(|l| !l.starts_with("### "));
     below.into_iter().any(|l| !l.trim().is_empty())
-}
-
-/// The version and the date of a released section's heading, `X.Y.Z (YYYY-MM-DD)`.
-pub fn released_heading(heading: &str) -> Option<(&str, &str)> {
-    let (number, date) = heading.split_once(" (")?;
-    let date = date.strip_suffix(')')?;
-    (version(number).is_some() && is_date(date)).then_some((number, date))
 }
 
 /// The changelog with its `## Unreleased` section turned into the section of `new`, dated
@@ -363,12 +260,6 @@ mod tests {
         for other in ["2026-11-6", "26-11-2026", "2026/11/26", "today", ""] {
             assert!(!is_date(other), "{other}");
         }
-        assert_eq!(date_of(0), "1970-01-01");
-        assert_eq!(date_of(59), "1970-03-01");
-        assert_eq!(date_of(11_016), "2000-02-29");
-        assert_eq!(date_of(11_017), "2000-03-01");
-        assert_eq!(date_of(20_783), "2026-11-26");
-        assert_eq!(date_of(20_819), "2027-01-01");
     }
 
     #[test]
