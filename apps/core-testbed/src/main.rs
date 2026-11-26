@@ -104,7 +104,25 @@ fn window(file: Option<&str>) -> Result<Exit, (Exit, String)> {
     Ok(Exit::Done)
 }
 
+/// Where an app's releases come from. The testbed publishes none and never checks for one; it
+/// names a source so that the updater's entry point at start is used here as an app uses it.
+const RELEASES: jcj_shell::updates::desktop::ReleaseSource = jcj_shell::updates::desktop::ReleaseSource {
+    id: PROGRAM,
+    name: "Core testbed",
+    tagline: "Exercises every crate of the core",
+    repo: "jamescjfoundation/open-source-core",
+    developer: "the open-source-core contributors",
+    version: env!("CARGO_PKG_VERSION"),
+    installs_in_place: false,
+};
+
 fn main() -> ExitCode {
+    // First, before the program reads its own arguments: a copy of it that the updater started
+    // to finish an update does that work and nothing else (Windows; `None` everywhere else).
+    let started_with: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+    if let Some(done) = RELEASES.finish_update(&started_with) {
+        return if done.is_ok() { ExitCode::SUCCESS } else { ExitCode::FAILURE };
+    }
     let args: Vec<String> = std::env::args().skip(1).collect();
     let rest = args.get(1..).unwrap_or_default();
     let outcome = match (standard(&args), args.first().map(String::as_str)) {
