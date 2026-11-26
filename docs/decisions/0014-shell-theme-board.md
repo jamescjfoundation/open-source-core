@@ -21,6 +21,20 @@ Date: 2026-11-24 · Status: accepted · General parts of Wordsmith Script decisi
 - **Options default to Script's behavior** (`ShellOptions`): a change that alters what users see
   in other apps goes behind one (decision 0011, plan "Step 3"). Panels may float unpinned; pinned
   is the default.
+- **File dialogs** (added 2026-11-26, core issue #28): the system's open, save and folder dialogs
+  are asked for through the shell (`Shell::ask_file`) and answered as a command, with the path
+  chosen in its parameters, on a later frame. They are craft-dialogs' through `jcj-upstream`,
+  which never stops the window's event loop: a blocking dialog can crash an app on macOS. The
+  shell draws inside a window it does not own, so the app's window keeps the dialogs
+  (`files::FileDialogs`) beside its shell and shows them once a frame, handing itself over;
+  that is the one call an app adds. They are not a field of the shell because a dialog on
+  screen belongs to the thread that showed it, and `Shell` stays `Send`. `jcj-shell` names
+  `raw-window-handle`, the traits a window offers, for that signature and nothing else.
+- **Keys** (added 2026-11-26, core issue #29): the shell takes bound keys with Mod, Ctrl or Alt
+  and function keys, and leaves every other key to the document. A document view asks the key
+  map what a key runs (`KeyMap::command_for`), which holds the one rule for a shifted key with
+  no command of its own: with a caret movement's key it extends the selection, and
+  Shift+Backspace deletes back.
 - **Preferences** are JSON in the app's settings folder (WordCraft's settings location with the
   app's own name), written atomically; a damaged file is set aside and defaults used. The shell's
   preferences and the app's own type live side by side (`Prefs<A>`).

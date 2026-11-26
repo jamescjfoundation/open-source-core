@@ -94,6 +94,9 @@ quick-xml = "0.41"
 image = { version = "0.25", default-features = false, features = ["png"] }
 # 2D transforms for reading PDF pages (the version Hayro uses).
 kurbo = "0.13"
+# The window a file dialog belongs to (jcj-shell): the traits a window offers, at the version
+# the dialogs upstream and the window toolkit already use.
+raw-window-handle = "0.6.2"
 
 # Interface: egui 0.37 on storytold's fork, as WordCraft v0.18.1 uses it (patched below).
 # No `default_fonts`: their Ubuntu Font Licence is outside the allowlist (decision 0001);

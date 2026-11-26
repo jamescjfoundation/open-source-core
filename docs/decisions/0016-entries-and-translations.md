@@ -20,7 +20,10 @@ and 0.1.13)
   every catalog and no catalog keeps a text nothing uses.
 - **The shell shows its own texts through the catalogs** (`jcj_shell::i18n`), and the labels,
   titles and tooltips an app gives it. Nothing is translated until an app sets a language, so an
-  app that does not use translations is unchanged.
+  app that does not use translations is unchanged. An interface crate reaches the lookups and
+  the catalog check through `jcj_shell::i18n` too, and needs no dependency on `jcj-i18n` of its
+  own (core issue #32). One language holds for the whole window: the shell shows an app's labels
+  through the same lookup as its own texts, so the two cannot be in different languages.
 - **`jcj-features`** (layer 4) has its own record, decision 0010. With these two, every crate in
   the layer table of decision 0002 has a decision.
 

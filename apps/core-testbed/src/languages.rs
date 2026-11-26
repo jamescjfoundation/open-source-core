@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! Interface languages (C4): the testbed's few texts in Spanish, layered over the shell's
 //! catalog. `CORE_TESTBED_LANG=es core-testbed` shows the window in Spanish.
+//!
+//! The testbed translates through `jcj_shell::i18n` alone, as an app's interface crate does: it
+//! has no translation dependency of its own. `tests/languages.rs` holds this catalog to the
+//! texts the window marks.
 
 /// The testbed's own catalogs: language code and catalog text.
 pub const CATALOGS: [(&str, &str); 1] = [(
@@ -11,7 +15,7 @@ pub const CATALOGS: [(&str, &str); 1] = [(
 "Add Card" = "Añadir tarjeta"
 "Every Format" = "Todos los formatos"
 "Self-Test" = "Autoprueba"
-"{n} pages" = { one = "{n} página", other = "{n} páginas" }
+"{n} cards" = { one = "{n} tarjeta", other = "{n} tarjetas" }
 "#,
 )];
 

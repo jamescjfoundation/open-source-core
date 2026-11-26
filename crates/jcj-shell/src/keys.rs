@@ -8,12 +8,23 @@
 //!
 //! A [`KeyMap`] holds the commands' own keys and the user's: the user's come first, and a user
 //! key bound to nothing (`""`) turns a command's key off.
+//!
+//! A document view that takes key presses itself asks [`KeyMap::command_for`] what each runs.
+//! It adds the one rule every editor shares for a shifted key that has no command of its own
+//! ([`KeyMap::shifted`]): Shift with a key that moves the caret extends the selection, and
+//! Shift+Backspace still deletes back.
 
 use std::collections::BTreeMap;
 
 use egui::{Key, Modifiers};
 
-use crate::commands::CommandInfo;
+use crate::commands::{Cmd, CommandInfo};
+
+/// The prefix of the ids of commands that move the caret (`caret.left`, `caret.wordRight`): they
+/// take `{"extend": true}` to move the selection's end and leave its start.
+pub const CARET_COMMANDS: &str = "caret.";
+/// The command that deletes back from the caret.
+pub const BACKSPACE: &str = "text.backspace";
 
 /// Every key that can be part of a shortcut, with its portable name.
 const KEYS: [(Key, &str); 66] = [
@@ -260,6 +271,40 @@ impl KeyMap {
         }
     }
 
+    /// What a shifted key with no command of its own does, by the key without Shift: when that
+    /// runs a caret movement ([`CARET_COMMANDS`]), the same movement extending the selection
+    /// (`{"extend": true}`); when it deletes back ([`BACKSPACE`]), the same. `None` for a key
+    /// without Shift, and for one whose unshifted key runs anything else or nothing.
+    ///
+    /// This is the rule alone: it does not ask whether `shortcut` is bound itself.
+    /// [`KeyMap::command_for`] does both.
+    pub fn shifted(&self, shortcut: &str) -> Option<Cmd> {
+        let mut key = parse_shortcut(shortcut)?;
+        if !key.shift {
+            return None;
+        }
+        key.shift = false;
+        let id = self.bound_to(&key.to_string())?;
+        if id.starts_with(CARET_COMMANDS) {
+            Some(Cmd::with(id, serde_json::json!({ "extend": true })))
+        } else if id == BACKSPACE {
+            Some(Cmd::new(id))
+        } else {
+            None
+        }
+    }
+
+    /// The command a key press runs: the one bound to `shortcut` ([`KeyMap::bound_to`]), or
+    /// else what the rule for shifted keys gives ([`KeyMap::shifted`]). A key the user turned
+    /// off runs nothing.
+    pub fn command_for(&self, shortcut: &str) -> Option<Cmd> {
+        let key = normalize(shortcut)?;
+        match self.user.get(&key) {
+            Some(id) => (!id.is_empty()).then(|| Cmd::new(id.as_str())),
+            None => self.defaults.get(&key).map(|id| Cmd::new(id.as_str())).or_else(|| self.shifted(&key)),
+        }
+    }
+
     /// The keys that run command `id` now, the user's first.
     pub fn keys_for(&self, id: &str) -> Vec<String> {
         let mut v: Vec<String> = self.user.iter().filter(|(_, c)| c.as_str() == id).map(|(k, _)| k.clone()).collect();
@@ -363,6 +408,49 @@ mod tests {
         saved.insert("bad key".to_string(), "edit.redo".to_string());
         k.set_user(&saved);
         assert_eq!(k.user().keys().collect::<Vec<_>>(), ["Mod+Shift+K"]);
+    }
+
+    #[test]
+    fn a_shifted_caret_key_extends_the_selection() {
+        let cmds = [
+            CommandInfo::new("caret.left", "Left", "Left"),
+            CommandInfo::new("caret.wordLeft", "Word Left", "Mod+Left / Alt+Left"),
+            CommandInfo::new("caret.docEnd", "Document End", "Mod+End"),
+            CommandInfo::new("text.backspace", "Backspace", "Backspace"),
+            CommandInfo::new("text.newParagraph", "New Paragraph", "Enter"),
+            CommandInfo::new("text.lineBreak", "Line Break", "Shift+Enter"),
+            CommandInfo::new("text.deleteSentenceBack", "Delete Previous Sentence", "Mod+Shift+Backspace"),
+            CommandInfo::new("text.deleteWordBack", "Delete Previous Word", "Mod+Backspace"),
+        ];
+        let mut k = KeyMap::from_commands(&cmds);
+        let extend = |id: &str| Some(Cmd::with(id, serde_json::json!({ "extend": true })));
+        // Shift with a caret movement's key: the same movement, extending.
+        assert_eq!(k.shifted("Shift+Left"), extend("caret.left"));
+        assert_eq!(k.command_for("Shift+Left"), extend("caret.left"));
+        assert_eq!(k.command_for("mod+shift+left"), extend("caret.wordLeft"));
+        assert_eq!(k.command_for("Alt+Shift+Left"), extend("caret.wordLeft"));
+        assert_eq!(k.command_for("Mod+Shift+End"), extend("caret.docEnd"));
+        // Shift+Backspace still deletes back.
+        assert_eq!(k.command_for("Shift+Backspace"), Some(Cmd::new("text.backspace")));
+        // A key without Shift runs its command as it is; the rule says nothing about it.
+        assert_eq!(k.command_for("Left"), Some(Cmd::new("caret.left")));
+        assert_eq!(k.shifted("Left"), None);
+        // A shifted key with a command of its own runs that command.
+        assert_eq!(k.command_for("Shift+Enter"), Some(Cmd::new("text.lineBreak")));
+        assert_eq!(k.command_for("Mod+Shift+Backspace"), Some(Cmd::new("text.deleteSentenceBack")));
+        // The rule covers caret movements and deleting back, nothing else.
+        assert_eq!(k.command_for("Shift+Right"), None, "no command moves right here");
+        assert_eq!(k.shifted("Shift+Enter"), None, "Enter moves no caret");
+        assert_eq!(k.command_for("Shift+F13"), None);
+        // The user's keys come first: one bound to another command, and one turned off.
+        assert!(k.bind("Shift+Left", "edit.other"));
+        assert_eq!(k.command_for("Shift+Left"), Some(Cmd::new("edit.other")));
+        assert!(k.bind("Shift+Left", ""));
+        assert_eq!(k.command_for("Shift+Left"), None, "a key the user turned off stays off");
+        assert_eq!(k.shifted("Shift+Left"), extend("caret.left"), "the rule itself does not look at the shifted key");
+        // A caret key the user moved takes its shifted form with it.
+        assert!(k.bind("Mod+J", "caret.left"));
+        assert_eq!(k.command_for("Mod+Shift+J"), extend("caret.left"));
     }
 
     #[test]

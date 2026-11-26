@@ -12,6 +12,7 @@
 //! - the File page (New, Open, Recent, Save, Save As, Export, Print, Preferences, Keys, About,
 //!   and the app's own pages) ([`backstage`]);
 //! - the command palette, "save changes first?" and crash recovery ([`dialogs`]);
+//! - the system's file dialogs (open, save, choose a folder), answered as a command ([`files`]);
 //! - preferences kept as JSON in the app's settings folder, the shell's and the app's own
 //!   ([`prefs`]); the user's own keys ([`keys`]);
 //! - auto-save's schedule, with the app's save ([`autosave`]); updates from the app's GitHub
@@ -31,6 +32,7 @@ pub mod backstage;
 mod chrome;
 pub mod commands;
 pub mod dialogs;
+pub mod files;
 pub mod i18n;
 pub mod icons;
 pub mod keys;

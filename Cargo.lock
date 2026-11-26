@@ -924,7 +924,6 @@ dependencies = [
  "jcj-engine",
  "jcj-entries",
  "jcj-features",
- "jcj-i18n",
  "jcj-interchange",
  "jcj-layout",
  "jcj-output",
@@ -2655,6 +2654,7 @@ dependencies = [
  "jcj-theme",
  "jcj-upstream",
  "log",
+ "raw-window-handle",
  "serde",
  "serde_json",
 ]

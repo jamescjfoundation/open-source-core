@@ -3,7 +3,7 @@
 Each release says what changed for apps. While at 0.x, a patch release never breaks an app; a
 minor release may, and then **What apps must do** says exactly what (decision 0011).
 
-## Unreleased
+## 0.1.20 (2026-11-26)
 
 ### Added
 
@@ -100,6 +100,111 @@ minor release may, and then **What apps must do** says exactly what (decision 00
   uses the core's copy and its own copy is deleted. The core issue stays open until then, and
   the `core-candidate` marker on the app's copy names it.
 
+- `jcj-doc`: the word list and the word-level comparison, where a crate with no engine and no
+  layout can use them (core issue #31). They were in `jcj-features`, which needs `jcj-engine` and
+  `jcj-layout`, so an app's model crate kept its own copy of both.
+  - `jcj_doc::verify` is the whole word-for-word check: `words`, `paragraph_words`,
+    `document_words`, `compare`, `Difference`, `Check`, `CONTEXT`. `jcj_doc::words` is the word
+    list again at the crate's root, beside `count_words`.
+  - `jcj_doc::wordiff` is the whole comparison: `Change`, `Segment`, `Diff`, `tokens`,
+    `paragraph`, `paragraphs`, `documents`.
+  - `jcj_features::verify` and `jcj_features::wordiff` are the same items under the old names:
+    the same types, fields and results, so nothing that uses them changes.
+  `core-testbed` lists words and compares two lists of paragraphs through `jcj-doc` alone, and
+  still checks its exports and compares documents through `jcj-features`.
+- `jcj-shell`: `jcj_shell::i18n` gives the translation lookups beside `set_language` (core issue
+  #32): `tr`, `tr_with`, `trn`, `tl`, `language`, and for a test of an app's catalog `Catalog`,
+  `Entry`, `texts_in`, `singulars_in` and `compare`. They are `jcj-i18n`'s own items, so an
+  interface crate that already depends on `jcj-shell` needs no second dependency to translate
+  its texts. No behaviour changes. `core-testbed` no longer names `jcj-i18n`: it marks its
+  labels with `tl`, shows a count with `trn`, and a test holds its catalog to its window's code.
+  - Not added: a way to translate an app's texts while the shell's stay in English. One language
+    holds for the whole window, because the shell shows the labels an app gives it through the
+    same lookup as its own texts; installing only an app's catalog would turn the shell texts
+    that share a key with it and leave the rest. An app that moves its texts onto the core's
+    catalogs gets the shell's in that language too, and says so in its own changelog.
+- `jcj-interchange`: the EPUB writer's notes are the caller's to choose, and the writer says
+  which words it added (core issue #33). `export_epub(doc, &EpubOptions) -> EpubExport`:
+  - `EpubOptions::default().note_numbering(NoteNumbering::Continuous)`: notes are numbered once,
+    from the first chapter file to the last, instead of from 1 in each (`PerChapter`, the
+    default);
+  - `.note_backlink(..)`: the link under each note is `NoteBacklink::Text("…")` in the
+    document's language, `NoteBacklink::Symbol { label }` (a return arrow with a name for screen readers,
+    which adds no word), or `NoteBacklink::None`; the default is the word "Back";
+  - `.note_heading("…")`: a heading above each chapter's notes (none by default);
+  - `EpubExport { bytes, added_words }`: the file, and the words in its chapters that are the
+    writer's and not the document's, in order: each note's mark where it is called, then at the
+    chapter's end the heading's words and, for each note, its mark again and the link's words.
+    A mark stands directly after the word before it, so a check that reads the file back by
+    white space compares letters, as a PDF check does.
+  `export(Format::Epub, doc)` and `export_epub(doc, &EpubOptions::default())` write the same
+  bytes as before: a test holds the content of every file in the package to a hash taken before
+  the change. `core-testbed` writes a book with all three choices and checks its words.
+- `jcj-shell`: the rule for a shifted key with no command of its own (core issue #29).
+  `KeyMap::command_for(shortcut) -> Option<Cmd>` is what a key press runs: the command bound to
+  it, or else what `KeyMap::shifted(shortcut)` gives: when the key without Shift runs a caret
+  movement (an id starting `keys::CARET_COMMANDS`, `caret.`), the same movement with
+  `{"extend": true}`; when it deletes back (`keys::BACKSPACE`, `text.backspace`), the same. A
+  key the user turned off runs nothing. `bound_to` and the shell's own key handling are
+  unchanged: the shell still takes only keys with Mod, Ctrl or Alt and function keys that are
+  bound, and leaves the rest to the document, whose view asks `command_for`. `core-testbed`
+  runs Shift+Right through the rule on a session and sees the selection grow.
+- `jcj-shell`: the system's file dialogs, asked for through the shell and answered as a command
+  (core issue #28). Until now an app showed them itself, modally, or asked for a typed path.
+  - `Shell::ask_file(FileAsk, then: Cmd) -> bool` queues a dialog; when the user has chosen,
+    `then` runs with `"path"` (the file, folder or place to save) and `"paths"` (every file
+    chosen) added to its parameters. Closing the dialog runs nothing, unless
+    `Shell::ask_file_or(ask, then, cancelled)` named a command for that. One dialog shows at a
+    time; a shell holds at most `files::MAX_WAITING` for its window.
+  - `files::FileAsk`: `open()`, `open_many()`, `save()`, `folder()`, then `.title(..)`,
+    `.filter(name, &[extensions])` (any letter case), `.in_folder(..)`, `.file_name(..)`.
+  - `files::FileDialogs`: the window's part. The app's window keeps one beside its shell and
+    calls `files.show(&mut shell, ui.ctx(), Some(&*frame))` once at the end of every frame,
+    after `Shell::ui`. The shell does not own the window, so without this call a dialog asked
+    for never opens. The dialogs live there and not in the shell because a dialog on screen
+    belongs to the thread that showed it: `Shell` is still `Send`, and a test says so.
+  - `FileDialogs::answer_with(..)` answers in the system's place (`files::FileAnswer`) and
+    `FileDialogs::tick(&mut shell, ctx)` needs no window, for tests and automation;
+    `Shell::file_asks_waiting()`, `FileDialogs::is_open()` and `waiting()` say what is pending.
+  - The dialogs are the upstream layer's (craft-dialogs), which keeps the window drawing while
+    one is up. `jcj-shell` gains one direct dependency, `raw-window-handle` 0.6.2, for the
+    window's handles; it was in every app's lock file already. A dialog that cannot be shown
+    is said in the status bar (one new text, in the shell's Spanish catalog too).
+  `core-testbed` has Open, Save As and Export To through it, and a test answers them.
+- **One convention for command lines and agent tools** (decision 0017, new;
+  `docs/command-lines-and-agent-tools.md`, new). The three apps' command lines each chose their
+  own exit codes, `mcp` arguments and tool names. The page decides them:
+  - exit codes 0 done, 1 failed, 2 usage, **3 a check of the content did not pass** (two texts
+    differ, a check blocks an export), so a script can tell "they differ" from "the check did
+    not run";
+  - no argument is a usage error (the usage on standard error, code 2); `--help`, `-h` and
+    `help` give the usage with code 0; `--version` and `-V` print `<program> <version>`;
+  - `<program> mcp [<file>] [--read-root <folder>] [--write-root <folder>]`, the two flags being
+    the folders an agent's commands may read and write;
+  - every tool that is an app's own is named `<app>_<command>`.
+- `jcj-agents`: the code for that convention, and the adapter two apps each wrote.
+  - `jcj_agents::cli`: `Exit` (`Done`, `Failed`, `Usage`, `Differs`, with `code()` and
+    `Into<ExitCode>`), `standard(&args) -> Option<Standard>` (`Help`, `Version`, `NoCommand`),
+    `version_line(program, version)`, and `McpArgs` (`parse`, `USAGE`, `roots()`, and
+    `confine(program)`, which puts the roots in force for the process or says on standard error
+    that nothing is confined).
+  - `AppCommands` (a trait: `commands() -> Vec<AppCommand>`, `run(id, params)`) and `AppCommand`
+    (`new(id, label)`, `.params(..)`, `.read_only()`, `.reads(&[..])`, `.writes(&[..])`): an
+    app's own commands, for an app whose commands run on its own state (a project) and not on a
+    document session. `AgentServer::for_app(Box<dyn AppCommands>, prefix, config)` serves them
+    and nothing else: each is a tool named `<prefix>_<command>`; the files its declared
+    parameters name are checked against the agent's folders before it runs; the general
+    document tools are left out, because there is no document behind them.
+  - `AgentServer::with_app_commands(..)` adds such commands to a server over a document;
+    `.tool_prefix("app")` names every tool of the app's own (exported commands too)
+    `app_<command>`; `.without_general_tools()` leaves the general document tools out;
+    `tool_names()` lists the app's own tools; `app_tool_name(prefix, id)` is the naming rule.
+  - `AgentServer::headless`, `AgentConfig` and every existing tool name are unchanged: all of
+    this is asked for by the app.
+  `core-testbed` follows the page (`--version`, `verify` with code 3, `mcp` with a file and the
+  two flags, its tools named `testbed_…`, the board's commands through the adapter), and
+  `apps/core-testbed/tests/command_line.rs` runs the built program to hold it there.
+
 ### Changed
 
 - **One run of `cargo xtask sync` is enough.** A release that changed `sync.rs` or its lists
@@ -143,11 +248,13 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 ### What apps must do
 
-`vX.Y.Z` below is this release's tag. Steps 2 to 9 change files only; nothing in an app's
+**The tooling.**
+
+Steps 2 to 9 change files only; nothing in an app's
 product code changes. An app that stops after step 5 has a working gate with its old
 `main.rs`; `sync` says on every run that it is not on the shared gate yet.
 
-1. Move every `jcj-` dependency to `tag = "vX.Y.Z"`, then run
+1. Move every `jcj-` dependency to `tag = "v0.1.20"`, then run
    `cargo metadata --format-version 1 >/dev/null` to bring `Cargo.lock` in line.
 2. Run `cargo xtask sync`. The program that runs is the app's older one: it writes the files
    it knows and says to run it again.
@@ -256,6 +363,64 @@ the two `app sources` lines of `deny.toml` by hand, one quoted address and a com
 Until its pin has moved, the app's own `cargo xtask sync` and `sync --check` say that the
 pinned core is an older release and write nothing; `cargo xtask dev-link <that checkout>` and
 `cargo xtask ci --linked` run its gate meanwhile.
+
+**The crates.** Nothing is required: every addition to a crate above is one an app asks for.
+An app that only moves its pin builds and behaves as before, and no existing call writes
+different output.
+
+What an app may now delete or switch to, each in a change of its own. The core issue named stays
+open until the app that holds the copy uses the core's.
+
+1. **A model crate's own word list and word-level comparison** (#31). Replace the copy of the
+   comparison with `pub use jcj_doc::wordiff::{Change, Diff, Segment, paragraph, paragraphs,
+   tokens};` and keep the app's own entry point over its own text type, calling `paragraphs`.
+   Make the app's word list call `jcj_doc::words`. A test that only compared the copy with the
+   core's can go. Wordsmith Manuscript: `crates/manuscript-model/src/diff.rs` and `words.rs`
+   (`words`), and `crates/manuscript-io/tests/words.rs`. Nothing a crate built on that model
+   sees changes: the types have the same names, fields and results.
+2. **A direct `jcj-i18n` dependency in an interface crate** (#32). Call `jcj_shell::i18n::tr`,
+   `tr_with`, `trn`, `tl` and `language`, write the catalog test with `jcj_shell::i18n::Catalog`,
+   `texts_in`, `singulars_in` and `compare`, and drop `jcj-i18n` from that crate's `Cargo.toml`
+   and from the app's layer table. Wordsmith Book: `crates/book-ui`. An app with catalog code of
+   its own (Wordsmith Manuscript: `crates/manuscript-ui/src/i18n.rs`) can delete it and call
+   `jcj_shell::i18n::set_language(code, &[("es", CATALOG)])`; the shell's own texts then follow
+   the language too, which users see, so that app says so in its changelog and guide.
+3. **Notes written into the document before the EPUB writer is called** (#33). Call
+   `jcj_interchange::export_epub` with the numbering, link and heading the reading copy has
+   today, and take the words to leave out of the word check from `added_words`. Wordsmith
+   Manuscript: `notes_as_endnotes` in `crates/manuscript-io/src/export.rs`, which numbers
+   through the book under a "Notes" heading with no link back:
+   `EpubOptions::default().note_numbering(NoteNumbering::Continuous).note_heading("Notes")
+   .note_backlink(NoteBacklink::None)`. Readers of the file will see three differences from
+   that workaround, all on purpose: a note's number where it is called is a link to the note,
+   the notes are a numbered list marked as endnotes for reading systems, and "Notes" is a
+   heading where it was a bold paragraph. Update the golden file with them.
+4. **An app's own rule for shifted caret keys** (#29). Where the document view asks the key map
+   what a key runs, call `map.command_for(&shortcut)` in place of `map.bound_to(..)` followed by
+   the app's rule. Wordsmith Script: `shifted` in `crates/wordsmith-ui/src/editor.rs`. One
+   difference: a shifted key the user turned off now runs nothing.
+5. **File dialogs an app shows itself** (#28). Ask with `shell.ask_file(FileAsk::open()…, Cmd)`
+   and handle the command that comes back with `"path"`; add a `jcj_shell::files::FileDialogs`
+   to the window beside the shell and call `files.show(&mut shell, ui.ctx(), Some(&*frame))`
+   after `shell.ui(..)`. Then drop the app's own dialog dependencies. Wordsmith Script:
+   `apps/wordsmith/src/files.rs` and its `rfd` and `raw-window-handle` lines. Wordsmith Book's
+   typed path box can become an Open dialog the same way.
+6. **An app's own adapter from its commands to agent tools** (decision 0017). Implement
+   `jcj_agents::AppCommands` for the value the commands run on (`commands()` from the app's
+   command list, with `reads` and `writes` naming the parameters that are paths; `run` calling
+   the app's own dispatch, and saving as it does today), and build the server with
+   `AgentServer::for_app(Box::new(tools), "<app>", config)`. The engine commands registered only
+   to stand for app commands, the macro that lists them and the global the project was kept in
+   all go. Wordsmith Manuscript: `crates/manuscript-ui/src/agents.rs`. Wordsmith Book:
+   `crates/book-ui/src/agents.rs`. The tool names stay as they are (`manuscript_…`, `book_…`).
+   One difference agents see: the general document tools (`execute`, `list_commands` and the
+   rest), which worked on an empty document, are no longer listed.
+7. **Follow `docs/command-lines-and-agent-tools.md`** with `jcj_agents::cli`: `Exit` for the
+   exit codes, `standard(&args)` for `--help`, `--version` and no argument, `McpArgs` for `mcp`.
+   Each app changes something a user of its command line can see (an exit code, a tool's name,
+   what no argument does), so each does it in a change of its own with a changelog line, a guide
+   line and a test that runs the built program, as `apps/core-testbed/tests/command_line.rs`
+   does.
 
 ## 0.1.19 (2026-11-26)
 
@@ -621,7 +786,7 @@ them, and `cargo xtask sync <the app's folder> --check` checks them. The app's o
   that an app builds on one core release (decision 0011). Until now nothing did: an app could
   name two tags, hold two cores in its graph, or sit many releases behind unnoticed.
   - **One tag.** Every line of the root `Cargo.toml` that names the core's git address carries a
-    release tag (`tag = "vX.Y.Z"`), all of them the same; the lines that differ are listed.
+    release tag (`tag = "v0.1.20"`), all of them the same; the lines that differ are listed.
   - **One core in the graph.** `Cargo.lock` holds packages from one ref of the core's address.
     A second one is named with the packages built from it and the packages that bring them in
     (another app's crates that pin a different core, for example; decision 0015).

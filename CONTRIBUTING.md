@@ -26,9 +26,9 @@ when present.
 | Path | What it is |
 | --- | --- |
 | `crates/jcj-upstream` | The one crate that names WordCraft and craft-libs |
-| `crates/jcj-doc` | Document model interface and typed extension data |
+| `crates/jcj-doc` | Document model interface, typed extension data, the word list and the word-level comparison |
 | `crates/jcj-entries`, `jcj-i18n` | Entries kept beside documents; interface translation catalogs |
-| `crates/jcj-layout`, `jcj-engine`, `jcj-output`, `jcj-proof`, `jcj-agents` | Adapters: pages, editing sessions, PDF and printing, spelling, agent tools |
+| `crates/jcj-layout`, `jcj-engine`, `jcj-output`, `jcj-proof`, `jcj-agents` | Adapters: pages, editing sessions, PDF and printing, spelling, agent tools (with the adapter for an app's own commands and the shared parts of a command line) |
 | `crates/jcj-project`, `jcj-interchange` | Project files, saving and backups; format import and export |
 | `crates/jcj-features` | Document features every app shares: bookmarks, notes, revisions, page locks |
 | `crates/jcj-theme`, `jcj-board`, `jcj-shell` | Theming from tokens, cards and boards, the app shell |
@@ -38,6 +38,7 @@ when present.
 | `xtask` | The core's own gate and maintenance tasks |
 | `.github/workflows` | The core's own workflows, and the two shared workflows every app's CI calls; its `README.md` says what each runs and when, and how a change to a shared one reaches the apps |
 | `docs/decisions` | Why things are the way they are |
+| `docs/command-lines-and-agent-tools.md` | The convention every app's command line and agent tools follow: exit codes, `mcp`, tool names |
 | `docs/UPSTREAM.md` | Pins, carried patches, follow / hold / own |
 | `docs/history/` | Finished plans and published reviews, kept as written and not maintained |
 | `CHANGELOG.md` | What each release changes for apps, with "What apps must do" |

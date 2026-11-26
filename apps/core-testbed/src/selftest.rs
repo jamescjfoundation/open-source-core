@@ -78,7 +78,18 @@ pub fn run() -> Result<Vec<Step>, String> {
     let paras = jcj_doc::walk::body_paragraphs(&doc);
     check(paras.len() == 7, "the sample has seven paragraphs")?;
     check(STATUS.get_or_none(paras[0].1).as_deref() == Some("draft"), "paragraph extension data reads back")?;
-    step("doc", format!("{} paragraphs, extension data on document, paragraph and run", paras.len()));
+    // The word list and the word-level comparison from the model crate alone, as an app's model
+    // crate (no engine, no layout) uses them on its own text type.
+    let lines: Vec<String> = paras.iter().map(|(_, p)| jcj_doc::plain_text(p)).collect();
+    let listed: usize = lines.iter().map(|l| jcj_doc::words(l).len()).sum();
+    check(listed == jcj_doc::verify::document_words(&doc).len(), "the word list is the document's words")?;
+    let mut reworded = lines.clone();
+    if let Some(last) = reworded.last_mut() {
+        *last = last.replacen("second", "last", 1);
+    }
+    let reworded = jcj_doc::wordiff::paragraphs(&lines, &reworded);
+    check(reworded.added == 1 && reworded.removed == 1 && !reworded.is_same(), "a changed word shows in two lists of paragraphs")?;
+    step("doc", format!("{} paragraphs, {listed} words listed, extension data on document, paragraph and run", paras.len()));
 
     // jcj-engine: a session, a command, undo and redo.
     let mut session = self::session(doc.clone());
@@ -103,6 +114,19 @@ pub fn run() -> Result<Vec<Step>, String> {
     let marks = session.run("bookmark.list", &json!({})).map_err(|e| format!("bookmark.list: {e:?}"))?;
     check(!marks.to_string().contains("Start"), "undo removes the bookmark")?;
     step("features", format!("find.all: {hits} matches; bookmark and note added and undone"));
+
+    // jcj-shell's keys: a shifted caret key extends the selection, by the key map's own rule,
+    // with the keys the registry's commands declare.
+    let mut keyed = self::session(doc.clone());
+    let infos: Vec<jcj_shell::CommandInfo> = keyed.registry.all().iter().map(|c| jcj_shell::CommandInfo::new(c.id, c.label, c.shortcut)).collect();
+    let keys = jcj_shell::keys::KeyMap::from_commands(&infos);
+    let extend = keys.command_for("Shift+Right").ok_or("Shift+Right runs a command")?;
+    check(keys.shifted("Shift+Right").as_ref() == Some(&extend) && extend.id.starts_with(jcj_shell::keys::CARET_COMMANDS), "the rule gives it")?;
+    keyed.run("caret.docStart", &json!({})).map_err(|e| format!("caret.docStart: {e:?}"))?;
+    keyed.run(&extend.id, &extend.params).map_err(|e| format!("{}: {e:?}", extend.id))?;
+    check(keyed.sel.anchor != keyed.sel.focus, "a shifted caret key extends the selection")?;
+    check(keys.command_for("Shift+Backspace").map(|c| c.id).as_deref() == Some(jcj_shell::keys::BACKSPACE), "Shift+Backspace deletes back")?;
+    step("keys", format!("Shift+Right runs {} extending the selection; Shift+Backspace deletes back", extend.id));
 
     // jcj-doc's section settings: a second section starting on an odd page, numbered in roman.
     let mut sectioned = doc.clone();
@@ -129,6 +153,27 @@ pub fn run() -> Result<Vec<Step>, String> {
     let back = jcj_interchange::import(Format::Epub, &epub).map_err(|e| format!("import EPUB: {e}"))?;
     let text: String = jcj_doc::walk::body_paragraphs(&back).iter().map(|(_, p)| jcj_doc::plain_text(p)).collect();
     check(text.contains("A footnote."), "the EPUB keeps the footnote")?;
+    // The same document with the notes the way a caller chooses: numbered continuously, a
+    // heading in the document's language, a link back that adds no word. The writer says which words
+    // it added, so a check of the file leaves out exactly those.
+    let chosen = jcj_interchange::EpubOptions::default()
+        .note_numbering(jcj_interchange::NoteNumbering::Continuous)
+        .note_backlink(jcj_interchange::NoteBacklink::Symbol { label: "Volver al texto".into() })
+        .note_heading("Notas");
+    let noted = jcj_interchange::export_epub(&sectioned, &chosen).map_err(|e| format!("export EPUB: {e}"))?;
+    check(noted.added_words == ["1", "Notas", "1"], "the EPUB writer says which words it added")?;
+    let back = jcj_interchange::import(Format::Epub, &noted.bytes).map_err(|e| format!("import EPUB: {e}"))?;
+    let letters = |words: &[String]| {
+        let mut all: Vec<char> = words.iter().flat_map(|w| w.chars()).filter(|c| c.is_alphanumeric()).collect();
+        all.sort_unstable();
+        all
+    };
+    let mut source = jcj_doc::verify::document_words(&sectioned);
+    source.extend(jcj_doc::words("A footnote."));
+    source.extend(noted.added_words.iter().cloned());
+    check(letters(&jcj_doc::verify::document_words(&back)) == letters(&source), "the EPUB holds the document's words and the added ones, no other")?;
+    let plain = jcj_interchange::export_epub(&sectioned, &jcj_interchange::EpubOptions::default()).map_err(|e| format!("export EPUB: {e}"))?;
+    check(plain.bytes == epub, "the EPUB writer's default choices are the plain export")?;
 
     // jcj-layout: pages.
     let mut cache = jcj_layout::LayoutCache::new();
@@ -270,15 +315,18 @@ pub fn run() -> Result<Vec<Step>, String> {
     check(jcj_theme::Tokens::from_json(&json).map_err(|e| e.to_string())? == tokens, "tokens round trip as JSON")?;
     step("theme", format!("neutral tokens, {} bytes of JSON", json.len()));
 
-    // jcj-agents: an MCP server over a session.
-    let info = jcj_agents::AgentInfo::new("core-testbed", "Core testbed", env!("CARGO_PKG_VERSION"), "The core's test app.");
-    let mut server = jcj_agents::AgentServer::headless(self::session(doc), jcj_agents::AgentConfig::new(info));
+    // jcj-agents: an MCP server over a session and the testbed's own commands, every tool of
+    // the testbed's own named after it.
+    let mut server = crate::agents::server(doc, None);
     let init = server.handle(json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})).ok_or("initialize answers")?;
     check(init.pointer("/result/serverInfo/name").and_then(|v| v.as_str()) == Some("core-testbed"), "the server names the app")?;
     let tools = server.handle(json!({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})).ok_or("tools/list answers")?;
     let count = tools.pointer("/result/tools").and_then(|t| t.as_array()).map_or(0, Vec::len);
     check(count > 0, "the server lists tools")?;
-    step("agents", format!("{count} tools"));
+    let own = server.tool_names();
+    check(!own.is_empty() && own.iter().all(|n| n.starts_with("testbed_")), "the testbed's own tools carry its name")?;
+    check(jcj_agents::app_tool_name(crate::agents::PREFIX, "board.list") == "testbed_board_list", "an app's tool is named after the app")?;
+    step("agents", format!("{count} tools, {} of them the testbed's own", own.len()));
 
     Ok(steps)
 }
@@ -295,6 +343,7 @@ mod tests {
                 "doc",
                 "engine",
                 "features",
+                "keys",
                 "sections",
                 "layout",
                 "output",

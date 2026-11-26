@@ -19,7 +19,7 @@ crosses them.
 
 | Crate | What apps get from it |
 | --- | --- |
-| `jcj-doc` | The document model (documents, paragraphs, runs, styles, notes, revisions) and typed extension data each app attaches to it |
+| `jcj-doc` | The document model (documents, paragraphs, runs, styles, notes, revisions), typed extension data each app attaches to it, and a text's words: the word list, the word-for-word check and the word-level comparison of two versions |
 | `jcj-layout` | Pages: lay out a document, page boxes, hit testing, the primitives a pagination pass needs, fonts |
 | `jcj-engine` | Editing sessions, undo and redo, the command registry, recovery, general editing commands |
 | `jcj-output` | PDF, page images, printing |
@@ -31,8 +31,8 @@ crosses them.
 | `jcj-features` | Document features every app shares: bookmarks, notes, revision sets, change tracking, page locks, watermarks, headers and footers, comparison |
 | `jcj-theme` | A product's design tokens turned into the shell's theme |
 | `jcj-board` | Cards, corkboard and canvas |
-| `jcj-shell` | Window, ribbon, panels, File page, dialogs, preferences, auto-save, updates |
-| `jcj-agents` | An app's commands as MCP tools for agents |
+| `jcj-shell` | Window, ribbon, panels, File page, dialogs, the system's file dialogs, preferences, keys, auto-save, updates, and the door to interface translations |
+| `jcj-agents` | An app's commands as MCP tools for agents, on a document or on the app's own state, and the parts of a command line every app shares (exit codes, `mcp` arguments) |
 | `jcj-upstream` | Internal: the one crate that names upstream code. Apps never use it |
 
 `apps/core-testbed` uses every crate; `contract-tests` checks the behavior apps rely on against

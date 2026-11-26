@@ -20,6 +20,12 @@
 //!
 //! The output is deterministic: the same document gives the same bytes (the identifier is made
 //! from the content, and the modification date from the document's properties).
+//!
+//! **Notes.** A note is a numbered reference where it is called and the note itself in a list
+//! at the end of its chapter file, each linked to the other. [`EpubOptions`] chooses how they
+//! are numbered, what the link back says and whether the list has a heading; the choices made by
+//! `EpubOptions::default()` are what the writer has always written. The numbers, the link's
+//! text and the heading are words the writer adds: [`EpubExport::added_words`] lists them.
 
 use std::io::{Cursor, Write};
 use std::sync::Arc;
@@ -29,6 +35,109 @@ use jcj_upstream::formats::model::{self, Cell, FBlock, FTable, Fmt, Inline, Kind
 use sha2::{Digest, Sha256};
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipWriter};
+
+/// Where the numbers of notes start again.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum NoteNumbering {
+    /// From 1 in each chapter file.
+    #[default]
+    PerChapter,
+    /// Once, from the first chapter file to the last.
+    Continuous,
+}
+
+/// The link under each note that leads back to where the note is called.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum NoteBacklink {
+    /// A link with this text, in the document's language. An empty text writes no link.
+    Text(String),
+    /// A link shown as a return arrow (↩), with `label` as its name for screen readers and its
+    /// tooltip. It adds no word to the text.
+    Symbol {
+        /// What the link is called ("Back to the text"), in the document's language.
+        label: String,
+    },
+    /// No link back.
+    None,
+}
+
+impl Default for NoteBacklink {
+    /// The English word the writer has always written, "Back".
+    fn default() -> Self {
+        NoteBacklink::Text("Back".into())
+    }
+}
+
+/// Choices for [`crate::export_epub`]. `EpubOptions::default()` writes what
+/// [`crate::export`] writes for [`crate::Format::Epub`], byte for byte.
+///
+/// ```
+/// use jcj_interchange::{EpubOptions, NoteBacklink, NoteNumbering};
+///
+/// let options = EpubOptions::default()
+///     .note_numbering(NoteNumbering::Continuous)
+///     .note_backlink(NoteBacklink::Symbol { label: "Volver al texto".into() })
+///     .note_heading("Notas");
+/// assert_eq!(options.note_heading.as_deref(), Some("Notas"));
+/// ```
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct EpubOptions {
+    /// Where the numbers of notes start again (in each chapter file).
+    pub note_numbering: NoteNumbering,
+    /// The link under each note back to its reference (the word "Back").
+    pub note_backlink: NoteBacklink,
+    /// A heading above each chapter's notes (none).
+    pub note_heading: Option<String>,
+}
+
+impl EpubOptions {
+    /// Number notes this way.
+    pub fn note_numbering(mut self, numbering: NoteNumbering) -> Self {
+        self.note_numbering = numbering;
+        self
+    }
+
+    /// Link each note back to its reference this way.
+    pub fn note_backlink(mut self, backlink: NoteBacklink) -> Self {
+        self.note_backlink = backlink;
+        self
+    }
+
+    /// Put this heading above each chapter's notes. An empty text writes none.
+    pub fn note_heading(mut self, heading: &str) -> Self {
+        self.note_heading = Some(heading.to_owned()).filter(|h| !h.trim().is_empty());
+        self
+    }
+
+    /// The words the writer adds for one note with these options, besides its mark at the
+    /// reference and in the list: the words of the link back.
+    fn backlink_words(&self) -> Vec<String> {
+        match &self.note_backlink {
+            NoteBacklink::Text(t) => jcj_doc::words(t),
+            NoteBacklink::Symbol { .. } | NoteBacklink::None => Vec::new(),
+        }
+    }
+}
+
+/// An EPUB file and what its writer added to the document's words.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct EpubExport {
+    /// The file.
+    pub bytes: Vec<u8>,
+    /// The words in the chapter files that are the writer's and not the document's, by the
+    /// core's word rule ([`jcj_doc::words`]), in the order they stand in the file: each note's
+    /// mark where it is called; then, at the end of the chapter, the words of the heading and,
+    /// for each note, its mark again and the words of the link back. A mark of the document's
+    /// own (a custom mark such as `*`) is listed like a number when it holds a letter or digit.
+    ///
+    /// A check that reads the file back leaves exactly these out. Two things to know: a mark
+    /// stands directly after the word before it, so a reader that splits text at white space
+    /// reads the two as one piece (compare letter by letter, as PDF checks do); and the contents
+    /// page (`nav.xhtml`), which is not part of the reading order, is not counted.
+    pub added_words: Vec<String>,
+}
 
 /// Deeper table nesting than this is written as text only.
 const MAX_DEPTH: usize = 16;
@@ -78,7 +187,7 @@ fn text_xhtml(s: &str) -> String {
     out
 }
 
-/// The pictures written into the package, in order of first use.
+/// The pictures written into the package, in order of first use, and the notes being written.
 #[derive(Default)]
 struct Images {
     files: Vec<(String, &'static str, Arc<Vec<u8>>)>,
@@ -86,6 +195,12 @@ struct Images {
     notes: Vec<(String, Vec<FBlock>)>,
     /// Writing a note's own text (notes inside notes are not followed).
     in_note: bool,
+    /// How notes are written.
+    options: EpubOptions,
+    /// The notes of the chapters before this one, when notes are numbered continuously.
+    notes_before: usize,
+    /// The words written that are not the document's ([`EpubExport::added_words`]).
+    added: Vec<String>,
 }
 
 impl Images {
@@ -168,8 +283,10 @@ fn inlines(out: &mut String, items: &[Inline], images: &mut Images) {
             // A note: a numbered reference here, the note at the chapter's end (numbered per
             // chapter; a custom mark is kept).
             Inline::Note { custom, blocks, .. } if !images.in_note && images.notes.len() < MAX_NOTES => {
+                // `n` names the note inside its file; the number shown may run on from the files before.
                 let n = images.notes.len() + 1;
-                let mark = if custom.trim().is_empty() { n.to_string() } else { custom.trim().to_string() };
+                let mark = if custom.trim().is_empty() { (images.notes_before + n).to_string() } else { custom.trim().to_string() };
+                images.added.extend(jcj_doc::words(&mark));
                 out.push_str(&format!(
                     "<a class=\"noteref\" epub:type=\"noteref\" role=\"doc-noteref\" id=\"noteref-{n}\" href=\"#note-{n}\"><sup>{}</sup></a>",
                     esc(&mark)
@@ -301,17 +418,43 @@ fn notes_xhtml(out: &mut String, images: &mut Images) {
     if notes.is_empty() {
         return;
     }
-    out.push_str("<section class=\"notes\" epub:type=\"endnotes\" role=\"doc-endnotes\">\n<ol>\n");
+    out.push_str("<section class=\"notes\" epub:type=\"endnotes\" role=\"doc-endnotes\">\n");
+    if let Some(heading) = images.options.note_heading.clone().filter(|h| !h.trim().is_empty()) {
+        out.push_str(&format!("<h2>{}</h2>\n", esc(heading.trim())));
+        images.added.extend(jcj_doc::words(&heading));
+    }
+    // The list counts from where the marks do, for readers that show the list's own numbers.
+    match images.notes_before {
+        0 => out.push_str("<ol>\n"),
+        before => out.push_str(&format!("<ol start=\"{}\">\n", before + 1)),
+    }
+    let backlink_words = images.options.backlink_words();
     for (i, (mark, blocks)) in notes.iter().enumerate() {
         let n = i + 1;
         out.push_str(&format!("<li id=\"note-{n}\" epub:type=\"endnote\"><span class=\"mark\">{}</span>", esc(mark)));
+        images.added.extend(jcj_doc::words(mark));
         let refs: Vec<&FBlock> = blocks.iter().collect();
         images.in_note = true;
         blocks_xhtml(out, &refs, images, MAX_DEPTH - 1);
         images.in_note = false;
-        out.push_str(&format!("<p><a href=\"#noteref-{n}\" role=\"doc-backlink\">Back</a></p></li>\n"));
+        match &images.options.note_backlink {
+            NoteBacklink::Text(text) if !text.trim().is_empty() => {
+                out.push_str(&format!("<p><a href=\"#noteref-{n}\" role=\"doc-backlink\">{}</a></p>", esc(text.trim())));
+            }
+            NoteBacklink::Symbol { label } => {
+                let name =
+                    Some(label.trim()).filter(|l| !l.is_empty()).map(|l| format!(" aria-label=\"{0}\" title=\"{0}\"", esc(l))).unwrap_or_default();
+                out.push_str(&format!("<p><a href=\"#noteref-{n}\" role=\"doc-backlink\"{name}>\u{21A9}</a></p>"));
+            }
+            NoteBacklink::Text(_) | NoteBacklink::None => {}
+        }
+        out.push_str("</li>\n");
+        images.added.extend(backlink_words.iter().cloned());
     }
     out.push_str("</ol>\n</section>\n");
+    if images.options.note_numbering == NoteNumbering::Continuous {
+        images.notes_before += notes.len();
+    }
 }
 
 fn table_xhtml(out: &mut String, t: &FTable, images: &mut Images, depth: usize) {
@@ -404,12 +547,12 @@ fn xhtml_page(lang: &str, title: &str, body: &str) -> String {
     )
 }
 
-/// The EPUB file for `doc`.
-pub(crate) fn write(doc: &Document) -> Result<Vec<u8>, String> {
+/// The EPUB file for `doc`, written as `options` say, and the words the writer added.
+pub(crate) fn write(doc: &Document, options: &EpubOptions) -> Result<EpubExport, String> {
     let flow = model::from_doc_with(doc, model::FlowOpts { notes: true, ..model::FlowOpts::default() });
     let lang = language(doc);
     let book_title = Some(doc.core.title.trim()).filter(|t| !t.is_empty()).map(str::to_string);
-    let mut images = Images::default();
+    let mut images = Images { options: options.clone(), ..Images::default() };
     let mut pages: Vec<(String, String, String)> = Vec::new();
     for (n, ch) in chapters(&flow).into_iter().enumerate() {
         let title = Some(ch.title).filter(|t| !t.is_empty()).or_else(|| book_title.clone()).unwrap_or_else(|| format!("Chapter {}", n + 1));
@@ -478,7 +621,8 @@ pub(crate) fn write(doc: &Document) -> Result<Vec<u8>, String> {
     for (file, _, data) in &images.files {
         parts.push((format!("OEBPS/{file}"), data.to_vec(), CompressionMethod::Stored));
     }
-    package(&parts).map_err(|e| e.to_string())
+    let bytes = package(&parts).map_err(|e| e.to_string())?;
+    Ok(EpubExport { bytes, added_words: images.added })
 }
 
 fn package(parts: &[(String, Vec<u8>, CompressionMethod)]) -> zip::result::ZipResult<Vec<u8>> {
@@ -540,8 +684,8 @@ mod tests {
         let mut h = Paragraph::with_text("One", CharProps::default());
         h.props.outline_level = Some(1);
         d.body = vec![para_block(h), para_block(p)];
-        let bytes = write(&d).unwrap();
-        let mut z = zip::ZipArchive::new(Cursor::new(bytes)).unwrap();
+        let bytes = write(&d, &EpubOptions::default()).unwrap().bytes;
+        let mut z = zip::ZipArchive::new(Cursor::new(bytes.clone())).unwrap();
         let mut chapter = String::new();
         for i in 0..z.len() {
             let mut f = z.by_index(i).unwrap();
@@ -559,7 +703,7 @@ mod tests {
         );
         assert!(chapter.contains("href=\"#noteref-1\" role=\"doc-backlink\"") && chapter.contains("href=\"#noteref-2\""));
         // The words come back through the core's reader, notes included.
-        let back = crate::import(crate::Format::Epub, &write(&d).unwrap()).unwrap();
+        let back = crate::import(crate::Format::Epub, &bytes).unwrap();
         let text: String = jcj_doc::walk::body_paragraphs(&back).iter().map(|(_, p)| jcj_doc::plain_text(p)).collect::<Vec<_>>().join(" ");
         assert!(text.contains("The first note.") && text.contains("The second note."), "{text}");
     }

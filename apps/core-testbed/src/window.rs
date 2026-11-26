@@ -11,6 +11,8 @@ use jcj_engine::Session;
 use jcj_interchange::Format;
 use jcj_shell::commands::{ids, shell_ids};
 use jcj_shell::egui;
+use jcj_shell::files::FileAsk;
+use jcj_shell::i18n::{tl, trn};
 use jcj_shell::widgets::{self, Control};
 use jcj_shell::{About, App, Cmd, CommandInfo, Commands, PanelSpec, Shell, Side, TabSpec};
 use serde_json::json;
@@ -25,8 +27,15 @@ pub mod cmd {
     pub const EXPORT_ALL: &str = "testbed.exportAll";
     pub const ADD_CARD: &str = "testbed.addCard";
     pub const SNAPSHOT: &str = "testbed.snapshot";
+    /// Add `{"line": "..."}` to the log panel.
+    pub const LOG: &str = "testbed.log";
     pub const SELFTEST: &str = "testbed.selftest";
+    /// Export every format into a folder the user chooses.
+    pub const EXPORT_TO: &str = "testbed.exportTo";
 }
+
+/// The extension of the test app's project files.
+pub const EXTENSION: &str = "jcjtest";
 
 /// The test app's state.
 pub struct Testbed {
@@ -88,6 +97,24 @@ impl Testbed {
         Ok(())
     }
 
+    /// Open the project file at `path`: its main document and its board.
+    fn open(&mut self, path: PathBuf) -> Result<(), String> {
+        let project = jcj_project::files::open(&path, &APP).map_err(|e| e.to_string())?;
+        let doc = project.find_document("Main").and_then(|id| project.document(id)).cloned().ok_or("the file has no main document")?;
+        self.board = project.app_data().get("board").cloned().and_then(|b| serde_json::from_value(b).ok()).unwrap_or_default();
+        self.session = crate::selftest::session(doc);
+        self.path = path;
+        self.changed();
+        self.saved_revision = self.revision;
+        self.log.push(format!("opened {}", self.path.display()));
+        Ok(())
+    }
+
+    /// The path a command got from a file dialog (`{"path": "..."}`), if it has one yet.
+    fn chosen(c: &Cmd) -> Option<PathBuf> {
+        c.params.get("path").and_then(|p| p.as_str()).map(PathBuf::from)
+    }
+
     fn export(&mut self, format: Format) -> Result<(), String> {
         let bytes = jcj_interchange::export(format, &self.session.doc).map_err(|e| e.to_string())?;
         let out = self.path.with_extension(format.extension());
@@ -139,7 +166,11 @@ impl Commands for Testbed {
             CommandInfo { icon: "new".into(), ..CommandInfo::new(ids::NEW, "New", "Mod+N") },
             CommandInfo::new(ids::NEW_FROM_TEMPLATE, "New from Template", ""),
             CommandInfo::new("testbed.split", "Split View", ""),
+            CommandInfo { icon: "open".into(), ..CommandInfo::new(ids::OPEN, "Open…", "Mod+O") },
+            CommandInfo { takes_params: true, ..CommandInfo::new(ids::OPEN_PATH, "Open a File", "") },
             CommandInfo { icon: "save".into(), ..CommandInfo::new(ids::SAVE, "Save", "Mod+S") },
+            CommandInfo::new(ids::SAVE_AS, "Save As…", "Mod+Shift+S"),
+            CommandInfo::new(cmd::EXPORT_TO, "Export Every Format To…", ""),
             CommandInfo { icon: "undo".into(), ..CommandInfo::new(ids::UNDO, "Undo", "Mod+Z") },
             CommandInfo { icon: "redo".into(), ..CommandInfo::new(ids::REDO, "Redo", "Mod+Shift+Z") },
             CommandInfo::new(cmd::SAMPLE, "Sample Document", ""),
@@ -181,6 +212,8 @@ impl App for Testbed {
     fn status_ui(&mut self, ui: &mut egui::Ui, _shell: &mut Shell) {
         let words = self.writing.session_words();
         jcj_shell::writing::progress_bar(ui, &format!("{words} of 500 words this session"), self.writing.progress().unwrap_or(0.0), 80.0);
+        // A count in the interface language, through the shell's door to the catalogs.
+        ui.label(trn("{n} card", "{n} cards", self.board.cards.len() as u64, &[]));
     }
 
     fn has_document(&self) -> bool {
@@ -194,9 +227,48 @@ impl App for Testbed {
         ]
     }
 
-    fn run(&mut self, c: &Cmd, _shell: &mut Shell) -> Result<(), String> {
+    fn run(&mut self, c: &Cmd, shell: &mut Shell) -> Result<(), String> {
         self.started = true;
         match c.id.as_str() {
+            // The file commands ask the shell for the system's dialog and come back with its
+            // answer: the same command again, now with the path chosen (jcj_shell::files).
+            ids::OPEN => {
+                shell.ask_file(FileAsk::open().title("Open").filter("Testbed projects", &[EXTENSION]), Cmd::new(ids::OPEN_PATH));
+            }
+            ids::OPEN_PATH => self.open(Self::chosen(c).ok_or("no file was named")?)?,
+            ids::SAVE_AS => match Self::chosen(c) {
+                Some(path) => {
+                    self.path = if path.extension().is_some() { path } else { path.with_extension(EXTENSION) };
+                    self.save()?;
+                }
+                None => {
+                    let name = self.path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                    let mut ask = FileAsk::save().title("Save As").filter("Testbed projects", &[EXTENSION]).file_name(name);
+                    if let Some(folder) = self.path.parent().filter(|f| f.is_dir()) {
+                        ask = ask.in_folder(folder);
+                    }
+                    shell.ask_file_or(
+                        ask,
+                        Cmd::new(ids::SAVE_AS),
+                        Cmd::with(cmd::LOG, json!({ "line": "Save As was closed without a place chosen" })),
+                    );
+                }
+            },
+            cmd::EXPORT_TO => match Self::chosen(c) {
+                Some(folder) => {
+                    let stem = self.path.file_stem().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "untitled".into());
+                    for f in Format::ALL {
+                        let bytes = jcj_interchange::export(f, &self.session.doc).map_err(|e| e.to_string())?;
+                        let out = folder.join(format!("{stem}.{}", f.extension()));
+                        std::fs::write(&out, bytes).map_err(|e| format!("{}: {e}", out.display()))?;
+                    }
+                    self.log.push(format!("exported every format to {}", folder.display()));
+                }
+                None => {
+                    shell.ask_file(FileAsk::folder().title("Export every format to"), Cmd::new(cmd::EXPORT_TO));
+                }
+            },
+            cmd::LOG => self.log.push(c.params.get("line").and_then(|l| l.as_str()).unwrap_or_default().to_owned()),
             "testbed.split" => {
                 self.split = if self.split == jcj_shell::split::Split::None { jcj_shell::split::Split::Side } else { jcj_shell::split::Split::None };
             }
@@ -294,24 +366,24 @@ impl App for Testbed {
         match tab {
             "home" => {
                 widgets::group(ui, shell, "Document", |ui, shell| {
-                    widgets::big(ui, shell, me, &Control::new(cmd::SAMPLE).label("Sample"));
-                    widgets::big(ui, shell, me, &Control::new(cmd::INSERT).label("Insert"));
+                    widgets::big(ui, shell, me, &Control::new(cmd::SAMPLE).label(tl("Sample")));
+                    widgets::big(ui, shell, me, &Control::new(cmd::INSERT).label(tl("Insert")));
                 });
                 widgets::group(ui, shell, "History", |ui, shell| {
                     widgets::small(ui, shell, me, &Control::new(ids::UNDO).icon("undo").label("Undo"));
                     widgets::small(ui, shell, me, &Control::new(ids::REDO).icon("redo").label("Redo"));
                 });
                 widgets::group(ui, shell, "Board", |ui, shell| {
-                    widgets::big(ui, shell, me, &Control::new(cmd::ADD_CARD).label("Add Card"));
+                    widgets::big(ui, shell, me, &Control::new(cmd::ADD_CARD).label(tl("Add Card")));
                 });
             }
             "tools" => {
                 widgets::group(ui, shell, "Export", |ui, shell| {
                     widgets::big(ui, shell, me, &Control::new(cmd::EXPORT_PDF).label("PDF"));
-                    widgets::big(ui, shell, me, &Control::new(cmd::EXPORT_ALL).label("Every Format"));
+                    widgets::big(ui, shell, me, &Control::new(cmd::EXPORT_ALL).label(tl("Every Format")));
                 });
                 widgets::group(ui, shell, "Checks", |ui, shell| {
-                    widgets::big(ui, shell, me, &Control::new(cmd::SELFTEST).label("Self-Test"));
+                    widgets::big(ui, shell, me, &Control::new(cmd::SELFTEST).label(tl("Self-Test")));
                     widgets::big(ui, shell, me, &Control::new(shell_ids::PALETTE).label("Commands"));
                 });
             }
@@ -396,6 +468,59 @@ mod tests {
         assert!(app.has_document() && !app.templates().is_empty());
         app.run(&Cmd::new(cmd::EXPORT_ALL), &mut shell).unwrap();
         assert!(dir.join("test.epub").is_file() && dir.join("test.docx").is_file());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Open, Save As and Export To go through the shell's file dialogs, answered here by a
+    /// stand-in for the system's: each answer comes back as the command with the path chosen.
+    #[test]
+    fn file_commands_ask_the_shell_and_run_with_the_answer() {
+        use egui_kittest::Harness;
+        use jcj_shell::files::{FileAnswer, FileKind};
+
+        let dir = std::env::temp_dir().join(format!("core-testbed-files-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("out")).unwrap();
+        let app = Testbed::new(dir.join("first.jcjtest"));
+        let shell = Shell::new("Core testbed", "0", jcj_shell::theme::Tokens::default());
+        let mut files = jcj_shell::files::FileDialogs::new();
+        let answers = dir.clone();
+        files.answer_with(Some(Box::new(move |ask| match ask.kind {
+            FileKind::Save if ask.file_name.as_deref() == Some("first.jcjtest") => FileAnswer::Chosen(vec![answers.join("second")]),
+            FileKind::Save => FileAnswer::Cancelled,
+            FileKind::Folder => FileAnswer::Chosen(vec![answers.join("out")]),
+            FileKind::Open | FileKind::OpenMany => FileAnswer::Chosen(vec![answers.join("second.jcjtest")]),
+        })));
+        type State = (Shell, jcj_shell::files::FileDialogs, Testbed);
+        let mut h = Harness::builder().with_size(egui::vec2(1200.0, 800.0)).build_ui_state(
+            |ui, s: &mut State| {
+                let (shell, files, app) = s;
+                shell.ui(ui, app);
+                files.tick(shell, ui.ctx());
+            },
+            (shell, files, app),
+        );
+        let run = |h: &mut Harness<'_, State>, id: &str| {
+            h.state_mut().0.run(Cmd::new(id));
+            h.run();
+            h.run();
+            assert!(h.state().0.message.is_empty(), "{id}: {}", h.state().0.message);
+        };
+        run(&mut h, cmd::ADD_CARD);
+        run(&mut h, ids::SAVE_AS);
+        assert_eq!(h.state().2.path, dir.join("second.jcjtest"), "the extension is added");
+        assert!(dir.join("second.jcjtest").is_file() && !h.state().2.is_dirty());
+        // Closed without choosing: nothing is saved, and the app is told.
+        run(&mut h, ids::SAVE_AS);
+        assert!(h.state().2.log.iter().any(|l| l.contains("without a place chosen")));
+        run(&mut h, cmd::EXPORT_TO);
+        assert!(dir.join("out/second.epub").is_file() && dir.join("out/second.txt").is_file());
+        run(&mut h, ids::NEW);
+        assert!(h.state().2.board.cards.len() == 1 && h.state().2.is_dirty());
+        run(&mut h, cmd::ADD_CARD);
+        run(&mut h, ids::OPEN);
+        let app = &h.state().2;
+        assert!(!app.is_dirty() && app.board.cards.len() == 1, "the saved file is open again");
+        assert!(app.log.iter().any(|l| l.starts_with("opened ")));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
