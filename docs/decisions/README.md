@@ -3,6 +3,10 @@
 open-source-core's decision records, one file each, numbered in order. Each says what was
 decided, why, and when to revisit it. Decisions about one app's behavior live in that app.
 
+Inside this repository a record is cited by its number ("decision 0011"). From anywhere else, and
+in everything an app carries from the core, it is "core decision 0011" with a link: apps have
+records with the same numbers.
+
 | # | Decision |
 | --- | --- |
 | [0001](0001-licenses-and-supply-chain.md) | Licenses and the supply chain |

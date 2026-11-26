@@ -42,12 +42,16 @@ every upstream candidate; `template/` starts a new app repository.
 
 ```toml
 [workspace.dependencies]
-jcj-doc = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.0" }
-jcj-shell = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "v0.1.0" }
+jcj-doc = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "vX.Y.Z" }
+jcj-shell = { git = "https://github.com/jamescjfoundation/open-source-core", tag = "vX.Y.Z" }
 # ... the other jcj- crates you use, all at the same tag
 ```
 
-Copy `template/` to start an app; `cargo xtask sync` (in the app) keeps the toolchain, lint,
+`vX.Y.Z` is a release tag; [CHANGELOG.md](CHANGELOG.md) lists them, newest first, with what each
+asks of an app.
+
+Copy `template/` to start an app ([template/README.md](template/README.md) has the steps);
+`cargo xtask sync` (in the app) keeps the toolchain, lint,
 cargo-deny settings, shared xtask modules, workflows, code of conduct, the core's `[patch]` block
 and the core's rules (marked blocks in the app's `AGENTS.md`, `SECURITY.md` and
 `CONTRIBUTING.md`) identical to the pinned core release, and the app's gate checks they stay so.
@@ -62,10 +66,10 @@ plans and published reviews are kept under [docs/history/](docs/history/); they 
 ```sh
 cargo run -p core-testbed     # the test app
 cargo xtask ci                # the full gate; `cargo xtask ci --changed` for just your change
-cargo xtask install-hooks     # pre-commit and pre-push hooks running the same checks
+cargo xtask install-hooks     # once: pre-commit (fmt, privacy) and pre-push (ci --changed) hooks
 ```
 
-Rust is pinned in `rust-toolchain.toml` (1.100.0; minimum 1.95). See [CONTRIBUTING.md](CONTRIBUTING.md).
+Rust is pinned in `rust-toolchain.toml` (1.100.0; minimum 1.95). [CONTRIBUTING.md](CONTRIBUTING.md) says where things are and how a release is cut.
 
 ## Upstream
 

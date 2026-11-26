@@ -11,6 +11,8 @@ cargo xtask ci                   # the full gate (CI runs the same)
 cargo xtask ci --changed         # only the packages your change affects, and their dependents
 cargo run -p core-testbed        # the test app that exercises every crate
 cargo xtask deny                 # licenses, advisories and sources (needs cargo-deny)
+cargo xtask template --write     # after changing a block or the code of conduct under template/
+cargo xtask template-check       # builds the app template against this checkout
 ```
 
 `cargo xtask help` lists every task. Install `cargo-nextest` for faster test runs; the gate uses it
@@ -29,11 +31,14 @@ when present.
 | `crates/jcj-theme`, `jcj-board`, `jcj-shell` | Theming from tokens, cards and boards, the app shell |
 | `apps/core-testbed` | A small app that uses every crate |
 | `contract-tests` | Behavior apps rely on, run against every upstream candidate |
-| `template` | Starter files for a new app repository, and the files `cargo xtask sync` keeps identical in every app |
-| `xtask` | The gate and maintenance tasks |
+| `template` | Starter files for a new app repository, and the source of what `cargo xtask sync` keeps identical in every app: the shared xtask modules, workflows, hooks, code of conduct and the marked blocks |
+| `xtask` | The core's own gate and maintenance tasks |
+| `.github/workflows` | The core's own workflows; its `README.md` says what each runs and when |
 | `docs/decisions` | Why things are the way they are |
 | `docs/UPSTREAM.md` | Pins, carried patches, follow / hold / own |
 | `docs/history/` | Finished plans and published reviews, kept as written and not maintained |
+| `CHANGELOG.md` | What each release changes for apps, with "What apps must do" |
+| `NOTICE`, `ATTRIBUTION.md` | The credit to upstream; the source and license of every asset and copied block of code we did not write |
 
 <!-- BEGIN open-source-core: contributing -->
 <!-- Owned by open-source-core (template/CONTRIBUTING.md). Change it there, never in a copy: `cargo xtask sync` rewrites the copies. -->
@@ -88,17 +93,53 @@ than "as discussed".
   branch of the fork and are recorded in `docs/UPSTREAM.md`.
 - Refer to upstream issues as `storytold/wordcraft#123`, never `#123`.
 - No ArtCraft or WordCraft name, logo or icon in anything users see; the credit lives in `NOTICE`.
-- No product name, color, logo, or screenplay, manuscript or book concept in the core.
+- No product's name, color, logo, or screenplay, manuscript or book concept in the core's code,
+  identifiers, interface text or anything under `template/`. The records of history
+  (`CHANGELOG.md`, the decision records, `docs/history/`) may say which app a thing came from,
+  and `README.md` and the opening of `AGENTS.md` may link the map of a project built on the core
+  (decision 0013).
 
 ### Dependencies and assets
 
 Every dependency's license must be on the allowlist (decision 0001). Fonts, images and data must
 be under an allowed license and listed in `ATTRIBUTION.md`.
 
-### The changelog
+### The marked blocks
 
-A change apps can see gets a line in `CHANGELOG.md`, under the next release. Anything an app must
-change to take the release goes under **What apps must do**, as exact steps.
+The rules every app carries are the marked blocks under `template/` (`BLOCKS` in
+`template/xtask/src/sync.rs`). Change a block there, never in this repository's own copy, then run
+`cargo xtask template --write`; the `template` task of the gate fails when a copy here differs. A
+changed block reaches the apps with the next release, so keep it true for every app and for the
+core, and say in the changelog what an app must do.
+
+## Releasing
+
+A person or an agent cuts a release, on a commit whose full gate has passed (decision 0011).
+
+1. Write the release's section in `CHANGELOG.md`: what changed for apps, and under **What apps
+   must do** the exact steps an app follows, starting with the pin move. Someone holding only
+   that text must be able to follow it.
+2. Make the release commit, "open-source-core X.Y.Z". It changes four files:
+   - `Cargo.toml`: `version` under `[workspace.package]`;
+   - `Cargo.lock`: run `cargo metadata --format-version 1 >/dev/null`, which brings the core's
+     own crates to the new version and moves nothing else;
+   - `CHANGELOG.md`: the section's heading, `## X.Y.Z (date)`;
+   - `template/Cargo.toml`: the tag on every `jcj-` line, `vX.Y.Z`.
+3. Run `cargo xtask ci` and push to `main`.
+4. Run the cross-platform gate on that commit and wait for it:
+   `gh workflow run nightly.yml --ref main`. It is the full gate on Linux, macOS and Windows,
+   the minimum Rust version, cargo-deny and the app template.
+5. When it is green, tag that commit and push the one tag:
+   `git tag -a vX.Y.Z <commit> -m "open-source-core X.Y.Z"`, then `git push origin vX.Y.Z`.
+   The release workflow runs the gate again, checks that the tag is `Cargo.toml`'s version and
+   that `CHANGELOG.md` has its section, and publishes the GitHub release with the vendored
+   sources, the third-party license texts and checksums.
+6. Apps name the tag and their lock files record its commit, so a pushed tag is not moved or
+   deleted. A mistake is fixed in the next version.
+
+The order of steps 4 and 5 is kept by hand today: nothing refuses a tag on a commit whose
+cross-platform run has not passed. The release workflow would fail on it, but the tag would
+already exist.
 
 ## Conduct
 

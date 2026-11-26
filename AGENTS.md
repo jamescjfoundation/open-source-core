@@ -5,7 +5,9 @@ app needs and none should write twice, and it is the only place that talks to th
 projects we build on (WordCraft, craft-libs). It carries no product name in its code, its
 interface text or the files apps copy from it.
 
-Read `CONTRIBUTING.md`, `SECURITY.md` and `docs/decisions/` before you start.
+Read `CONTRIBUTING.md` (where things are, this repository's own rules, how a release is cut),
+`SECURITY.md` and `docs/decisions/` before you start. `README.md` says what each crate gives an
+app.
 
 **Who builds on the core.** Any project may. Each project keeps its own map of its repositories,
 outside the core. The foundation's own apps are the Wordsmith apps, and their map is the
@@ -25,8 +27,12 @@ when a copy here differs.
 ```sh
 cargo xtask install-hooks     # once: pre-commit (fmt, privacy) and pre-push (ci --changed)
 cargo xtask ci --changed      # what CI will run for your change; `cargo xtask ci` for everything
-cargo xtask template --write  # after changing a shared block or file under template/
+cargo xtask template --write  # after changing a block or the code of conduct under template/
+cargo xtask template-check    # after any change under template/: builds it against this checkout
 ```
+
+`cargo xtask help` lists every task. A release needs more than the gate: the cross-platform run
+passes on the commit before it is tagged (`CONTRIBUTING.md`, "Releasing").
 
 <!-- BEGIN open-source-core: public -->
 <!-- Owned by open-source-core (template/AGENTS.md). Change it there, never in a copy: `cargo xtask sync` rewrites the copies. -->
@@ -167,3 +173,8 @@ interface back out is not.
   `Cargo.lock`.
 - Public items are documented in plain, short English. A new public interface gets a test here and
   a use in `core-testbed`.
+- No product's name, color, logo or concept in code, identifiers, interface text or anything
+  under `template/`. `CHANGELOG.md`, the decision records and `docs/history/` may say which app
+  a thing came from (decision 0013).
+- A new crate, or a change in what a crate holds, is entered in the crate table of `README.md`
+  and in "Where things are" of `CONTRIBUTING.md`.
