@@ -34,4 +34,4 @@ app.
 
 Script's `.wss` gets a format version bump: the nine fields move into `script.*` keys and
 `app_data` entries into document `ext`, with a migration that opens every old file
-(`docs/porting-script.md`).
+(`docs/history/porting-script.md`).

@@ -48,8 +48,8 @@ the pinned core release, and the app's CI checks they stay so. To work on the co
 together, `cargo xtask dev-link ../open-source-core` in the app.
 
 The rules for deciding whether a change belongs in an app or the core are in
-[AGENTS.md](AGENTS.md); how Wordsmith Script moves onto the core is in
-[docs/porting-script.md](docs/porting-script.md).
+[AGENTS.md](AGENTS.md), and the reasons in [docs/decisions/](docs/decisions/README.md). Finished
+plans and published reviews are kept under [docs/history/](docs/history/); they are not maintained.
 
 ## Building
 

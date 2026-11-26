@@ -22,8 +22,10 @@ when present.
 | --- | --- |
 | `crates/jcj-upstream` | The one crate that names WordCraft and craft-libs |
 | `crates/jcj-doc` | Document model interface and typed extension data |
+| `crates/jcj-entries`, `jcj-i18n` | Entries kept beside documents; interface translation catalogs |
 | `crates/jcj-layout`, `jcj-engine`, `jcj-output`, `jcj-proof`, `jcj-agents` | Adapters: pages, editing sessions, PDF and printing, spelling, agent tools |
 | `crates/jcj-project`, `jcj-interchange` | Project files, saving and backups; format import and export |
+| `crates/jcj-features` | Document features every app shares: bookmarks, notes, revisions, page locks |
 | `crates/jcj-theme`, `jcj-board`, `jcj-shell` | Theming from tokens, cards and boards, the app shell |
 | `apps/core-testbed` | A small app that uses every crate |
 | `contract-tests` | Behavior apps rely on, run against every upstream candidate |
@@ -31,8 +33,7 @@ when present.
 | `xtask` | The gate and maintenance tasks |
 | `docs/decisions` | Why things are the way they are |
 | `docs/UPSTREAM.md` | Pins, carried patches, follow / hold / own |
-| `docs/review/` | The review of Wordsmith Script that defined the core |
-| `docs/porting-script.md` | How Wordsmith Script moves onto the core |
+| `docs/history/` | Finished plans and published reviews, kept as written and not maintained |
 
 ## Rules for a public repository
 
@@ -51,9 +52,10 @@ fixes it.
 
 ### Private working notes
 
-Reviews, audits and notes not ready to be public go in `.private/` (ignored by Git). Write the
-public part as a decision record or changelog entry, giving the reason itself rather than "as
-discussed".
+Reviews, audits and working notes go in `.private/` (ignored by Git). One is published only when
+a maintainer says so, under `docs/history/`, with a first line saying it is history (decision
+0012). Write the public part as a decision record or changelog entry, giving the reason itself
+rather than "as discussed".
 
 ### Upstream code and names
 
@@ -68,11 +70,16 @@ discussed".
 Every dependency's license must be on the allowlist (decision 0001). Fonts, images and data must
 be under an allowed license and listed in `ATTRIBUTION.md`.
 
-## Commits and pull requests
+## Commits, pushes and pull requests
 
+- While no app built on the core has a public release, a push to `main` is allowed once
+  `cargo xtask ci` passes. A pull request is optional; its author may merge it once its checks
+  pass (decision 0013).
+- A release is cut, and an upstream pin is moved, only on a commit whose full gate has passed; a
+  person or an agent may do either (decisions 0004 and 0011).
 - Contributions are licensed as the project is, MIT OR Apache-2.0, with no extra terms. No CLA.
 - Use your GitHub no-reply address (`git config user.email <id>+<login>@users.noreply.github.com`).
-- One concern per pull request; say what changed, why, and how you checked it.
+- One concern per commit or pull request; say what changed, why, and how you checked it.
 - Update `CHANGELOG.md` (with "What apps must do" for anything apps must change) and the decision
   records when behavior changes.
 - AI-assisted contributions are welcome; you are responsible for every line.

@@ -8,7 +8,7 @@ entry in the same commit as the asset or code.
 
 WordCraft and craft-libs are dependencies, not copies (docs/UPSTREAM.md). Code
 moved here from Wordsmith Script (the foundation's own, MIT OR Apache-2.0) is
-listed in docs/review/script-29ed4bf.md. Code in it that Script had itself copied
+listed in docs/history/script-29ed4bf.md. Code in it that Script had itself copied
 from WordCraft keeps WordCraft's credit:
 
 | Path | What it is | Source | License |

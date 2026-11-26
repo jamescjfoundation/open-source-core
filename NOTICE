@@ -19,7 +19,7 @@ by the ArtCraft team" in their About page and README.
 
 Portions of open-source-core were first written for Wordsmith Script
 (github.com/jamescjfoundation/wordsmith-script, MIT OR Apache-2.0) and moved
-here; see docs/review/script-29ed4bf.md.
+here; see docs/history/script-29ed4bf.md.
 
 Some Rust dependencies are under the Zlib, Unicode-3.0, IJG, BSL-1.0 and
 CDLA-Permissive-2.0 licenses, as well as MIT, Apache-2.0, BSD and ISC. Each

@@ -7,7 +7,7 @@ Date: 2026-11-24 · Status: accepted · From Wordsmith Script decisions 0021 (he
 
 Script built bookmarks, notes, revision sets, change tracking, page locks, a watermark, headers
 and footers and version comparison for screenplays, but almost none of it is about screenplays
-(`docs/review/script-29ed4bf.md`: 0 to 3 % screenplay terms, comparison aside). Any foundation app
+(`docs/history/script-29ed4bf.md`: 0 to 3 % screenplay terms, comparison aside). Any foundation app
 that writes long documents wants them. Script kept their state in fields it added to its copy of
 WordCraft's model (`ParaProps::bookmark`, `CharProps::note`, `revised`, `page_lock`) and in
 `Document::app_data`.
@@ -70,7 +70,7 @@ Script's `dates` and `data` helpers came along as `dates` and `data`.
 
 ## Consequences
 
-- Script (M4) reads its old fields into these keys (`docs/review/script-29ed4bf.md`, section 4) and
+- Script (M4) reads its old fields into these keys (`docs/history/script-29ed4bf.md`, section 4) and
   composes `LockPass` with its own pass.
 - Pasted text keeps the marks it was copied with (a pasted noted word is in the same note).
 - `track.*` settles changes to text runs; tracked paragraph marks, moves and formatting changes

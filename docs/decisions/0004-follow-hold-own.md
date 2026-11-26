@@ -1,8 +1,7 @@
 # 0004: Upstream pins, forks, and the follow / hold / own rule
 
-Date: 2026-11-24 · Status: **proposed** (the plan's "Decisions for Dylan" item 3 awaits a
-maintainer's approval; until then the rule is applied as written) · Replaces Wordsmith Script
-decision 0039 (a fork of WordCraft) for every app built on the core
+Date: 2026-11-24 · Status: accepted (2026-11-26) · Replaces Wordsmith Script decision 0039 (a fork
+of WordCraft) for every app built on the core
 
 ## Decision
 
@@ -15,6 +14,9 @@ decision 0039 (a fork of WordCraft) for every app built on the core
 - **The train.** Every two weeks: move to WordCraft's newest release tag, rebuild `jcj`, run the
   contract tests, decide follow / hold / own per source, tag a core release, update the apps
   (`docs/UPSTREAM.md`, "The two-week train"). Urgent fixes may take an extra train.
+- **Who moves a pin.** A person or an agent, once the contract tests and the full gate
+  (`cargo xtask ci`) pass on the commit that moves it. A pin never moves on a commit that has not
+  passed both, and the move is recorded in `docs/UPSTREAM.md` in the same change.
 - **Follow** is the default: the update needs at most about two days of adapter work.
 - **Hold** when an update breaks the adapters badly or upstream is mid-refactor: stay on the pin,
   plan the migration with its own decision record. A hold longer than three months forces a
@@ -32,3 +34,6 @@ decision 0039 (a fork of WordCraft) for every app built on the core
 Principle 1: our apps never wait on anyone else. Principle 5: upstream is followed on our
 schedule. Script's decision 0039 made a one-off fork that stopped following upstream; this keeps
 following by default and owns a crate only deliberately, for every app at once.
+
+The contract tests and the gate decide whether a pin may move, not who runs them: they hold the
+behavior apps rely on, and a move that passes them is the same move whoever makes it.

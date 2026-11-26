@@ -1,10 +1,13 @@
 # Review of Wordsmith Script at 29ed4bf: what moves to the core
 
+> History. A review published by a maintainer's decision (decision 0012) because the core's first
+> decisions cite it. It describes one commit of one app in November 2026 and is not maintained.
+
 Milestone M1 of the core plan. `jamescjfoundation/wordsmith-script`, version 0.1.2, commit
 `29ed4bf` (2026-11-22), reviewed module by module on 2026-11-24 to decide what is general (moves
 to open-source-core) and what is about screenplays (stays in Script). This is the review the plan
 asks for before any reset of the Script repository; the rebuild (M4) follows
-`docs/porting-script.md`.
+`docs/history/porting-script.md`.
 
 **How it was measured.** For every module of Script's own crates (`wordsmith-script`,
 `wordsmith-format`, `wordsmith-ui`, the apps) we counted lines and lines naming a screenplay
@@ -116,7 +119,7 @@ Script's native format stores paragraph and run fields as attributes and text ma
 - `Document::app_data` entries move into the document's `ext` under the same keys;
 - the format version is bumped, and reading an older version maps the old attributes onto the
   new keys. A migration test opens every golden and fixture file of 0.1.x and checks it saves,
-  reopens and paginates identically (`docs/porting-script.md`, step 5).
+  reopens and paginates identically (`docs/history/porting-script.md`, step 5).
 
 ## 5. Script's 43 decisions
 

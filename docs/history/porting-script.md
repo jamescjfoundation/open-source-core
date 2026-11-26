@@ -1,14 +1,17 @@
 # Rebuilding Wordsmith Script on the core (milestone M4)
 
+> History. This plan was carried out in November 2026 and is kept as it was written; it is not
+> maintained. Where the outcome differs, the app's own records and `CHANGELOG.md` here are right.
+
 How `jamescjfoundation/wordsmith-script` moves from its own copy of WordCraft onto open-source-core.
-The module-by-module decisions are in [review/script-29ed4bf.md](review/script-29ed4bf.md); this is
+The module-by-module decisions are in [script-29ed4bf.md](script-29ed4bf.md); this is
 the order of work and the exact core interfaces each part lands on. It is written for the people
 and agents doing the rebuild.
 
 ## Before anything else
 
-1. **The review is done against `29ed4bf`** (this repository's `docs/review/`), so the repository
-   may now be reset or rebuilt on top of its history (the plan's decision for Dylan).
+1. **The review is done against `29ed4bf`** (this repository's `docs/history/`), so the repository
+   may now be reset or rebuilt on top of its history (a maintainer's decision in the plan).
 2. **Keep today's code readable**: tag `v0.1.2-final`; optionally an archived read-only copy.
 3. **Look after 0.1.x users**: they check this repository's GitHub releases for updates (Script
    decision 0038). Keep the repository's address and releases, or publish a last 0.1.x release

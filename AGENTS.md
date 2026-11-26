@@ -62,7 +62,10 @@ interface back out is not.
 
 ### Step 2: build it
 
-- **App-only change:** one pull request in the app.
+- **How a change lands** (decision 0013): while no app has a public release, a push to
+  `main` is allowed once the gate passes; a pull request is optional and its author merges it
+  when its checks pass.
+- **App-only change:** one change in the app.
 - **Core change an app needs:**
   1. Open a core issue describing the general need, not the app's feature.
   2. Check out both side by side. In the app: `cargo xtask dev-link ../open-source-core`
@@ -70,32 +73,39 @@ interface back out is not.
   3. Build the general part in the core with its own tests and a use in `apps/core-testbed`, so it
      is proven without any product.
   4. Build the app's use of it in the app.
-  5. Open two linked pull requests: the core one first, then the app one, which says which core
-     pull request it needs.
-  6. Merge the core pull request, release the core, update the app's pin, merge the app.
+  5. Land the core change first, with the core's gate green. Then release the core.
+  6. Move the app's pin to that release (`cargo xtask sync`), then land the app change, which
+     names the core issue it needed.
 - **Prototype first, promote later.** If the general shape is not clear yet, build it in the app,
   mark it `// core-candidate:` and open a core issue labelled `core-candidate`. Move it once it works
   and a second app wants it. Never copy code between app repositories.
+- **Something one app needs from another app** (decision 0015): open an issue in the
+  providing app's repository. The provider's change lands and is tagged there first; the consumer
+  then moves its pin. Never edit the provider as part of the consumer's change.
 
 ### Step 3: let it reach the other apps safely
 
 - Everything in the core is shared by default.
 - A change that alters what users see in other apps goes behind an option (a shell setting or a
   Cargo feature) that defaults to the old behavior; each app turns it on when ready.
-- Versioning (decision 0011): while at 0.x a patch release only adds or fixes; a minor release may
-  break and its changelog says exactly what each app must do. A breaking change to a public `jcj-`
-  interface says so in the pull request title, and every app is updated in follow-up pull requests.
+- Versioning (decision 0011): while at 0.x a patch release only adds or fixes; a minor release
+  may break and its changelog says exactly what each app must do. A breaking change to a public
+  `jcj-` interface says so in the title of its commit or pull request, and every app is updated
+  in follow-up changes.
 - A core change that breaks another app is fixed in the core, not worked around in the app.
-- Apps stay at most one core release behind.
+- An app moves to the newest core before new work starts on it and before its own release. Every
+  `jcj-` line names one tag. `cargo xtask core-pin` says how far behind an app is, and a
+  scheduled check opens an issue when it is more than three releases behind.
 
 ### Things agents must not do
 
 - Name WordCraft or craft-libs types in an app repository. Use the `jcj-` interfaces; if one is
   missing, add it to the core.
 - Put a product name, color, logo, or screenplay, manuscript or book concept into the core.
-- Change a core interface from an app repository's pull request.
+- Change a core interface from a change made in an app repository.
 - Copy code from one app repository into another.
-- Release the core, move upstream pins, or merge pull requests without a person's approval.
+- Release the core, or move an upstream pin, on a commit whose full gate has not passed. A
+  person or an agent may do either once it has (decisions 0004 and 0011).
 - Edit WordCraft or craft-libs code anywhere but our forks' topic branches.
 - Commit personal details, private files or secrets.
 
@@ -108,6 +118,8 @@ interface back out is not.
 | Pins, carried patches, follow / hold / own | `docs/UPSTREAM.md` here |
 | What changed for apps in each core release | `CHANGELOG.md` here, with "What apps must do" |
 | Ideas waiting to be promoted to the core | Core issues labelled `core-candidate` |
+| A request to another app | An issue in that app's repository |
+| Reviews, audits, working notes | `.private/`, or `docs/history/` once a maintainer publishes one |
 
 ## House rules for code
 

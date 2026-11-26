@@ -90,7 +90,7 @@ engine's own commands already do.
 - Printing (Cargo feature `print`) sends a print-ready PDF to the system spooler through
   craft-print: CUPS on macOS and Linux, the Windows spooler on Windows. The craft-print
   dependency Script avoided on Windows (sigstore) is not needed at our craft-libs pin
-  (`docs/review/script-29ed4bf.md`). Script's fallback (`lp` by hand, a PDF viewer on Windows)
+  (`docs/history/script-29ed4bf.md`). Script's fallback (`lp` by hand, a PDF viewer on Windows)
   is not carried.
 - Screenplay PDF rules (title page, scene numbers in margins, revision colors) stay in Script.
   PDF/X waits for a crate at our pins.

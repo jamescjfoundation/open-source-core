@@ -4,7 +4,7 @@ Date: 2026-11-24 · Status: accepted
 
 ## Context
 
-Script names about 145 distinct upstream items (`docs/review/script-29ed4bf.md`, "Adapter
+Script names about 145 distinct upstream items (`docs/history/script-29ed4bf.md`, "Adapter
 interface"). Apps must never name upstream types (plan principle 2), but wrapping WordCraft's whole
 document model in new types would be a rewrite of the model's API, not an adapter.
 

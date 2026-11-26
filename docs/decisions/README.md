@@ -8,7 +8,7 @@ decided, why, and when to revisit it. Decisions about one app's behavior live in
 | [0001](0001-licenses-and-supply-chain.md) | Licenses and the supply chain |
 | [0002](0002-layers.md) | Layers, and the one door to upstream |
 | [0003](0003-toolchain-gate-and-ci.md) | Toolchain, the gate, and CI that rarely makes anyone wait |
-| [0004](0004-follow-hold-own.md) | Upstream pins, forks, and the follow / hold / own rule (proposed) |
+| [0004](0004-follow-hold-own.md) | Upstream pins, forks, and the follow / hold / own rule |
 | [0005](0005-thin-adapters.md) | Thin adapters: the jcj- crates are the interface apps use |
 | [0006](0006-extension-data.md) | Extension data on documents, paragraphs and runs |
 | [0007](0007-engine-agents-output.md) | The full engine, general commands, agents, output and proofing |
@@ -19,3 +19,5 @@ decided, why, and when to revisit it. Decisions about one app's behavior live in
 | [0012](0012-working-in-the-open.md) | Working in the open |
 | [0013](0013-app-and-core.md) | Building between an app and the core |
 | [0014](0014-shell-theme-board.md) | The shell, theming and boards |
+| [0015](0015-apps-that-depend-on-apps.md) | Apps that depend on apps |
+| [0016](0016-entries-and-translations.md) | Entries and interface translations |
