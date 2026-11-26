@@ -192,8 +192,6 @@ first run on an app's `main` builds everything once from nothing, because the ar
 names; `gh workflow run ci.yml --repo <owner>/<app> -f full=true` starts that run by hand, so
 that it is nobody's push that waits for it.
 
-**Start-up, brand loading and folder projects.**
-
 **The start-up, brand loading and folder projects.** Nothing is required, and nothing an app
 does today changes: every item above is new, and the start-up is behind a feature that is
 off. What an app may switch to, when it chooses:
