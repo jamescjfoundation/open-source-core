@@ -1,10 +1,19 @@
 # 0009: The project container, saving, backups and recovery
 
-Date: 2026-11-24 · Status: accepted · General parts of Wordsmith Script decisions 0017 and 0020
+Date: 2026-11-24 · Status: accepted · Amended 2026-11-26 (the container and the folder) ·
+General parts of Wordsmith Script decisions 0017 and 0020
+
+Amended 2026-11-26: the container below is no longer the one form for every app. The standard
+for an app's project is a folder of plain files (decision 0018, `jcj_project::folder`), which
+the two apps built since this record both chose. The container stays as it is, for a document
+that is one file; nothing here is removed, and an app picks one form. The two share this
+record's atomic saves, its backup names and its recovery idea, and a folder project's packed
+form follows this container's shape (a stored `mimetype` entry first, the same bytes for the
+same content, reading that never trusts the file).
 
 ## Decision
 
-- **One container for every app** (`jcj-project`): a zip holding `mimetype` (first, stored),
+- **One container** (`jcj-project`; "for every app" until the 2026-11-26 amendment): a zip holding `mimetype` (first, stored),
   `manifest.json` (container version, app id, app format version, document list),
   optional `app.json` (the app's project-wide data), `documents/<id>.json` (WordCraft's native
   JSON, so extension data survives), `snapshots/<id>.json` and `assets/<key>`. The app picks the
