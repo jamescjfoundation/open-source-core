@@ -110,6 +110,7 @@ jobs:
           fi
       - name: Install cargo-nextest (the project's release file, checksum checked)
         run: |
+          # BEGIN same: install cargo-nextest on any system
           case "$RUNNER_OS" in
             Linux) platform="x86_64-unknown-linux-gnu"; sum="$CARGO_NEXTEST_LINUX_SHA256" ;;
             macOS) platform="universal-apple-darwin"; sum="$CARGO_NEXTEST_MACOS_SHA256" ;;
@@ -132,6 +133,7 @@ jobs:
           tar -xzf "$file" -C nextest
           mv nextest/* "$bin/"
           cargo nextest --version
+          # END same: install cargo-nextest on any system
       - name: cargo xtask ci
         run: cargo xtask ci
       - name: Keep the dependencies' build output, not the workspace's own
@@ -147,7 +149,7 @@ jobs:
           cargo metadata --format-version 1 --locked \
             | jq -r '.packages[] | select(.source == null) | "--package=\(.name)"' | tr -d '\r' \
             | xargs -r cargo clean --locked
-          rm -rf target/tmp target/nextest target/xtask-sync target/template-check target/*/incremental target/*/examples
+          rm -rf target/tmp target/nextest target/xtask-sync target/template-check target/template-package target/*/incremental target/*/examples
           cp "$LOCK" target/deps.lock
           du -sh target
           # END same: keep the dependencies' output
@@ -221,6 +223,49 @@ jobs:
           restore-keys: ${{ steps.name.outputs.older }}
       - name: cargo xtask template-check
         run: cargo xtask template-check
+
+  # The release package of the template app, made on each system by the app's own
+  # `cargo xtask package`, as shared-release.yml makes an app's (docs/app-releases.md). The
+  # packaging of every system is tried here, every night and before a core release, so that an
+  # app's release is not the first to find what a change broke. Nothing is signed or kept
+  # beyond the run; a release build is not what CI keeps between runs.
+  package:
+    name: package the app template (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - name: Toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Restore cargo home
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: cargo-home-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-home-
+      - name: cargo xtask template-check --package
+        run: cargo xtask template-check --package
+      - name: Keep the package for a day, to look inside
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: template-package-${{ runner.os }}
+          path: target/template-package/dist/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
 
   # Each app in .github/apps.json, built and checked with its own gate against this checkout in
   # place of the core release it pins. A core change that breaks an app is red here, before a
@@ -411,7 +456,7 @@ jobs:
           cargo metadata --format-version 1 --locked \
             | jq -r '.packages[] | select(.source == null) | "--package=\(.name)"' | tr -d '\r' \
             | xargs -r cargo clean --locked
-          rm -rf target/tmp target/nextest target/xtask-sync target/template-check target/*/incremental target/*/examples
+          rm -rf target/tmp target/nextest target/xtask-sync target/template-check target/template-package target/*/incremental target/*/examples
           cp "$LOCK" target/deps.lock
           du -sh target
           # END same: keep the dependencies' output
@@ -496,7 +541,7 @@ jobs:
           cargo metadata --format-version 1 --locked \
             | jq -r '.packages[] | select(.source == null) | "--package=\(.name)"' | tr -d '\r' \
             | xargs -r cargo clean --locked
-          rm -rf target/tmp target/nextest target/xtask-sync target/template-check target/*/incremental target/*/examples
+          rm -rf target/tmp target/nextest target/xtask-sync target/template-check target/template-package target/*/incremental target/*/examples
           cp "$LOCK" target/deps.lock
           du -sh target
           # END same: keep the dependencies' output

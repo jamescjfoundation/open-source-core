@@ -307,7 +307,7 @@ jobs:
           cargo metadata --format-version 1 --locked \
             | jq -r '.packages[] | select(.source == null) | "--package=\(.name)"' | tr -d '\r' \
             | xargs -r cargo clean --locked
-          rm -rf target/tmp target/nextest target/xtask-sync target/template-check target/*/incremental target/*/examples
+          rm -rf target/tmp target/nextest target/xtask-sync target/template-check target/template-package target/*/incremental target/*/examples
           cp "$LOCK" target/deps.lock
           du -sh target
           # END same: keep the dependencies' output
