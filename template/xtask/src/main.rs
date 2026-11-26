@@ -15,6 +15,7 @@ mod shared;
 use std::process::ExitCode;
 
 use shared::gate::{self, App, Task};
+use shared::package::Package;
 
 /// What the shared tasks need to know about this app. Set the fields the app has; the rest come
 /// from `App::DEFAULT` (`xtask/src/gate.rs` describes each):
@@ -26,12 +27,35 @@ use shared::gate::{self, App, Task};
 /// - `legal_files`: legal files beyond the ones every app carries;
 /// - `screenshots`: the package whose `screenshots` example draws `docs/images/`.
 const APP: App = App {
-    // The product's name, for generated files. Change to the app's name.
+    // The product's name, for generated files and for the release packages. Change to the app's name.
     product: "This app",
-    // The programs the app ships (for THIRD-PARTY-LICENSES.txt). Change to the app's binaries.
+    // The programs the app ships, as the packages that build them, the desktop program first
+    // (for THIRD-PARTY-LICENSES.txt and the release packages). Change to the app's.
     shipped: &["app"],
+    package: Some(PACKAGE),
     tasks: TASKS,
     ..App::DEFAULT
+};
+
+/// What a release of the app carries besides its programs (`cargo xtask package`; the core's
+/// `docs/app-releases.md`). Set the fields the app has; the rest come from `Package::DEFAULT`
+/// (`shared::package::Package` describes each):
+///
+/// - `file_types`: the kinds of file the app opens, as
+///   `&[FileType { name: "Example document", extensions: &["exd"], mime: "application/x-example", ..FileType::DEFAULT }]`
+///   (`shared::package::FileType`);
+/// - `license_files`: the license texts of what the programs embed (fonts, data);
+/// - `macos_icons`, `windows_icon`: icons drawn apart for those systems.
+const PACKAGE: Package = Package {
+    // The release id: the stem of every release file and the name of the desktop program, which
+    // is also the id the app gives its update source. Change to the app's.
+    id: "app",
+    // The app's id on a desktop: the one the window is given (`with_app_id`). Change to the app's.
+    app_id: "org.example.app",
+    summary: "A foundation app",
+    // A placeholder. Replace it with the app's icon, in the sizes it has.
+    icons: &[(256, "assets/icon-256.png")],
+    ..Package::DEFAULT
 };
 
 /// The app's own tasks: a name, a line for `cargo xtask help`, and a function that takes the

@@ -5,13 +5,15 @@ Started from open-source-core's `template/`. To make it yours:
 1. Copy this folder into a new repository. Take it from the core release the app will pin, so the
    files agree with that release from the start.
 2. Rename the package `app` (in `Cargo.toml` and `apps/app`), set `APP` (the app's identifier)
-   and `NAME` in `apps/app/src/main.rs`, and `product` and `shipped` in `xtask/src/main.rs`.
-   That file is the app's own and holds only its data and its own tasks; the gate is the core's
-   (`xtask/src/gate.rs`).
+   and `NAME` in `apps/app/src/main.rs`, and `product`, `shipped` and `PACKAGE` in
+   `xtask/src/main.rs`. That file is the app's own and holds only its data and its own tasks;
+   the gate is the core's (`xtask/src/gate.rs`). `PACKAGE` is what a release carries: the
+   release id, which is also the name of the desktop program, the app's id on a desktop, its
+   icons and file types. `assets/icon-256.png` is a placeholder for the app's own icon.
 3. Pin the core: every `jcj-` dependency in `Cargo.toml` at the same release tag. Add a line for
    each other `jcj-` crate the app uses.
-4. Run `cargo xtask sync`. This folder already holds the shared xtask modules, the CI and
-   core-pin workflows, the Dependabot settings, the pull request template, the hooks, the code
+4. Run `cargo xtask sync`. This folder already holds the shared xtask modules, the CI,
+   core-pin and release workflows, the Dependabot settings, the pull request template, the hooks, the code
    of conduct and the files with the core's marked blocks (`AGENTS.md`, `SECURITY.md`,
    `CONTRIBUTING.md`, `Cargo.toml`, `.cargo/config.toml`, `.gitignore`, `.gitattributes`). The
    first run adds the four settings files kept at the core's root (`rust-toolchain.toml`,
@@ -32,17 +34,25 @@ Started from open-source-core's `template/`. To make it yours:
    `LICENSE-MIT` and `LICENSE-APACHE` (`cargo xtask third-party-licenses` reads them), `NOTICE`
    (keep the credit "based on WordCraft by the ArtCraft team"), `ATTRIBUTION.md` (every file
    under `assets/` is named in it, in backticks; `cargo xtask assets`, a task of the gate, fails
-   until these four files exist), `CHANGELOG.md`, a `docs/decisions/` folder, and the product's
-   `tokens.json` (the core's `crates/jcj-theme/TOKENS.md` describes it).
+   until these four files exist), `CHANGELOG.md` with a `## Unreleased` section (the gate's
+   `release-data` task wants it: a release's text is its section there), a `docs/decisions/`
+   folder, and the product's `tokens.json` (the core's `crates/jcj-theme/TOKENS.md` describes
+   it).
 8. Code that should one day move to the core is marked `// core-candidate: open-source-core#N`
    with the core issue that tracks it; `cargo xtask docs`, a task of the gate, fails on a marker
    without an issue, on a relative Markdown link that leads nowhere and on a decision reference
    that names no record.
 9. In the repository's settings on GitHub, turn on private vulnerability reporting (the
    `security` block and the code of conduct send reports there) and keep issues on (the
-   core-pin workflow opens one when the pin falls behind). `ci.yml` and `core-pin.yml` call
-   workflows kept in `jamescjfoundation/open-source-core`: an organisation that limits which
-   actions and workflows may run must allow that repository's (its own are always allowed).
+   core-pin workflow opens one when the pin falls behind, and the release workflow when its
+   weekly dry run fails). `ci.yml`, `core-pin.yml` and `release.yml` call workflows kept in
+   `jamescjfoundation/open-source-core`: an organisation that limits which actions and
+   workflows may run must allow that repository's (its own are always allowed).
+10. Releases: the core's `docs/app-releases.md` says what a release is made of and how one is
+   cut. `cargo xtask package` makes this computer's package in `dist/`;
+   `gh workflow run release.yml -f dry-run=true` tries every system without publishing. The
+   packages are unsigned until the repository or its organisation has the secrets that
+   document names.
 
 Moving to a newer core release later: change the tag on every `jcj-` line, run
 `cargo metadata --format-version 1 >/dev/null` to bring `Cargo.lock` in line, run
