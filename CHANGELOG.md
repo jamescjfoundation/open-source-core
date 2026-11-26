@@ -52,11 +52,12 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 ### What apps must do
 
-An app that carries the rules as hand copies does this once, after moving its pin to this
-release.
+An app that carries the rules as hand copies does this once.
 
-1. Run `cargo xtask sync`. It brings the new `sync.rs` and says to run it again.
-2. In `AGENTS.md`, find the hand copy of the core's rules (from "## Before you commit" to the end
+1. Move every `jcj-` dependency to `tag = "v0.1.17"`, then run
+   `cargo metadata --format-version 1 >/dev/null` to bring `Cargo.lock` in line.
+2. Run `cargo xtask sync`. It brings the new `sync.rs` and says to run it again.
+3. In `AGENTS.md`, find the hand copy of the core's rules (from "## Before you commit" to the end
    of "## House rules for code"). Delete it and put these six lines in its place, in this order,
    each pair with one empty line after it:
 
@@ -73,23 +74,31 @@ release.
 
    Keep the app's opening lines, a project block if the app has one, and the app's own rules.
    Remove "Read the core's AGENTS.md too" from the opening.
-3. In `SECURITY.md`, delete the app's "## Reporting a problem" and "## How we handle a report"
+4. In `SECURITY.md`, delete the app's "## Reporting a problem" and "## How we handle a report"
    and put the pair `<!-- BEGIN open-source-core: security -->`,
-   `<!-- END open-source-core: security -->` under the title. Keep "## What counts" below it.
-4. In `CONTRIBUTING.md`, delete the app's "## Rules for a public repository" and its commit and
+   `<!-- END open-source-core: security -->` under the title. Keep "## What counts" below it,
+   and move there any sentence of the deleted sections that is only about the app (what never
+   to attach to a report, for example).
+5. In `CONTRIBUTING.md`, delete the app's "## Rules for a public repository" and its commit and
    pull request section, and put the pair `<!-- BEGIN open-source-core: contributing -->`,
    `<!-- END open-source-core: contributing -->` there. Move any rule that is the app's own
-   (a naming rule, a commit subject form, a progress file) to a section below the pair; do not
-   keep a second copy of a rule the block states.
-5. Run `cargo xtask sync` again. It fills the five blocks and replaces `CODE_OF_CONDUCT.md` with
+   (a naming rule, a commit subject form, a progress file), or that only adds to what the block
+   says, to a section below the pair; do not keep a second copy of a rule the block states. End
+   the file with a line that points at `CODE_OF_CONDUCT.md` if it has none.
+6. Run `cargo xtask sync` again. It fills the five blocks and replaces `CODE_OF_CONDUCT.md` with
    the core's. If it names a block it could not place, the marker lines for that block are
    missing or misspelled; each must be a line of its own.
-6. Read the three files once through: text outside a block must not contradict the block, and a
+7. Read the three files once through: text outside a block must not contradict the block, and a
    bare "decision NNNN" in the app's own text that means a core record becomes "core decision
    NNNN".
-7. `cargo xtask sync --check`, then `cargo xtask ci`.
+8. `cargo xtask sync --check`, then `cargo xtask ci`.
 
 Nothing changes in an app's `xtask/src/main.rs`, and no code changes.
+
+An app that follows another app's tag, and so cannot move its pin until that app has, can take
+the files first: in a core checkout at this release, `cargo xtask sync <the app's folder>` writes
+them, and `cargo xtask sync <the app's folder> --check` checks them. The app's own
+`cargo xtask sync --check` passes once its pin has moved.
 
 ## 0.1.16 (2026-11-26)
 
