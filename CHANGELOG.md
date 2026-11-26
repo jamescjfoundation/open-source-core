@@ -111,6 +111,68 @@ minor release may, and then **What apps must do** says exactly what (decision 00
   two flags, its tools named `testbed_…`, the board's commands through the adapter), and
   `apps/core-testbed/tests/command_line.rs` runs the built program to hold it there.
 
+### What apps must do
+
+Nothing is required. Every item above is an addition an app asks for: an app that only moves its
+pin builds and behaves as before, and no existing call writes different output.
+
+- Move every `jcj-` dependency to this release's tag when convenient. The patch block is
+  unchanged.
+
+What an app may now delete or switch to, each in a change of its own. The core issue named stays
+open until the app that holds the copy uses the core's.
+
+1. **A model crate's own word list and word-level comparison** (#31). Replace the copy of the
+   comparison with `pub use jcj_doc::wordiff::{Change, Diff, Segment, paragraph, paragraphs,
+   tokens};` and keep the app's own entry point over its own text type, calling `paragraphs`.
+   Make the app's word list call `jcj_doc::words`. A test that only compared the copy with the
+   core's can go. Wordsmith Manuscript: `crates/manuscript-model/src/diff.rs` and `words.rs`
+   (`words`), and `crates/manuscript-io/tests/words.rs`. Nothing a crate built on that model
+   sees changes: the types have the same names, fields and results.
+2. **A direct `jcj-i18n` dependency in an interface crate** (#32). Call `jcj_shell::i18n::tr`,
+   `tr_with`, `trn`, `tl` and `language`, write the catalog test with `jcj_shell::i18n::Catalog`,
+   `texts_in`, `singulars_in` and `compare`, and drop `jcj-i18n` from that crate's `Cargo.toml`
+   and from the app's layer table. Wordsmith Book: `crates/book-ui`. An app with catalog code of
+   its own (Wordsmith Manuscript: `crates/manuscript-ui/src/i18n.rs`) can delete it and call
+   `jcj_shell::i18n::set_language(code, &[("es", CATALOG)])`; the shell's own texts then follow
+   the language too, which users see, so that app says so in its changelog and guide.
+3. **Notes written into the document before the EPUB writer is called** (#33). Call
+   `jcj_interchange::export_epub` with the numbering, link and heading the reading copy has
+   today, and take the words to leave out of the word check from `added_words`. Wordsmith
+   Manuscript: `notes_as_endnotes` in `crates/manuscript-io/src/export.rs`, which numbers
+   through the book under a "Notes" heading with no link back:
+   `EpubOptions::default().note_numbering(NoteNumbering::ThroughBook).note_heading("Notes")
+   .note_backlink(NoteBacklink::None)`. Readers of the file will see three differences from
+   that workaround, all on purpose: a note's number where it is called is a link to the note,
+   the notes are a numbered list marked as endnotes for reading systems, and "Notes" is a
+   heading where it was a bold paragraph. Update the golden file with them.
+4. **An app's own rule for shifted caret keys** (#29). Where the document view asks the key map
+   what a key runs, call `map.command_for(&shortcut)` in place of `map.bound_to(..)` followed by
+   the app's rule. Wordsmith Script: `shifted` in `crates/wordsmith-ui/src/editor.rs`. One
+   difference: a shifted key the user turned off now runs nothing.
+5. **File dialogs an app shows itself** (#28). Ask with `shell.ask_file(FileAsk::open()…, Cmd)`
+   and handle the command that comes back with `"path"`; add a `jcj_shell::files::FileDialogs`
+   to the window beside the shell and call `files.show(&mut shell, ui.ctx(), Some(&*frame))`
+   after `shell.ui(..)`. Then drop the app's own dialog dependencies. Wordsmith Script:
+   `apps/wordsmith/src/files.rs` and its `rfd` and `raw-window-handle` lines. Wordsmith Book's
+   typed path box can become an Open dialog the same way.
+6. **An app's own adapter from its commands to agent tools** (decision 0017). Implement
+   `jcj_agents::AppCommands` for the value the commands run on (`commands()` from the app's
+   command list, with `reads` and `writes` naming the parameters that are paths; `run` calling
+   the app's own dispatch, and saving as it does today), and build the server with
+   `AgentServer::for_app(Box::new(tools), "<app>", config)`. The engine commands registered only
+   to stand for app commands, the macro that lists them and the global the project was kept in
+   all go. Wordsmith Manuscript: `crates/manuscript-ui/src/agents.rs`. Wordsmith Book:
+   `crates/book-ui/src/agents.rs`. The tool names stay as they are (`manuscript_…`, `book_…`).
+   One difference agents see: the general document tools (`execute`, `list_commands` and the
+   rest), which worked on an empty document, are no longer listed.
+7. **Follow `docs/command-lines-and-agent-tools.md`** with `jcj_agents::cli`: `Exit` for the
+   exit codes, `standard(&args)` for `--help`, `--version` and no argument, `McpArgs` for `mcp`.
+   Each app changes something a user of its command line can see (an exit code, a tool's name,
+   what no argument does), so each does it in a change of its own with a changelog line, a guide
+   line and a test that runs the built program, as `apps/core-testbed/tests/command_line.rs`
+   does.
+
 ## 0.1.19 (2026-11-26)
 
 ### Added
