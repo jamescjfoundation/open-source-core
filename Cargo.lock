@@ -2654,6 +2654,7 @@ dependencies = [
  "jcj-theme",
  "jcj-upstream",
  "log",
+ "raw-window-handle",
  "serde",
  "serde_json",
 ]

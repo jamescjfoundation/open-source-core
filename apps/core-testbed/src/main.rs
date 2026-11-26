@@ -17,8 +17,11 @@ struct Window {
 }
 
 impl eframe::App for Window {
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         self.shell.ui(ui, &mut self.app);
+        // The window's part of the shell's file dialogs: show the next one asked for, over
+        // this window, once the frame is drawn.
+        self.shell.show_file_dialogs(Some(&*frame));
     }
 }
 

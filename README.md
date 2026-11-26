@@ -31,7 +31,7 @@ crosses them.
 | `jcj-features` | Document features every app shares: bookmarks, notes, revision sets, change tracking, page locks, watermarks, headers and footers, comparison |
 | `jcj-theme` | A product's design tokens turned into the shell's theme |
 | `jcj-board` | Cards, corkboard and canvas |
-| `jcj-shell` | Window, ribbon, panels, File page, dialogs, preferences, auto-save, updates |
+| `jcj-shell` | Window, ribbon, panels, File page, dialogs, the system's file dialogs, preferences, keys, auto-save, updates, and the door to interface translations |
 | `jcj-agents` | An app's commands as MCP tools for agents |
 | `jcj-upstream` | Internal: the one crate that names upstream code. Apps never use it |
 

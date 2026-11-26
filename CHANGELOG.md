@@ -55,6 +55,25 @@ minor release may, and then **What apps must do** says exactly what (decision 00
   unchanged: the shell still takes only keys with Mod, Ctrl or Alt and function keys that are
   bound, and leaves the rest to the document, whose view asks `command_for`. `core-testbed`
   runs Shift+Right through the rule on a session and sees the selection grow.
+- `jcj-shell`: the system's file dialogs, asked for through the shell and answered as a command
+  (core issue #28). Until now an app showed them itself, modally, or asked for a typed path.
+  - `Shell::ask_file(FileAsk, then: Cmd) -> bool` queues a dialog; when the user has chosen,
+    `then` runs with `"path"` (the file, folder or place to save) and `"paths"` (every file
+    chosen) added to its parameters. Closing the dialog runs nothing, unless
+    `Shell::ask_file_or(ask, then, cancelled)` named a command for that. One dialog shows at a
+    time; at most `files::MAX_WAITING` wait.
+  - `files::FileAsk`: `open()`, `open_many()`, `save()`, `folder()`, then `.title(..)`,
+    `.filter(name, &[extensions])` (any letter case), `.in_folder(..)`, `.file_name(..)`.
+  - `Shell::show_file_dialogs(Some(&*frame))`: the app's window calls it once at the end of
+    every frame, after `Shell::ui`. The shell does not own the window, so without this call a
+    dialog asked for never opens.
+  - `Shell::answer_file_dialogs_with(..)` answers in the system's place (`files::FileAnswer`),
+    for tests and automation; `Shell::file_dialog_pending()` says whether one is up or waiting.
+  - The dialogs are the upstream layer's (craft-dialogs), which keeps the window drawing while
+    one is up. `jcj-shell` gains one direct dependency, `raw-window-handle` 0.6.2, for the
+    window's handles; it was in every app's lock file already. A dialog that cannot be shown
+    is said in the status bar (one new text, in the shell's Spanish catalog too).
+  `core-testbed` has Open, Save As and Export To through it, and a test answers them.
 
 ## 0.1.19 (2026-11-26)
 

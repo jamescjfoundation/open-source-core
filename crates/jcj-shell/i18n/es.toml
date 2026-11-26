@@ -108,6 +108,7 @@
 "Theme" = "Tema"
 "There are no unsaved documents to recover." = "No hay documentos sin guardar que recuperar."
 "There is no command {command}." = "No existe el comando {command}."
+"The file dialog could not be shown: {why}" = "No se pudo mostrar el cuadro de diálogo de archivos: {why}"
 "Unpin: float over the document" = "Soltar: flotar sobre el documento"
 "Unsaved Changes" = "Cambios sin guardar"
 "Unsaved work" = "Trabajo sin guardar"
