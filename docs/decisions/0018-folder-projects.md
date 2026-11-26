@@ -88,7 +88,10 @@ backups. The core's container is used by its own test app and by the app templat
 ## What each app changes to use it
 
 Neither app is moved by this decision. Each is listed here, with what its files on disk would
-do: nothing, in both.
+do: nothing, in both. That was checked, not argued: each app's format crate was built beside
+the layer and the two were compared on the same projects. The packed project, a new folder,
+the folder after a save, the recovery copy and a backup came out the same bytes under the same
+names from both, and each read what the other wrote.
 
 **Wordsmith Manuscript.** A `Format`: `project.toml`, schema 3; `project.toml` and
 `binder.toml` written last; a path belongs when it is `binder.toml` or under `text/`, `bible/`,
@@ -131,9 +134,11 @@ and `.jpg` stored uncompressed; no conflict copies; its four packed limits.
 - `toml_file.rs` keeps the migration and the checks of the project; its `nesting` is the
   core's `toml_nesting`.
 - On disk: the same files with the same bytes, and the same packed bytes.
-- What behaves differently: backups are listed by their exact name, as above; a folder is read
-  16 levels deep, not 8. Conflict copies stay off until Book wants them: a new folder in the
-  project is Book's own format decision.
+- What behaves differently: backups are listed by their exact name, as above, and two made in
+  the same second are listed in the order they were made, where today the numbered second one
+  sorts before the first and would be removed first; a folder is read 16 levels deep, not 8.
+  Conflict copies stay off until Book wants them: a new folder in the project is Book's own
+  format decision.
 
 ## Why
 
