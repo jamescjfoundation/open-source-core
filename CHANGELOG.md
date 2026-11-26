@@ -3,6 +3,121 @@
 Each release says what changed for apps. While at 0.x, a patch release never breaks an app; a
 minor release may, and then **What apps must do** says exactly what (decision 0011).
 
+## Unreleased
+
+### Added
+
+- **cargo-nextest runs the tests of every app's gate when it is installed** (decision 0003,
+  amended). The `test` task ran `cargo test`, which runs one test program after another; in an
+  app with long end-to-end tests that was about ten minutes of every push with nothing left to
+  build. Now, in `xtask/src/gate.rs`:
+  - with cargo-nextest on the machine, the task runs `cargo nextest run --locked`, then the
+    tests in documentation with `cargo test --locked --doc` for the packages that have a
+    library (cargo-nextest does not run those);
+  - without it, `cargo test --locked`, as before;
+  - both run every test; the task's first line says which ran, so a result on a laptop and one
+    in CI can be told apart when they differ.
+  CI installs cargo-nextest for every app, so an app's CI uses it from the push that moves its
+  pin here. No test leaves the per-push gate. The core's own gate uses the same code.
+- **`cargo xtask prune-target <older lock file> [--target <folder>]`** in every app: removes
+  from `target/` the build output of every package that moved between that lock file and the
+  one in use, and of everything built on one. The shared CI workflow runs it after it restores
+  build output kept from another lock file. It reads `.cargo/dev-link/Cargo.lock` when the app
+  is linked. Nobody needs to run it by hand.
+- In the core: **each app is built against a core commit, with its own gate, every night and
+  before a release** (decision 0011, amended; the job `apps` of `nightly.yml`). For each
+  repository in `.github/apps.json` it checks out the app at the newest commit of its `main`
+  that passed the app's own CI, links it to the core commit with the app's own
+  `cargo xtask dev-link`, takes the commit's shared files with `cargo xtask sync`, and runs
+  `cargo xtask ci --linked`. An app that does not build or does not pass, a golden file that
+  differs included, fails the run. `.github/workflows/README.md` says what a green job shows
+  and what it cannot: an app that builds on another app's crates is built with them at the tag
+  it names, not at that app's `main`; the apps are built on Linux only; an app on a core older
+  than 0.1.20 cannot be linked this way and fails until it moves.
+- In the core: **a release is gated before its tag exists, and the workflow makes the tag**
+  (decision 0011, amended).
+  - `cargo xtask release <version>` makes the changes of a release commit: the version in
+    `Cargo.toml` and `Cargo.lock`, the tags in `template/Cargo.toml`, and `## Unreleased` in
+    this file as `## <version> (<date>)`. It refuses a section with no **What apps must do**.
+  - `release.yml` is started for that commit (`gh workflow run release.yml --ref main`). It
+    runs the gate on Linux, macOS and Windows with the minimum Rust version, cargo-deny, the
+    template and the apps; only when all of it has passed does it make the annotated tag and
+    publish the GitHub release. A run of the gate that has already passed on the commit is
+    used, not repeated. Pushing a tag by hand starts nothing; nobody does it.
+  - A red app stops the release unless the release's section of this file carries, for that
+    app, the line `**App gate override, <owner>/<repository>:** <the reason>`.
+- In the core: the gate has a `workflows` task. Every workflow uses only GitHub's own actions,
+  each at a full commit; two workflows that download the same tool name the same version and
+  checksums; a script two workflows must run alike is the same text in both; and
+  `.github/apps.json` can be read.
+
+### Changed
+
+- **What the shared CI workflow keeps between runs** (decision 0003, amended;
+  `.github/workflows/README.md`, "What CI keeps between runs"). The name of the build archive
+  ended in the commit, so every push to `main` saved a new one of one to five gigabytes, most
+  of it the workspace's own packages, which Cargo builds again on every fresh checkout whatever
+  is kept. Three repositories were over GitHub's 10 GB at once. Now:
+  - the archive holds the build output of the dependencies only, and is named after what that
+    output depends on: the system, the toolchain and Cargo's settings, the locked packages that
+    come from elsewhere, and the manifests without the workspace's own version;
+  - it is saved from `main` only, after a build of everything, and only when no archive of
+    that name exists. A push that moves no dependency saves nothing;
+  - a run on `main` that finds no archive for its dependencies builds and tests everything
+    once, so that what it saves is whole;
+  - after a dependency moves, a run starts from the newest archive of the same toolchain and
+    first drops what the move made stale (`cargo xtask prune-target`, where the app has it).
+- **CI compiles no tool.** cargo-nextest and cargo-deny are downloaded as the files their
+  projects publish, and each file is checked against a SHA-256 checksum written in the
+  workflow. Compiling them took two to four minutes whenever their cache was gone.
+- In the core: `nightly.yml` and the release use the same archives as `ci.yml`, saved from
+  `main` only (a run for a tag used to save archives no other run could read, which pushed out
+  the ones in use), run the tests under cargo-nextest on all three systems, and restore the
+  cargo home in the cargo-deny job.
+- In the core: `release.yml` no longer starts when a `v*` tag is pushed.
+
+### What apps must do
+
+1. Move every `jcj-` dependency to this release's tag, then run
+   `cargo metadata --format-version 1 >/dev/null` to bring `Cargo.lock` in line.
+2. Run `cargo xtask sync`, once. It brings three changed modules (`xtask/src/gate.rs`,
+   `changed.rs`, `corepin.rs`). Then `cargo xtask sync --check`. No file of the app's own
+   changes: not `xtask/src/main.rs`, not a workflow file.
+3. Install cargo-nextest where the gate is run by hand, if it is wanted there (the gate works
+   without it): <https://nexte.st/docs/installation/pre-built-binaries/>. Run `cargo xtask ci`
+   once with it installed. cargo-nextest runs each test in a process of its own and several
+   test programs at a time, which two kinds of test notice:
+   - **A test that asserts a time** (a frame under so many milliseconds, a page within a
+     second). Under `cargo test` its program had the machine nearly to itself; now other test
+     programs run beside it, and on a busy machine it fails. Give it the machine: in
+     `.config/nextest.toml`, which is the app's own file,
+
+     ```toml
+     [[profile.default.overrides]]
+     filter = 'binary(<the test program>)'
+     threads-required = "num-test-threads"
+     ```
+
+     cargo-nextest then runs nothing beside it. `cargo test` does not read the file, so it
+     can be added before the pin moves. Wordsmith Book: the programs `live` and `preview` of
+     `crates/book-ui/tests/` failed this way on a heavily loaded machine and passed on a less
+     loaded one.
+   - **A test that passed only because of its neighbours**: because another test of the same
+     program ran before it, or because no other program ran beside it (two that write the
+     same file, say). Make it stand alone; where two tests must not run together, put them in
+     a test group in the same file.
+
+**The shared workflow** asks nothing of an app. It reaches an app when the core moves the tag
+`workflows-v1` to a commit that has it, not with this release, and no file in an app changes
+for it. The tag may move while apps are on any core release from 0.1.19 on, which is every app
+that calls it: the workflow runs the same commands of an app's xtask as before (`ci --skip`,
+`ci --only`, `affected`), and tries `prune-target` and goes on without it where an older core
+has none. An app on 0.1.19 or 0.1.20 gets the new archives and the downloaded tools at once and
+keeps running its tests with `cargo test` until it moves here. After the tag has moved, the
+first run on an app's `main` builds everything once from nothing, because the archives have new
+names; `gh workflow run ci.yml --repo <owner>/<app> -f full=true` starts that run by hand, so
+that it is nobody's push that waits for it.
+
 ## 0.1.20 (2026-11-26)
 
 ### Added

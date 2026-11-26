@@ -10,7 +10,7 @@
 #   CI on main, and for everything that depends on it.
 #
 # A newer push cancels an older run. The full matrix (Linux, macOS, Windows), the minimum Rust
-# version and the full test run are in nightly.yml.
+# version, the full test run and the apps built against this repository are in nightly.yml.
 name: CI
 
 on:
@@ -41,4 +41,3 @@ jobs:
     uses: ./.github/workflows/shared-ci.yml
     with:
       full: ${{ inputs.full == true }}
-      nextest: true

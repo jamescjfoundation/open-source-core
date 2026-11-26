@@ -39,8 +39,10 @@ cargo xtask template --write  # after changing a block or the code of conduct un
 cargo xtask template-check    # after any change under template/: builds it against this checkout
 ```
 
-`cargo xtask help` lists every task. A release needs more than the gate: the cross-platform run
-passes on the commit before it is tagged (`CONTRIBUTING.md`, "Releasing").
+`cargo xtask help` lists every task. A release needs more than the gate: `cargo xtask release
+<version>` makes the release commit, and the release workflow tags it only after the run on
+Linux, macOS and Windows and the build of every app against it have passed. Never push a `v*`
+tag by hand (`CONTRIBUTING.md`, "Releasing").
 
 <!-- BEGIN open-source-core: public -->
 <!-- Owned by open-source-core (template/AGENTS.md). Change it there, never in a copy: its tooling rewrites the copies. -->

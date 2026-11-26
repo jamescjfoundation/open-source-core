@@ -5,7 +5,8 @@
 //! GitHub Actions, so a change that passes locally passes in CI. `cargo xtask ci --changed` runs
 //! clippy and tests only for the packages a change can affect (and their dependents). The
 //! pre-push hook runs that, and so does CI on a push or a pull request; the scheduled run and
-//! the run before a release are the full gate on three platforms.
+//! the run before a release are the full gate on three platforms. `cargo xtask release` makes
+//! the release commit; the release workflow makes the tag, once that run has passed.
 //!
 //! The modules under `template/xtask/src/` are shared with every app repository's xtask (copied by
 //! `cargo xtask sync <app>`); they are compiled into this xtask from there, so the core tests them.
@@ -19,6 +20,8 @@ mod shared;
 
 mod layers;
 mod pins;
+mod release;
+mod workflows;
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -36,11 +39,12 @@ const TASKS: &[(&str, &str)] = &[
     ("layers", "only jcj-upstream names upstream; dependencies point down"),
     ("pins", "upstream pins, Cargo.lock and docs/UPSTREAM.md agree"),
     ("template", "the app template carries the core's patch block and shared files, and the core its own shared blocks"),
+    ("workflows", "workflows use only GitHub's own actions at a full commit and agree on the tools they download; the list of apps reads"),
     ("docs", "links in Markdown lead somewhere, and decision references name a record"),
     ("privacy", "no personal details or secrets in files or commit identities"),
     ("licenses", "every dependency's license is on the allowlist; legal files exist"),
     ("clippy", "clippy on all targets and features, warnings are errors"),
-    ("test", "all tests"),
+    ("test", "all tests: by cargo-nextest when it is installed, else by `cargo test`"),
 ];
 
 /// The programs the core ships (for the third-party license file of a release).
@@ -86,6 +90,8 @@ fn main() -> ExitCode {
         "upstream-status" => pins::status(&root),
         "third-party-licenses" => licenses::task(&root, SHIPPED, "open-source-core's test app", rest.first().map(String::as_str)),
         "privacy" => privacy::task(&root, rest),
+        "prune-target" => changed::prune_task(&root, rest),
+        "release" => release::task(&root, rest),
         "help" | "--help" | "-h" => {
             print_help();
             Ok(())
@@ -132,6 +138,14 @@ fn print_help() {
         "  install-hooks             use the repository's git hooks (pre-commit: fmt, privacy, no dev-link in a tracked file; pre-push: ci --changed)"
     );
     println!("  third-party-licenses [file]  write the dependency license texts");
+    println!("  prune-target <older lock file> [--target <folder>]");
+    println!("                            remove the build output that a move from that lock file made stale (CI's cache)");
+    println!("  release <version> [--date YYYY-MM-DD]");
+    println!("                            make the release commit's changes: the version in Cargo.toml and Cargo.lock, the tags");
+    println!("                            in template/Cargo.toml, and `## Unreleased` in CHANGELOG.md as that version, dated today");
+    println!("  release --check | --notes | --override <owner>/<repository>");
+    println!("                            what the release workflow asks: is this a release commit; the release's text; the");
+    println!("                            reason the changelog gives for going ahead although that app fails against the core");
 }
 
 fn workspace_root() -> PathBuf {
@@ -165,11 +179,12 @@ fn run_task(name: &str, root: &Path, scope: &Affected) -> TaskResult {
         "layers" => check_layers(root),
         "pins" => pins::task(root),
         "template" => check_template(root),
+        "workflows" => workflows::task(root),
         "docs" => docs::core_task(root, None),
         "privacy" => privacy::task(root, &[]),
         "licenses" => check_licenses(root),
         "clippy" => scoped(root, scope, &["clippy", "--locked", "--all-targets", "--all-features"], &["--", "-D", "warnings"]),
-        "test" => test(root, scope),
+        "test" => gate::test(root, scope, &["--all-features"]),
         other => Err(format!("no runner for task '{other}'")),
     };
     println!("    ({name}: {:.1?})", t.elapsed());
@@ -186,34 +201,6 @@ fn fmt_template(root: &Path) -> TaskResult {
         .status()
         .map_err(|e| format!("could not run rustfmt: {e}"))?;
     if status.success() { Ok(()) } else { Err("the template's Rust files need `rustfmt --edition 2024` (see the diff above)".to_owned()) }
-}
-
-fn has_nextest(root: &Path) -> bool {
-    cargo_output(root, &["nextest", "--version"]).is_ok()
-}
-
-/// Tests: cargo-nextest when installed (faster: one process per test, all cores), plus doc tests.
-fn test(root: &Path, scope: &Affected) -> TaskResult {
-    if has_nextest(root) {
-        scoped(root, scope, &["nextest", "run", "--locked", "--all-features", "--no-tests=pass"], &[])?;
-        // Doc tests exist only in libraries; `--doc -p <bin-only package>` is an error.
-        let docs = match scope {
-            Affected::All => Affected::All,
-            Affected::Some(names) => {
-                let graph = changed::workspace_graph(root)?;
-                Affected::Some(
-                    names
-                        .iter()
-                        .filter(|n| graph.get(n.as_str()).is_some_and(|(dir, _)| root.join(dir).join("src/lib.rs").is_file()))
-                        .cloned()
-                        .collect(),
-                )
-            }
-        };
-        scoped(root, &docs, &["test", "--locked", "--all-features", "--doc"], &[])
-    } else {
-        scoped(root, scope, &["test", "--locked", "--all-features"], &[])
-    }
 }
 
 fn check_layers(root: &Path) -> TaskResult {

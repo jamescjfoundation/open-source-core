@@ -2,7 +2,8 @@
 
 Date: 2026-11-24 · Status: accepted · Amended 2026-11-26 (what `sync` carries; the `docs` task
 and the hooks; the shared workflows, what a change affects, and checks on every push; the gate an
-app shares, its layer table, and one run of `sync`) · Ported
+app shares, its layer table, and one run of `sync`; what CI keeps between runs, cargo-nextest in
+every gate, and the apps built against the core) · Ported
 from Wordsmith Script decisions 0003 and 0040
 
 ## Decision
@@ -13,7 +14,7 @@ from Wordsmith Script decisions 0003 and 0040
 - **Lints.** `unsafe_code` is forbidden and the six panicking lints are denied at every crate root
   (`cargo xtask lint-roots` checks the attributes); clippy warnings are errors. Tests may unwrap.
 - **One gate.** `cargo xtask ci` runs, cheapest first: fmt, lint-roots, layers, pins, template,
-  docs, privacy, licenses, clippy, tests. The same command runs locally, in the pre-push hook and in CI,
+  workflows, docs, privacy, licenses, clippy, tests. The same command runs locally, in the pre-push hook and in CI,
   so CI confirms what the developer already saw instead of being the first to find a mistake.
 - **xtask has no dependencies**, so the gate never depends on a crate the gate must vet. The
   modules apps share (`template/xtask/src/`) are compiled into the core's xtask, so the core tests
@@ -58,8 +59,14 @@ from Wordsmith Script decisions 0003 and 0040
   cannot be replaced while it runs on Windows.
 - **Only what changed.** `cargo xtask ci --changed --base <ref>` runs clippy and tests only for the
   packages a change touches and everything that depends on them (`template/xtask/src/changed.rs`).
-  A change to a manifest, the lock file or the toolchain affects everything. Tests run under
-  cargo-nextest when installed.
+  A change to a manifest, the lock file or the toolchain affects everything.
+- **Every test, run at once** (amended 2026-11-26). The `test` task of the core's gate and of
+  every app's runs the tests under cargo-nextest when it is installed, then the tests in
+  documentation with `cargo test --doc`; without it, `cargo test`. Both run every test, and the
+  task says which ran. CI always has cargo-nextest. `cargo test` runs one test program after
+  another, and in an app with long end-to-end tests that was most of every push's wait: about
+  ten minutes, with nothing left to build. Nothing was taken out of the per-push gate to make it
+  faster.
 - **What a change touches** (amended 2026-11-26). At first a file counted only for the package
   whose folder holds it, so a change to a built-in design, a font, a fixture or a golden file at
   the root, or to a page of `docs/` that a test compares, ran no test at all and was reported
@@ -125,6 +132,27 @@ from Wordsmith Script decisions 0003 and 0040
   (`template/.github/dependabot.yml`).
 - **A failed scheduled run is reported** (amended 2026-11-26): `nightly-failed.yml` opens an
   issue, since a red mark on the Actions page reaches nobody.
+- **What CI keeps between runs** (amended 2026-11-26) is the build output of the dependencies
+  and nothing of the workspace's own, under a name made of what that output depends on: the
+  toolchain, Cargo's settings, the locked packages that come from elsewhere and the manifests.
+  It is saved from `main` only, after a whole build, and only when no archive of that name
+  exists. `.github/workflows/README.md` has the rules. Before this the name ended in the
+  commit, so every push to `main` saved a new archive of one to five gigabytes, most of it the
+  workspace's own packages, which Cargo builds again on every fresh checkout whatever is kept.
+  Three repositories sat over GitHub's 10 GB at once, and what was dropped to make room was
+  as often the archive the next run needed. Considered and not chosen: paying for more
+  storage; a compiler cache (sccache), which still asks the compiler about every package on
+  every run and cannot keep what must be linked; keeping no fallback to an older archive, which
+  would build every dependency from nothing each time one of them moves.
+- **Tools are downloaded, not built** (amended 2026-11-26). cargo-nextest and cargo-deny come
+  as the files their projects publish, each checked against a SHA-256 checksum written in the
+  workflow. Compiling them took two to four minutes whenever their cache was gone, and an
+  action of someone else's is not allowed here. The `workflows` task of the core's gate holds
+  the workflow files to that, and to GitHub's own actions at a full commit.
+- **The apps are built against the core** (amended 2026-11-26) every night and before a
+  release, each with its own gate; decision 0011 says what a red app means for a release.
+  Which repositories those are is a list in `.github/apps.json`, so the core's code still
+  names no product (decision 0013).
 
 ## Revisit when
 

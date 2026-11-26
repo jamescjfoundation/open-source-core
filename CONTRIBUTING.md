@@ -16,10 +16,13 @@ cargo run -p core-testbed        # the test app that exercises every crate
 cargo xtask deny                 # licenses, advisories and sources (needs cargo-deny)
 cargo xtask template --write     # after changing a block or the code of conduct under template/
 cargo xtask template-check       # builds the app template against this checkout
+cargo xtask release <version>    # the changes of a release commit ("Releasing" below)
 ```
 
-`cargo xtask help` lists every task. Install `cargo-nextest` for faster test runs; the gate uses it
-when present.
+`cargo xtask help` lists every task. Install
+[cargo-nextest](https://nexte.st/docs/installation/pre-built-binaries/) for faster test runs: the
+`test` task uses it when it is installed, here and in every app, and CI always does. It runs the
+same tests and says which of the two ran them.
 
 ## Where things are
 
@@ -36,7 +39,8 @@ when present.
 | `contract-tests` | Behavior apps rely on, run against every upstream candidate |
 | `template` | Starter files for a new app repository, and the source of what `cargo xtask sync` keeps identical in every app: the shared xtask modules (the gate every app runs is `template/xtask/src/gate.rs`), the two files that call the shared workflows, the Dependabot settings, hooks, code of conduct and the marked blocks of rules and settings |
 | `xtask` | The core's own gate and maintenance tasks |
-| `.github/workflows` | The core's own workflows, and the two shared workflows every app's CI calls; its `README.md` says what each runs and when, and how a change to a shared one reaches the apps |
+| `.github/workflows` | The core's own workflows, and the two shared workflows every app's CI calls; its `README.md` says what each runs and when, how a change to a shared one reaches the apps, what CI keeps between runs, and how a release is gated |
+| `.github/apps.json` | The app repositories that are built against a core commit every night and before a release |
 | `docs/decisions` | Why things are the way they are |
 | `docs/command-lines-and-agent-tools.md` | The convention every app's command line and agent tools follow: exit codes, `mcp`, tool names |
 | `docs/UPSTREAM.md` | Pins, carried patches, follow / hold / own |
@@ -128,7 +132,9 @@ An app's gate is this repository's code: `template/xtask/src/gate.rs` and the mo
 listed in `template/xtask/src/shared.rs`. An app's `xtask/src/main.rs` is the app's own and holds
 only its data and its own tasks. Keep a release from asking for an edit there: a new check goes
 in `CHECKS`, a new module in `shared.rs` and in `MANAGED`, and a new field of `App` gets a value
-in `App::DEFAULT`. `cargo xtask template-check` builds the template against this checkout and
+in `App::DEFAULT`. Until issue #42 is fixed, a release that adds a module cannot be taken by an
+app's own `cargo xtask sync`: put new code in a module apps already have, or give the step that
+works under "What apps must do". `cargo xtask template-check` builds the template against this checkout and
 runs its checks.
 
 ### The shared workflows
@@ -142,32 +148,59 @@ ask of an app, are in `.github/workflows/README.md`; a change that asks more get
 
 ## Releasing
 
-A person or an agent cuts a release, on a commit whose full gate has passed (decision 0011).
+A person or an agent cuts a release, on a commit whose full gate has passed (decision 0011). The
+gate runs first and the tag is made by a workflow, so a tag cannot land on a commit that failed.
 
-1. Write the release's section in `CHANGELOG.md`: what changed for apps, and under **What apps
-   must do** the exact steps an app follows, starting with the pin move. Someone holding only
-   that text must be able to follow it.
-2. Make the release commit, "open-source-core X.Y.Z". It changes four files:
+1. Write what the release changes for apps under `## Unreleased` at the top of `CHANGELOG.md`,
+   and under **What apps must do** the exact steps an app follows, starting with the pin move.
+   Someone holding only that text must be able to follow it. When the pin move and
+   `cargo xtask sync` are all an app does, say exactly that.
+2. Run `cargo xtask release X.Y.Z`. It changes the four files of a release commit and nothing
+   else:
    - `Cargo.toml`: `version` under `[workspace.package]`;
-   - `Cargo.lock`: run `cargo metadata --format-version 1 >/dev/null`, which brings the core's
-     own crates to the new version and moves nothing else;
-   - `CHANGELOG.md`: the section's heading, `## X.Y.Z (date)`;
+   - `Cargo.lock`: the core's own crates at the new version (it runs
+     `cargo metadata --format-version 1`, which moves nothing else);
+   - `CHANGELOG.md`: `## Unreleased` becomes `## X.Y.Z (date)`, with today's date in UTC
+     (`--date YYYY-MM-DD` for another);
    - `template/Cargo.toml`: the tag on every `jcj-` line, `vX.Y.Z`.
-3. Run `cargo xtask ci` and push to `main`.
-4. Run the cross-platform gate on that commit and wait for it:
-   `gh workflow run nightly.yml --ref main`. It is the full gate on Linux, macOS and Windows,
-   the minimum Rust version, cargo-deny and the app template.
-5. When it is green, tag that commit and push the one tag:
-   `git tag -a vX.Y.Z <commit> -m "open-source-core X.Y.Z"`, then `git push origin vX.Y.Z`.
-   The release workflow runs the gate again, checks that the tag is `Cargo.toml`'s version and
-   that `CHANGELOG.md` has its section, and publishes the GitHub release with the vendored
-   sources, the third-party license texts and checksums.
-6. Apps name the tag and their lock files record its commit, so a pushed tag is not moved or
-   deleted. A mistake is fixed in the next version.
 
-The order of steps 4 and 5 is kept by hand today: nothing refuses a tag on a commit whose
-cross-platform run has not passed. The release workflow would fail on it, but the tag would
-already exist.
+   It refuses a version that is not newer than the present one, a changelog whose newest
+   section is not `## Unreleased`, and a section with no **What apps must do** or nothing
+   under it. A refusal changes no file.
+3. Run `cargo xtask ci`, commit the four files as "open-source-core X.Y.Z" and push to `main`.
+4. Start the release for that commit:
+
+   ```sh
+   gh workflow run release.yml --ref main
+   gh run watch "$(gh run list --workflow release.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
+   ```
+
+   It checks that the commit is a release commit and not released yet. It runs the full gate
+   on Linux, macOS and Windows, the minimum Rust version, cargo-deny, the app template, and
+   each app in `.github/apps.json` built against the commit with its own gate. Only when all
+   of that has passed does it make the annotated tag `vX.Y.Z` and publish the GitHub release,
+   with the changelog section, the vendored sources, the third-party license texts and
+   checksums. When a run of the gate (`nightly.yml`) has already passed on that very commit, it
+   uses that run and does not run the gate again. `-f commit=<commit>` releases an older commit
+   of `main` than its newest.
+5. A red job stops the release, and no tag exists. Fix the cause on `main`, with a line in the
+   release's changelog section when apps should know, and start the workflow again: the
+   version was never tagged, so the commit with the fix is the release commit now. When only a
+   runner or the network was at fault, run the failed jobs again:
+   `gh run rerun <run> --failed`.
+6. **When an app is red** and the core is right, the release goes ahead only with the reason
+   written in the release's changelog section, one line for each such app:
+
+   ```text
+   **App gate override, <owner>/<repository>:** <the reason, a sentence or more>
+   ```
+
+   The line is part of the release commit, so it is in the release's text, where the app's
+   maintainers read what they must do. `.github/workflows/README.md`, "When an app is red",
+   has the rule.
+7. Do not make or push a `v*` tag by hand: no workflow runs for it, and it cannot be taken
+   back. Apps name the tag and their lock files record its commit, so a tag is never moved or
+   deleted. A mistake is fixed in the next version.
 
 ## Conduct
 

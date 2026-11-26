@@ -1,0 +1,9 @@
+# Settings for cargo-nextest, which runs the tests of `cargo xtask ci` when it is installed
+# (decision 0003). `cargo test` does not read this file.
+#
+# cargo-nextest runs several test programs at a time. A test that asserts a time needs the
+# machine to itself, or it fails on a busy one: it takes every test slot, so nothing runs
+# beside it.
+[[profile.default.overrides]]
+filter = 'package(jcj-shell) & test(a_thousand_rows_draw_only_what_is_in_view)'
+threads-required = "num-test-threads"

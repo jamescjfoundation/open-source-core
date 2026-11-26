@@ -13,6 +13,9 @@
 # - `cargo deny --locked check` with the repository's `deny.toml`;
 # - a `rust-toolchain.toml` and a `Cargo.lock` at the root.
 #
+# One thing it tries and does without: `cargo xtask prune-target <lock file>`, which an app has
+# from core 0.1.21 on. An older app keeps a little stale build output until it moves.
+#
 # Built so nobody waits on it:
 #
 # - The gate is `cargo xtask ci`, the same command the pre-push hook runs, so CI confirms what
@@ -25,13 +28,30 @@
 #   for everything that depends on it. A changed file that a package's sources name (a design,
 #   a font, a fixture, a golden file, a page a test compares) counts as that package's.
 #   Manifests, the lock file or the toolchain changing means everything. When the change
-#   affects no package the job ends before it restores a build cache.
-# - Caches are restored everywhere but saved only from main, so they stay warm and small.
+#   affects no package the job ends before it restores any build output.
+# - The tests run under cargo-nextest where the calling repository's gate uses it (an app's
+#   does from core 0.1.21 on): every test program at once, not one after another.
+# - cargo-nextest and cargo-deny are downloaded as the release files their projects publish,
+#   and each file's checksum is checked against the one written below. Nothing is compiled to
+#   get a tool.
+#
+# What is kept between runs (README.md in this folder, "What CI keeps between runs"):
+#
+# - `cargo-home-<lock file>`: the crates and git repositories Cargo downloaded.
+# - `deps-<system>-<toolchain and settings>-<dependencies>`: the build output of the
+#   dependencies, and only theirs. A package built from a folder (the workspace's own) is
+#   built again on every run whatever is kept, because a fresh checkout is newer than any
+#   output; keeping it only made the archive several times larger.
+# - Both are saved from `main` only, and only when no archive with that exact name exists. A
+#   push that moves no dependency saves nothing. No name holds a commit, so pushes do not pile
+#   up archives.
+# - On `main`, a run that finds no archive for its dependencies builds everything, so that what
+#   it saves is whole.
 #
 # The `github` context here is the calling repository's: its code is checked out, its commit is
 # tested, its token is used. That token is read-only; the caller grants `contents: read` and
 # `actions: read` (to find the last run that passed) and this file asks for no more.
-# Only GitHub's own actions, pinned to full commit SHAs.
+# Only GitHub's own actions, pinned to full commit SHAs (`cargo xtask workflows` checks it).
 name: Shared CI
 
 on:
@@ -41,24 +61,26 @@ on:
         description: "Run clippy and every test, not only what changed"
         type: boolean
         default: false
-      nextest:
-        description: "Install cargo-nextest for the tests (a gate that uses it when present)"
-        type: boolean
-        default: false
 
 permissions:
   contents: read
 
+# A tool's version and the checksum of each file downloaded for it. Another workflow that
+# downloads the same tool names the same values (`cargo xtask workflows` checks it). To move to
+# a newer version: change the version, then each checksum, to the `sha256` the project's
+# release page shows for the file (`gh release view <tag> --repo <project> --json assets`).
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: "0"
   CARGO_NET_RETRY: "10"
   RUST_BACKTRACE: "short"
   CARGO_DENY_VERSION: "0.20.2"
+  CARGO_DENY_LINUX_SHA256: "9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f"
   CARGO_NEXTEST_VERSION: "0.9.152"
+  CARGO_NEXTEST_LINUX_SHA256: "d039b43c3e0958441b6ad0a39c8884d018b3d2e8fb9928f209074b1100b5e17a"
 
 jobs:
-  # Everything that needs no product build. About a minute.
+  # Everything that needs no product build. About half a minute.
   checks:
     name: checks (every task but clippy and test)
     runs-on: ubuntu-latest
@@ -103,15 +125,15 @@ jobs:
             ~/.cargo/git/db
           key: cargo-home-${{ hashFiles('Cargo.lock') }}
           restore-keys: cargo-home-
-      - name: Cached cargo-deny
-        id: deny-bin
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cargo/bin/cargo-deny
-          key: cargo-deny-${{ env.CARGO_DENY_VERSION }}-${{ hashFiles('rust-toolchain.toml') }}
-      - name: Install cargo-deny
-        if: steps.deny-bin.outputs.cache-hit != 'true'
-        run: cargo install --locked cargo-deny --version "$CARGO_DENY_VERSION"
+      - name: Install cargo-deny (the project's release file, checksum checked)
+        run: |
+          file="cargo-deny-$CARGO_DENY_VERSION-x86_64-unknown-linux-musl.tar.gz"
+          cd "$RUNNER_TEMP"
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location --retry 5 --output "$file" \
+            "https://github.com/EmbarkStudios/cargo-deny/releases/download/$CARGO_DENY_VERSION/$file"
+          echo "$CARGO_DENY_LINUX_SHA256  $file" | sha256sum --check --strict -
+          tar -xzf "$file" --strip-components=1 -C "$(dirname "$(command -v cargo)")" "${file%.tar.gz}/cargo-deny"
+          cargo deny --version
       - name: cargo deny check
         run: cargo deny --locked check
 
@@ -131,6 +153,7 @@ jobs:
       - name: Toolchain
         run: rustup show active-toolchain || rustup toolchain install
       - name: Restore cargo home
+        id: home
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -139,6 +162,36 @@ jobs:
             ~/.cargo/git/db
           key: cargo-home-${{ hashFiles('Cargo.lock') }}
           restore-keys: cargo-home-
+      - name: Name the dependencies' build output
+        id: name
+        env:
+          KIND: deps-${{ runner.os }}
+        run: |
+          # BEGIN same: name the build output
+          # What decides the build output of the dependencies, and nothing else: the toolchain,
+          # Cargo's settings, the locked packages that come from elsewhere (a package of the
+          # workspace has no `source` line), and the manifests without the workspace's own
+          # version. A change to the workspace's code, or a release that moves only its
+          # version, keeps the archive it has.
+          hash() { if command -v sha256sum >/dev/null; then sha256sum; else shasum -a 256; fi | cut -c1-32; }
+          settings=$(cat rust-toolchain.toml .cargo/config.toml | hash)
+          dependencies=$({
+            awk -v RS= '/\nsource = /' Cargo.lock
+            git ls-files -z -- '*Cargo.toml' ':(exclude)template/*' | xargs -0 grep -hv '^version = '
+          } | hash)
+          {
+            echo "key=$KIND-$settings-$dependencies"
+            echo "older=$KIND-$settings-"
+          } >> "$GITHUB_OUTPUT"
+          # END same: name the build output
+      # Asks only whether the archive exists; nothing is downloaded yet.
+      - name: Is build output kept for these dependencies?
+        id: kept
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: target
+          key: ${{ steps.name.outputs.key }}
+          lookup-only: true
       - name: What to check
         id: plan
         env:
@@ -146,6 +199,7 @@ jobs:
           EVENT: ${{ github.event_name }}
           PR_BASE: ${{ github.event.pull_request.base.sha }}
           FULL: ${{ inputs.full }}
+          KEPT: ${{ steps.kept.outputs.cache-hit }}
           # The calling workflow, as owner/repository/.github/workflows/<file>@<ref>.
           CALLER: ${{ github.workflow_ref }}
         run: |
@@ -166,10 +220,20 @@ jobs:
               if git merge-base --is-ancestor "$sha" HEAD 2>/dev/null; then base="$sha"; break; fi
             done
           fi
+          # What `main` saves is restored by every later run with these dependencies, so it
+          # must be the output of a whole build: a run of two packages would leave the rest out
+          # for good.
+          if [ -n "$base" ] && [ "$KEPT" != "true" ] && [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            echo "No build output is kept for these dependencies yet: checking everything, so that it can be saved whole"
+            base=""
+          fi
           if [ -z "$base" ]; then
-            echo "args=" >> "$GITHUB_OUTPUT"
-            echo "build=true" >> "$GITHUB_OUTPUT"
-            echo "No green base found, or a full run was asked for: checking everything"
+            {
+              echo "args="
+              echo "build=true"
+              echo "whole=true"
+            } >> "$GITHUB_OUTPUT"
+            echo "Checking everything"
             exit 0
           fi
           echo "Checking changes since $base"
@@ -178,6 +242,9 @@ jobs:
             exit 1
           fi
           echo "args=--changed --base $base" >> "$GITHUB_OUTPUT"
+          if [ "$affected" = "all" ]; then
+            echo "whole=true" >> "$GITHUB_OUTPUT"
+          fi
           if [ -n "$affected" ]; then
             echo "build=true" >> "$GITHUB_OUTPUT"
             echo "Affected: $affected"
@@ -185,23 +252,38 @@ jobs:
             echo "build=false" >> "$GITHUB_OUTPUT"
             echo "The change affects no package: nothing to build or test"
           fi
-      - name: Restore cargo home and target
+      # The archive for these dependencies, or else the newest one for this toolchain: after a
+      # dependency moves, most of the others are still as they were.
+      - name: Restore the dependencies' build output
+        id: deps
         if: steps.plan.outputs.build == 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: |
-            ~/.cargo/registry/index
-            ~/.cargo/registry/cache
-            ~/.cargo/git/db
-            ~/.cargo/bin/cargo-nextest
-            target
-          key: build-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}
-          restore-keys: |
-            build-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}-
-            build-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}-
-      - name: Install cargo-nextest
-        if: steps.plan.outputs.build == 'true' && inputs.nextest
-        run: command -v cargo-nextest || cargo install --locked cargo-nextest --version "$CARGO_NEXTEST_VERSION"
+          path: target
+          key: ${{ steps.name.outputs.key }}
+          restore-keys: ${{ steps.name.outputs.older }}
+      # Restored from another lock file: the output of every dependency that moved since, and of
+      # everything built on one, will never be read again. Without this it would be saved again
+      # with each new archive, for good.
+      - name: Drop the output of dependencies that moved
+        if: steps.plan.outputs.build == 'true' && steps.deps.outputs.cache-hit != 'true' && steps.deps.outputs.cache-matched-key != ''
+        run: |
+          if [ ! -f target/deps.lock ]; then
+            echo "The restored output does not say which lock file it was built from: starting from nothing"
+            rm -rf target
+          elif ! cargo xtask prune-target target/deps.lock; then
+            echo "::notice::Stale build output was not removed (the task is in an app's xtask from core 0.1.21 on). The build is right either way; the archive is larger than it need be."
+          fi
+      - name: Install cargo-nextest (the project's release file, checksum checked)
+        if: steps.plan.outputs.build == 'true'
+        run: |
+          file="cargo-nextest-$CARGO_NEXTEST_VERSION-x86_64-unknown-linux-gnu.tar.gz"
+          cd "$RUNNER_TEMP"
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location --retry 5 --output "$file" \
+            "https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-$CARGO_NEXTEST_VERSION/$file"
+          echo "$CARGO_NEXTEST_LINUX_SHA256  $file" | sha256sum --check --strict -
+          tar -xzf "$file" -C "$(dirname "$(command -v cargo)")"
+          cargo nextest --version
       - name: cargo xtask ci (clippy and tests)
         if: steps.plan.outputs.build == 'true'
         env:
@@ -210,29 +292,39 @@ jobs:
           # $ARGS is empty or `--changed --base <commit>`: unquoted so that it is split into words.
           # shellcheck disable=SC2086
           cargo xtask ci $ARGS --only clippy,test
-      # A run that built nothing restored no target folder, and must not save an empty one as
-      # the newest cache.
-      - name: Trim the target folder before saving
-        if: steps.plan.outputs.build == 'true' && github.ref == 'refs/heads/main'
-        run: rm -rf target/debug/incremental target/debug/examples target/nextest
-      - name: Save cargo home and target (main only)
-        if: steps.plan.outputs.build == 'true' && github.ref == 'refs/heads/main'
+      # Saved from main only, after a whole build, and only when these dependencies have no
+      # archive yet.
+      - name: Keep the dependencies' build output, not the workspace's own
+        id: trim
+        if: steps.plan.outputs.whole == 'true' && github.ref == 'refs/heads/main' && steps.deps.outputs.cache-hit != 'true'
+        env:
+          LOCK: Cargo.lock
+        run: |
+          # BEGIN same: keep the dependencies' output
+          # Every package built from a folder (the workspace's own, a linked checkout) is
+          # taken out, with the scratch folders of tests and tools: a fresh checkout is newer
+          # than any output of theirs, so they are built again whatever is kept.
+          cargo metadata --format-version 1 --locked \
+            | jq -r '.packages[] | select(.source == null) | "--package=\(.name)"' | tr -d '\r' \
+            | xargs -r cargo clean --locked
+          rm -rf target/tmp target/nextest target/xtask-sync target/template-check target/*/incremental target/*/examples
+          cp "$LOCK" target/deps.lock
+          du -sh target
+          # END same: keep the dependencies' output
+      - name: Save the dependencies' build output (main only)
+        if: steps.trim.outcome == 'success'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        continue-on-error: true # a run that could not save is still a run that passed
+        with:
+          path: target
+          key: ${{ steps.name.outputs.key }}
+      - name: Save cargo home (main only)
+        if: steps.plan.outputs.build == 'true' && github.ref == 'refs/heads/main' && steps.home.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        continue-on-error: true
         with:
           path: |
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             ~/.cargo/git/db
-            ~/.cargo/bin/cargo-nextest
-            target
-          key: build-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}
-      - name: Save cargo home for the other jobs (main only)
-        if: steps.plan.outputs.build == 'true' && github.ref == 'refs/heads/main'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        continue-on-error: true # already saved for this lock file
-        with:
-          path: |
-            ~/.cargo/registry/index
-            ~/.cargo/registry/cache
-            ~/.cargo/git/db
-          key: cargo-home-${{ hashFiles('Cargo.lock') }}
+          key: ${{ steps.home.outputs.cache-primary-key }}

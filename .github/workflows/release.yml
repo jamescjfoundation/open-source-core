@@ -1,51 +1,205 @@
-# A core release (decision 0011). A person or an agent pushes a `v*` tag once the full gate
-# (nightly.yml) has passed on the commit; CONTRIBUTING.md, "Releasing", has the steps. This
-# runs the full gate again on every platform, then publishes a GitHub release with the changelog
-# section, the vendored sources of every dependency and the third-party license texts.
+# A core release (decision 0011): the gate first, then the tag. A person or an agent starts this
+# for the release commit on `main` (`cargo xtask release <version>` makes that commit;
+# CONTRIBUTING.md, "Releasing", has the steps):
+#
+#   gh workflow run release.yml --ref main
+#
+# 1. `check`: the commit is on `main`, is a release commit (the version in Cargo.toml, the tags
+#    in template/Cargo.toml and the newest section of CHANGELOG.md agree, and that section says
+#    what apps must do), and is not released yet.
+# 2. `gate`: nightly.yml on that commit: the full gate on Linux, macOS and Windows, the minimum
+#    Rust version, cargo-deny, the app template, and every app in .github/apps.json built
+#    against the commit. When a run of nightly.yml has already passed on this very commit (the
+#    scheduled one, or one started by hand), that run is the gate and nothing is run twice.
+# 3. `publish`: only when the gate has passed, it makes the annotated tag `vX.Y.Z` on the commit
+#    and publishes the GitHub release with the changelog section, the vendored sources of every
+#    dependency and the third-party license texts.
+#
+# So the tag does not exist before the gate has passed, and a commit that fails gets none. A
+# pushed tag is never moved or deleted (apps pin it), so nothing here can take one back: that is
+# why the order matters. Nothing runs when a tag is pushed by hand; do not push one.
 name: Release
 
 on:
-  push:
-    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: "The release commit, on main. Empty: the newest commit of the branch this is started on."
+        type: string
+        default: ""
+      run-gate-again:
+        description: "Run the gate even when a run of it has already passed on the commit"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
+# One release at a time; a second one waits.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
+  check:
+    name: a release commit, and whether its gate has passed
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      commit: ${{ steps.commit.outputs.commit }}
+      version: ${{ steps.commit.outputs.version }}
+      gate: ${{ steps.recorded.outputs.gate }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.commit }}
+          persist-credentials: false
+          fetch-depth: 0 # to see that the commit is on main
+      - name: Toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Restore cargo home
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: cargo-home-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-home-
+      - name: A release commit of main, not released yet
+        id: commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Start this workflow on main (gh workflow run release.yml --ref main): it is main's copy of the workflow that releases."
+            exit 1
+          fi
+          commit=$(git rev-parse HEAD)
+          git fetch --quiet origin main
+          if ! git merge-base --is-ancestor "$commit" FETCH_HEAD; then
+            echo "::error::$commit is not a commit of main"
+            exit 1
+          fi
+          # Prints `version=X.Y.Z`, or says what stops this from being a release commit.
+          cargo xtask release --check | tee "$RUNNER_TEMP/check"
+          version=$(sed -n 's/^version=//p' "$RUNNER_TEMP/check")
+          tag="v$version"
+          # An annotated tag names a tag object; `^{}` is the commit behind it.
+          tagged=$(git ls-remote origin "refs/tags/$tag^{}" | cut -f1)
+          if [ -z "$tagged" ]; then tagged=$(git ls-remote origin "refs/tags/$tag" | cut -f1); fi
+          if [ -n "$tagged" ] && [ "$tagged" != "$commit" ]; then
+            echo "::error::$tag exists on $tagged, another commit. A tag is never moved: this commit needs the next version."
+            exit 1
+          fi
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::$tag is already released"
+            exit 1
+          fi
+          if [ -n "$tagged" ]; then
+            echo "::notice::$tag exists on this commit and has no release yet: the gate decides whether it gets one"
+          fi
+          {
+            echo "commit=$commit"
+            echo "version=$version"
+          } >> "$GITHUB_OUTPUT"
+      # The gate is nightly.yml. A run of it that passed on this commit ran the same file on the
+      # same code, so it is not run again. A run with a red app in it did not pass, unless the
+      # changelog of this commit goes ahead for that app with a reason.
+      - name: Has the gate already passed on this commit?
+        id: recorded
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT: ${{ steps.commit.outputs.commit }}
+          AGAIN: ${{ inputs.run-gate-again }}
+        run: |
+          gate="run"
+          if [ "$AGAIN" != "true" ]; then
+            url=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow nightly.yml --commit "$COMMIT" --status success \
+                  --limit 1 --json url --jq '.[0].url // empty') || url=""
+            if [ -n "$url" ]; then
+              gate="recorded"
+              echo "::notice::The gate has passed on $COMMIT and is not run again: $url"
+              echo "The gate passed on this commit before, and that run is used: $url" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+          echo "gate=$gate" >> "$GITHUB_OUTPUT"
+
   gate:
+    needs: check
+    if: needs.check.outputs.gate == 'run'
+    permissions:
+      contents: read
     uses: ./.github/workflows/nightly.yml
+    with:
+      ref: ${{ needs.check.outputs.commit }}
 
   publish:
-    needs: gate
+    name: tag and publish
+    needs: [check, gate]
+    # Only after the gate: a run of it in this workflow that passed, or one recorded earlier.
+    if: >-
+      !cancelled() && needs.check.result == 'success' &&
+      (needs.gate.result == 'success' || (needs.gate.result == 'skipped' && needs.check.outputs.gate == 'recorded'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: write
+    env:
+      COMMIT: ${{ needs.check.outputs.commit }}
+      VERSION: ${{ needs.check.outputs.version }}
+      TAG: v${{ needs.check.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.check.outputs.commit }}
           persist-credentials: false
       - name: Toolchain
         run: rustup show active-toolchain || rustup toolchain install
-      - name: Version matches the tag
+      - name: Restore cargo home
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: cargo-home-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-home-
+      # Everything the release carries is made before the tag, so that a failure here leaves no tag.
+      - name: Vendored sources, license texts and the release's text
         run: |
-          version=$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)
-          test "v$version" = "$GITHUB_REF_NAME" || { echo "Cargo.toml says $version, tag is $GITHUB_REF_NAME"; exit 1; }
-      - name: Vendored sources and license texts
-        run: |
-          cargo xtask vendor "dist/open-source-core-$GITHUB_REF_NAME-vendored-sources.tar.gz"
+          cargo xtask vendor "dist/open-source-core-$TAG-vendored-sources.tar.gz"
           cargo xtask third-party-licenses dist/THIRD-PARTY-LICENSES.txt
           (cd dist && sha256sum ./*.tar.gz THIRD-PARTY-LICENSES.txt > SHA256SUMS.txt)
-      - name: Release notes from CHANGELOG.md
-        run: |
-          awk -v v="${GITHUB_REF_NAME#v}" '
-            $0 ~ "^## " { if (on) exit; if (index($0, v)) { on=1; next } }
-            on { print }' CHANGELOG.md > dist/notes.md
-          test -s dist/notes.md || { echo "CHANGELOG.md has no section for $GITHUB_REF_NAME"; exit 1; }
-      - name: Publish
+          cargo xtask release --notes > dist/notes.md
+      # An annotated tag, made through the API by this run's own token: a tag object that names
+      # the commit, then the ref that names the object. Run again after a failure further down,
+      # it finds the tag it made and goes on.
+      - name: Tag the commit
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "open-source-core $GITHUB_REF_NAME" \
+          tagged=$(git ls-remote origin "refs/tags/$TAG^{}" | cut -f1)
+          if [ -z "$tagged" ]; then tagged=$(git ls-remote origin "refs/tags/$TAG" | cut -f1); fi
+          if [ "$tagged" = "$COMMIT" ]; then
+            echo "$TAG is already on $COMMIT"
+            exit 0
+          fi
+          if [ -n "$tagged" ]; then
+            echo "::error::$TAG exists on $tagged, another commit"
+            exit 1
+          fi
+          object=$(gh api "repos/$GITHUB_REPOSITORY/git/tags" --raw-field tag="$TAG" --raw-field message="open-source-core $VERSION" \
+                   --raw-field object="$COMMIT" --raw-field type=commit --jq '.sha')
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" --raw-field ref="refs/tags/$TAG" --raw-field sha="$object" --silent
+          echo "Tagged $COMMIT as $TAG" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "open-source-core $TAG" \
             --notes-file dist/notes.md \
             dist/open-source-core-*-vendored-sources.tar.gz dist/THIRD-PARTY-LICENSES.txt dist/SHA256SUMS.txt

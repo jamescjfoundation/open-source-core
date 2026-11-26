@@ -6,11 +6,11 @@ Decision 0003. GitHub-hosted runners only; built so nobody waits on CI.
 
 | Workflow | When | What |
 | --- | --- | --- |
-| `ci.yml` | Every push to `main` and every pull request, a change to Markdown alone included | Calls `shared-ci.yml` from the same commit. Three jobs in parallel: **checks** (every task of the gate but clippy and test: fmt, crate roots, layers, pins, template, docs, privacy of every file and commit identity, licenses; no product build), **deny** (cargo-deny), **build** (clippy and tests for the packages changed since the last green commit on `main`, and their dependents; it ends at once when the change affects no package). A newer push cancels an older run; nothing is skipped, because the base is the last *green* commit. |
-| `nightly.yml` | Daily, on demand, and before a release | The full gate on Linux, macOS and Windows; the minimum Rust version; cargo-deny with today's advisories; the app template built against this checkout. |
+| `ci.yml` | Every push to `main` and every pull request, a change to Markdown alone included | Calls `shared-ci.yml` from the same commit. Three jobs in parallel: **checks** (every task of the gate but clippy and test: fmt, crate roots, layers, pins, template, workflows, docs, privacy of every file and commit identity, licenses; no product build), **deny** (cargo-deny), **build** (clippy and tests for the packages changed since the last green commit on `main`, and their dependents; it ends at once when the change affects no package). A newer push cancels an older run; nothing is skipped, because the base is the last *green* commit. |
+| `nightly.yml` | Daily, on demand, and as the gate of a release | The full gate on Linux, macOS and Windows; the minimum Rust version; cargo-deny with today's advisories; the app template built against this checkout; and each app in `.github/apps.json` built against this checkout with its own gate ("The apps, built against a core commit" below). |
 | `nightly-failed.yml` | When a scheduled `nightly.yml` run has failed | Opens the issue "Nightly run failed", or adds a comment to the open one. A run started by hand or by a release is not reported: someone is watching it. |
 | `upstream-train.yml` | Every other Monday | Opens an issue with the train checklist when WordCraft has a newer release than the pin (`cargo xtask upstream-status`). |
-| `release.yml` | Pushing a `v*` tag, which a person or an agent does once the nightly run has passed on that commit (decision 0011) | The nightly run again, a check that the tag is `Cargo.toml`'s version and that `CHANGELOG.md` has its section, then a GitHub release with the changelog section, vendored sources, third-party licenses and checksums. |
+| `release.yml` | Started by a person or an agent for a release commit on `main` (decision 0011): `gh workflow run release.yml --ref main` | Checks that the commit is a release commit and not released yet; runs `nightly.yml` on it, unless a run of it has already passed on that commit; and only then makes the annotated tag and the GitHub release, with the changelog section, vendored sources, third-party licenses and checksums ("A release" below). |
 
 ## The shared workflows, which every app calls
 
@@ -69,6 +69,14 @@ every core release from 0.1.19 on gives an app:
 - `cargo xtask core-pin --max-behind <n>`, which prints `pinned=`, `newest=` and `behind=` lines;
 - `cargo deny --locked check`, a `rust-toolchain.toml` and a `Cargo.lock` at the root.
 
+It may also try something a newer core gives and do without it where it is missing, as long as
+the run is right either way. There is one such thing: `cargo xtask prune-target <lock file>`
+(from 0.1.21), which removes stale build output after a dependency moved. An app on an older
+core keeps that output, a few hundred megabytes at most, until it moves.
+
+The tests run under cargo-nextest where the app's gate uses it, which is from 0.1.21 on. The
+workflow puts the program there for every app; an older gate does not look for it.
+
 A change that needs more than this (a new task, a new flag, a new file in the app) does not go
 to `workflows-v1`. It gets a new tag, `workflows-v2`: the release that brings what the workflow
 needs also changes the two files under `template/.github/workflows/` to name the new tag, and
@@ -88,27 +96,176 @@ gh workflow list --all --repo jamescjfoundation/<repository>    # shows it as di
 gh workflow enable core-pin.yml --repo jamescjfoundation/<repository>
 ```
 
-## Before a release
+## The apps, built against a core commit
 
-`nightly.yml` is started by hand on the release commit (`gh workflow run nightly.yml --ref main`)
-and the tag is pushed only when it is green. Nothing enforces that order yet; the steps are in
-`CONTRIBUTING.md`, "Releasing".
+"A patch release never breaks an app" (decision 0011) is checked, not hoped for. The job
+`apps` of `nightly.yml` runs once for each repository in `.github/apps.json`, on Linux:
+
+1. It checks out the core at the commit under test, and the app at the newest commit of its
+   `main` that passed the app's own CI (the newest commit of `main` when none is found). An app
+   whose `main` is red for a reason of its own therefore does not stop a core release.
+2. In the app: `cargo xtask dev-link <the core checkout>`, the app's own task, which changes no
+   file Git tracks; then `cargo xtask sync`, which takes the core checkout's shared files, as
+   the app will when it moves to the release.
+3. `cargo xtask ci --linked`: the app's whole gate against the core commit. Its checks, clippy,
+   and every test, golden files included. A golden file that differs is a failure of that app.
+
+What a green job shows: the app, as it is on its `main`, builds and passes its gate with this
+core in place of the release it pins, after nothing more than the pin move and `sync`.
+
+What it cannot show, and says in the run's summary:
+
+- **An app that builds on another app's crates** (decision 0015) takes them at the tag it
+  names. Those crates are built against this core too, because the link replaces the core for
+  the whole build, whatever core that tag was cut on. The other app's `main`, from which its
+  next tag will be cut, is not tried with this one: that is between the two apps, and the
+  provider's own row tries the provider.
+- macOS and Windows: an app's gate runs on Linux here, as in the app's own CI.
+- An app on a core older than 0.1.20 has no link that leaves its files alone and no
+  `ci --linked`. Its job fails and says so; the app moves first.
+- The app after a step that "What apps must do" asks beyond the pin move and `sync`. A release
+  that asks for one may leave an app red on purpose; see the next section.
+
+To add or remove an app, edit `.github/apps.json`: the `apps` list holds each repository as
+`"owner/name"`. It must be public; the job reads it with no token of its own.
+`cargo xtask workflows` checks that the file can be read.
+
+### When an app is red
+
+A red app fails the nightly run and stops a release. Fix the core. When the core is right and
+the app is the one that must change (a minor release that breaks on purpose, an output that
+changes on purpose and a golden file that must follow), whoever cuts the release goes ahead by
+writing the reason where every app's maintainer will read it: the newest section of
+`CHANGELOG.md`, `## Unreleased` or the release's own, carries one line for each such app, on a
+line of its own or as an item of a list:
+
+```text
+**App gate override, <owner>/<repository>:** <the reason, a sentence or more>
+```
+
+For example: `**App gate override, example/some-app:** the EPUB writer now marks notes as a
+list; the app updates its golden file when it moves.` The job then passes with a warning that
+shows the reason, and the line is part of the release's text. A line names one app; no line
+covers them all. The reason says what the app must do; it is not an apology.
+`cargo xtask release --override <owner>/<repository>` prints the reason the checkout gives for
+an app, and fails when it gives none.
+
+## A release
+
+The steps a person or an agent follows are in `CONTRIBUTING.md`, "Releasing". What the
+workflows hold:
+
+- **The gate runs before the tag exists.** `release.yml` is started for the release commit. Its
+  `check` job refuses a commit that is not on `main`, is not a release commit
+  (`cargo xtask release --check`: the version in `Cargo.toml`, the tags in
+  `template/Cargo.toml` and the newest section of `CHANGELOG.md` agree, and the section says
+  what apps must do), or is released already. Its `gate` job is `nightly.yml` on that commit.
+  Its `publish` job needs the gate, and is the only thing that makes the tag.
+- **Linux, macOS and Windows pass before every release**, a patch release included, with the
+  minimum Rust version, cargo-deny, the template and the apps.
+- **The gate runs once for a commit.** When a run of `nightly.yml` has already passed on the
+  very commit (the scheduled run, or one started by hand), `check` finds it and `gate` is
+  skipped: the same workflow file ran on the same code. `run-gate-again` runs it anyway. When
+  only `publish` failed, run the failed job again (`gh run rerun <run> --failed`): the gate's
+  result is kept, and the step that tags finds a tag it already made.
+- **The tag is annotated and made by the run's own token**, through the API, with
+  `contents: write` in that one job. The repository's rule for `v*` tags lets anyone with
+  write access create one and nobody move or delete one.
+- **Nothing runs when a tag is pushed by hand.** Such a tag would get no release and no gate,
+  and it cannot be taken back. The rule is not to push one; what would make it impossible is a
+  repository rule that lets only this workflow create `v*` tags, which is a setting, not a
+  file.
+
+## What CI keeps between runs
+
+GitHub keeps 10 GB of cache for a repository and drops what was used longest ago. So every
+archive here is one a later run will read, and none is saved twice.
+
+| Archive | Holds | Saved |
+| --- | --- | --- |
+| `cargo-home-<lock file>` | The crates and git repositories Cargo downloaded | By a build on `main`, when the lock file has none yet |
+| `deps-<system>-<toolchain and settings>-<dependencies>` | `target/`, with the build output of the dependencies only | By `ci.yml` (Linux) and `nightly.yml` (Linux, macOS, Windows) on `main`, when these dependencies have none yet |
+| `msrv-<version>-...`, `app-<owner>/<name>-...` | The same, for the build on the minimum Rust version and for each app built against the core | By `nightly.yml` on `main`, likewise |
+
+- **Dependencies only.** Cargo builds a package that comes from a folder again whenever its
+  files are newer than its output, and a fresh checkout is always newer. So the workspace's own
+  packages were rebuilt on every run whatever was kept; keeping them only made the archive
+  several times larger and slower to move. Before an archive is saved, every package built from
+  a folder is taken out of `target/` (`cargo clean --package`), with the tests' scratch folders.
+- **The name says what the content depends on**, and nothing else: the toolchain, Cargo's
+  settings, the locked packages that come from elsewhere, and the manifests without the
+  workspace's own version. No commit is in it. A push that moves no dependency finds the
+  archive and saves nothing; a release of the workspace itself, which moves only its version,
+  keeps its archive too.
+- **Saved from `main` only**, and never from a tag or a pull request, whose archives no other
+  run could read. A release runs on `main` and restores what `main` saved.
+- **Saved whole.** On `main`, a run that finds no archive for its dependencies builds
+  everything, not only what changed, so that what it saves serves every later run.
+- **After a dependency moves**, the run starts from the newest archive of the same toolchain,
+  and first removes the output of every package that moved and of everything built on one
+  (`cargo xtask prune-target`, from the copy of the lock file kept inside the archive). Most of
+  the output is still good, and what is not would otherwise be saved again for good.
+- The full gate on Linux and `ci.yml` build the same things and share one archive. The
+  template job restores it and saves nothing.
+
+To see what a repository keeps and what a run cost:
+
+```sh
+gh api repos/jamescjfoundation/<repository>/actions/cache/usage
+gh api "repos/jamescjfoundation/<repository>/actions/caches?per_page=100" \
+  --jq '.actions_caches[] | "\(.size_in_bytes / 1048576 | floor) MB  \(.ref)  \(.key)"'
+gh run list --repo jamescjfoundation/<repository> --workflow ci.yml --limit 10
+gh run view <run> --repo jamescjfoundation/<repository> --json jobs \
+  --jq '.jobs[] | .name, (.steps[] | "  \(.name): \(.startedAt) to \(.completedAt)")'
+```
+
+## Tools the workflows download
+
+cargo-nextest and cargo-deny are not compiled in CI. Each is downloaded as the file its project
+publishes with a release, and the file's SHA-256 checksum is checked against the one written in
+the workflow's `env`, so a file that changed after we chose it is refused. The organisation
+allows only GitHub's own actions, each named by a full commit; `cargo xtask workflows` checks
+that, and that `shared-ci.yml` and `nightly.yml` name the same version and checksums.
+
+To move to a newer version, change the version and each checksum in both files:
+
+```sh
+gh release view cargo-nextest-<version> --repo nextest-rs/nextest --json assets \
+  --jq '.assets[] | select(.name | endswith(".tar.gz")) | "\(.digest)  \(.name)"'
+gh release view <version> --repo EmbarkStudios/cargo-deny --json assets \
+  --jq '.assets[] | select(.name | endswith(".tar.gz")) | "\(.digest)  \(.name)"'
+```
+
+A change to `shared-ci.yml` reaches the apps when `workflows-v1` is moved.
 
 ## Why it rarely makes anyone wait
 
 1. **The same gate runs locally first.** `cargo xtask install-hooks` makes `git push` run
    `cargo xtask ci --changed` against what the remote has. CI repeats a check that already passed.
    A clone or worktree without the hooks is told so each time `cargo xtask ci` runs there.
-2. **Only what changed is built and tested on pushes**, with a warm cache saved from `main`.
+2. **Only what changed is built and tested on pushes**, on top of the dependencies' build output
+   kept from `main`.
    A changed file belongs to the package whose folder holds it and to every package whose
    sources name it: a design or a font under `assets/`, a fixture or a golden file under
    `tests/`, a page of `docs/` that a test compares. A file under the root `assets/` or `tests/`
    that no package names means everything, and so do manifests, the lock file and the toolchain
    (`template/xtask/src/changed.rs`; `cargo xtask affected` says what a change affects, and why).
-3. **Cheap checks finish in about a minute**, in parallel with the build, so the common mistakes
-   (format, layers, privacy, licenses) report first. They run for every change, Markdown
-   included: the marked blocks and the links live in Markdown.
-4. **The slow, wide checks run on a schedule**, not on every push.
+3. **Every test still runs, and the test programs run at once.** The `test` task uses
+   cargo-nextest when it is installed, in CI and on a laptop alike: each test in a process of
+   its own, as many at a time as the machine has cores. `cargo test` runs one test program after
+   another, which is most of the wait in a repository with long end-to-end tests. The tests in
+   documentation, which cargo-nextest does not run, follow with `cargo test --doc`. Without
+   cargo-nextest the task runs `cargo test`, and says which of the two ran. A test that asserts
+   a time needs the machine to itself: the repository says so in its own `.config/nextest.toml`
+   (`threads-required = "num-test-threads"` for that test), and cargo-nextest runs nothing
+   beside it.
+4. **Cheap checks finish in about half a minute**, in parallel with the build, so the common
+   mistakes (format, layers, privacy, licenses) report first. They run for every change,
+   Markdown included: the marked blocks and the links live in Markdown.
+5. **The slow, wide checks run on a schedule**, not on every push.
 
 Run any job's work locally: `cargo xtask ci`, `cargo xtask ci --changed --base <ref>`,
-`cargo xtask deny`, `cargo xtask template-check`.
+`cargo xtask deny`, `cargo xtask template-check`. For the apps job, in a checkout of the app:
+`cargo xtask dev-link <this checkout>`, `cargo xtask sync`, `cargo xtask ci --linked`. Afterwards
+`cargo xtask dev-unlink`, and put back the shared files `sync` wrote from this checkout
+(`git status` in the app lists them).

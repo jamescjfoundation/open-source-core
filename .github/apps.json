@@ -1,0 +1,8 @@
+{
+  "about": "The app repositories built against a core commit, each with its own gate: every night, and before a core release (nightly.yml, job 'apps'). An app is a repository built on open-source-core whose main branch is public.",
+  "apps": [
+    "jamescjfoundation/wordsmith-script",
+    "jamescjfoundation/wordsmith-manuscript",
+    "jamescjfoundation/wordsmith-book"
+  ]
+}

@@ -1,7 +1,7 @@
 # 0011: Core releases and versioning
 
 Date: 2026-11-24 · Status: accepted · Amended 2026-11-26 (who cuts a release; how far behind an
-app may be)
+app may be; the gate before the tag, and the apps in the gate)
 
 ## Decision
 
@@ -17,9 +17,23 @@ app may be)
   releases behind the newest.
 - **A release is cut by a person or an agent once the full gate has passed on the commit**:
   `cargo xtask ci` (full), cargo-deny and the cross-platform run. This holds for patch and minor
-  releases alike. No release is cut on a commit whose gate has not passed. Pushing a `v*` tag runs
-  the release workflow, which re-runs the gate, attaches the vendored sources and the third-party
-  license texts, and publishes the GitHub release with the changelog section.
+  releases alike. No release is cut on a commit whose gate has not passed.
+- **The gate runs before the tag exists, and the workflow makes the tag** (amended 2026-11-26).
+  `cargo xtask release <version>` makes the release commit. The release workflow is started
+  for that commit of `main`; it runs the gate, and only when the gate has passed does it make
+  the annotated tag, attach the vendored sources and the third-party license texts, and
+  publish the GitHub release with the changelog section. Nobody pushes a `v*` tag by hand.
+- **The gate of a release** (amended 2026-11-26) is the full gate on Linux, macOS and Windows,
+  the minimum Rust version, cargo-deny, the app template, and each app in `.github/apps.json`
+  built against the commit with the app's own gate. All three systems pass before every
+  release, a patch release included. The gate runs once for a commit: a run of it that has
+  already passed on the very commit is used and not repeated.
+- **A red app stops a release** (amended 2026-11-26). An app that does not build, or does not
+  pass its own gate, against the commit fails the gate; a golden file of the app that differs
+  is such a failure. Whoever cuts the release may go ahead by writing the reason in the
+  release's changelog section, one line for each such app:
+  `**App gate override, <owner>/<repository>:** <the reason>`. The workflow reads that line
+  and nothing else lets a red app through.
 - **Changes that alter what users see in other apps** sit behind an option (a shell setting or a
   Cargo feature) that defaults to the old behavior until every app has turned it on (plan, "Step
   3").
@@ -34,6 +48,26 @@ app may be)
   day it was broken within hours and nothing checked it. A rule tied to the moments that matter
   (starting work, releasing) can be kept, and a check that opens an issue makes drift visible
   without turning an app's CI red for a release it does not need yet.
+
+## Why the gate comes before the tag, and holds the apps (2026-11-26)
+
+- The release workflow used to start when a tag was pushed and ran the gate then. The order
+  "gate first" was kept by hand: a run started by hand, a wait, then a tag made by hand. A tag
+  is never moved or deleted, because apps pin it, so a tag pushed too early could not be taken
+  back, and an app could pin it even when the gate then failed. The only place where "no tag
+  on a commit that failed" can be held is the step that makes the tag, so the workflow makes
+  it. The same commit was also checked twice, once before the tag and once after.
+- "A patch release never breaks an app" rested on review and on an empty template app. The
+  break showed when an app moved its pin, after the tag, and the fix was another release.
+  Building each app against the commit, with the app's own gate, shows it while the fix is
+  still an ordinary commit. An app's golden files count: when the core changes what an app
+  writes, either the core is wrong or the app must be told, and the changelog is where apps
+  are told. That is why the way past a red app is a line in the changelog and not a switch on
+  the workflow: the reason is then in the release's own text.
+- Considered and not chosen: macOS and Windows only for minor releases (a patch that breaks one
+  system would reach every app before the nightly run saw it); a person's approval before the
+  tag (the first rule of this record, dropped for the reasons above); building the apps on
+  macOS and Windows too (three times the cost for what an app's own release build checks).
 
 ## Revisit when
 

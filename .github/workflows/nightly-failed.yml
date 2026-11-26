@@ -2,7 +2,7 @@
 # is sent to. This opens an issue for it, or adds a comment to the one already open, so the
 # failure is in the place where work is picked up (decision 0003).
 #
-# Only scheduled runs: someone who starts Nightly by hand, or pushes a release tag, is watching
+# Only scheduled runs: someone who starts Nightly by hand, or starts a release, is watching
 # that run. Starting this workflow by hand opens the issue for the newest Nightly run whatever
 # its result, to try the workflow out; close that issue afterwards.
 #
@@ -44,7 +44,7 @@ jobs:
           fi
           text="The scheduled Nightly run failed on commit $RUN_SHA: $RUN_URL
 
-          It is the full gate on Linux, macOS and Windows, the minimum Rust version, cargo-deny with the day's advisories and the app template. A release is cut only on a commit where it passes (decision 0011). Fix the cause on \`main\`, or re-run the failed jobs when a runner or the network was at fault, and close this issue when a Nightly run is green again."
+          It is the full gate on Linux, macOS and Windows, the minimum Rust version, cargo-deny with the day's advisories, the app template, and each app in \`.github/apps.json\` built against the commit with its own gate. A release is cut only on a commit where it passes (decision 0011). Fix the cause on \`main\`, or re-run the failed jobs when a runner or the network was at fault, and close this issue when a Nightly run is green again. A job named after an app failed: the run's summary says which commit of the app was built; when the core is right and the app must change, the changelog says so (\`.github/workflows/README.md\`, \"When an app is red\")."
           # Every open issue (the list also holds pull requests), not a search: a search can lag.
           open=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues?state=open&per_page=100" \
                  --jq '.[] | select(.pull_request == null) | "\(.number) \(.title)"' \
