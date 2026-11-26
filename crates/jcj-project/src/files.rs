@@ -38,7 +38,7 @@ fn check_read(path: &Path) -> Result<()> {
     file_access::check_read(&shown(path)).map_err(Error::Refused)
 }
 
-fn check_write(path: &Path) -> Result<()> {
+pub(crate) fn check_write(path: &Path) -> Result<()> {
     file_access::check_write(&shown(path)).map_err(Error::Refused)
 }
 
@@ -220,9 +220,16 @@ pub fn backups_of(dir: &Path, saved: &Path) -> Vec<PathBuf> {
 /// Copy the file just saved at `saved` into `dir` as a dated backup, then remove the oldest
 /// backups of the same file beyond `keep` (1 to [`MAX_BACKUPS`]). Returns the new backup's path.
 pub fn backup(saved: &Path, dir: &Path, keep: usize, at: SystemTime) -> Result<PathBuf> {
+    let bytes = read_bounded(saved, Limits::default().max_file)?;
+    backup_bytes(&bytes, saved, dir, keep, at)
+}
+
+/// [`backup`] of bytes that are not a file yet (a packed copy of a project folder): write
+/// `bytes` into `dir` as a dated backup named after the file `saved`, its name and extension,
+/// then remove the oldest backups of the same name beyond `keep`.
+pub fn backup_bytes(bytes: &[u8], saved: &Path, dir: &Path, keep: usize, at: SystemTime) -> Result<PathBuf> {
     let keep = keep.clamp(1, MAX_BACKUPS);
     let (stem, ext) = backup_parts(saved);
-    let bytes = read_bounded(saved, Limits::default().max_file)?;
     check_write(dir)?;
     std::fs::create_dir_all(dir).map_err(io(dir))?;
     let base = format!("{stem} {}", stamp(at));
@@ -231,7 +238,7 @@ pub fn backup(saved: &Path, dir: &Path, keep: usize, at: SystemTime) -> Result<P
         let name = if n == 0 { format!("{base}{ext}") } else { format!("{base} {}{ext}", n + 1) };
         let path = dir.join(name);
         check_write(&path)?;
-        match jcj_upstream::atomic::write_new(&path, &bytes) {
+        match jcj_upstream::atomic::write_new(&path, bytes) {
             Ok(()) => {
                 written = Some(path);
                 break;

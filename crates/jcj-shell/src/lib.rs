@@ -18,7 +18,11 @@
 //! - auto-save's schedule, with the app's save ([`autosave`]); updates from the app's GitHub
 //!   releases ([`updates`]);
 //! - generic icons ([`icons`]) and an offscreen renderer for pictures and visual checks
-//!   ([`snapshot`]).
+//!   ([`snapshot`]);
+//! - the app's start-up on the desktop, from its data: the window with its title, app id and
+//!   icon, the settings folder, preferences read and kept current, the update check with its
+//!   close and its helper, the file dialogs, the question before closing, and files named on
+//!   the command line ([`desktop`]). With the `window` feature it opens the window too.
 //!
 //! Every control runs a command by id. The shell's own commands start with `shell.`; the rest go
 //! to [`App::run`] once the frame is drawn.
@@ -31,6 +35,8 @@ pub mod autosave;
 pub mod backstage;
 mod chrome;
 pub mod commands;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod desktop;
 pub mod dialogs;
 pub mod files;
 pub mod i18n;

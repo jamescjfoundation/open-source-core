@@ -51,6 +51,78 @@ minor release may, and then **What apps must do** says exactly what (decision 00
   checksums; a script two workflows must run alike is the same text in both; and
   `.github/apps.json` can be read.
 
+- **An app's whole start-up, from its data: `jcj_shell::desktop`** (decision 0014, amended; core
+  issue #46). Three apps each wrote the code that opens the window, and each copy left out a
+  step another had: the close that starts an installed update and its helper at the end; a
+  file whose name is not Unicode; the shell's file dialogs; coming back to write a preference
+  that waited. The steps are now the core's, and an app's `main` can be one call.
+  - `Desktop` is the app's data: its name, machine name, window app id and version, its brand,
+    where its releases are (`Releases`), a variable that names another settings folder, and
+    the window's first size. `Desktop::new(...)` fills the rest, so a field added later needs
+    no edit in an app.
+  - `DesktopApp` is what only the app can do, each with a default but its preferences:
+    `apply_prefs`, `prefs`, `open` (the files it was started with), `report` (where a problem
+    with the preferences is shown), `may_close` and `close_confirmed` (the question before a
+    window with unsaved work closes), `tick`, `window_title` and `exit`.
+  - `desktop::Window` is the window's state and the steps of a frame (`logic`, `ui`) and of
+    the end (`exit`). It needs no window toolkit, so a test drives it; dropping it ends it.
+  - With the crate's new `window` feature, `Desktop::main` is the whole `main` of an app and
+    `Desktop::run` is the same for an app that reads its own command line first. The feature
+    brings in eframe and is off by default: an app that keeps its own start-up builds exactly
+    as before, with nothing new compiled.
+  - `prefs::Contents` lets the start-up work with any app's preferences file, the usual
+    `Prefs<A>` or an app's own struct; `prefs::NoPrefs` is for an app with none of its own.
+  - `desktop::arguments` and `files_named` give the files named on the command line as the
+    system wrote them.
+- **The updater's helper has its entry point** (core issue #36). On Windows the updater
+  finishes an update by starting a copy of the app with `--finish-update`.
+  `ReleaseSource::finish_update(args)` does that work, and `Desktop::finish_update()` is the
+  call for the top of `main`: `Some(exit code)` when the process was the helper, so the app
+  returns without a window. `Desktop::main` and `Desktop::run` make the call themselves.
+  `updates::desktop::is_finish_update` and `FINISH_FLAG` say how the start is told apart.
+- **Brand loading: `jcj_theme::brand`** (decision 0014, amended; core issue #46). The brand
+  stays the app's; what three apps each wrote around it is the core's.
+  - `Brand::new(tokens_json, icon_png)`: `tokens()` (the neutral set when the file does not
+    read, so a window always opens), `read_tokens()` (the error, for the app's test),
+    `section::<T>(name)` (the app's own part of the tokens file), `icon()` (the window's icon)
+    and `apply(ctx, mode)` (fonts and theme in a context the shell does not manage).
+  - `Mask::new(key, png)` paints a mark from a white mask in any color, with its texture made
+    once for each context.
+  - `brand::contrast`, `luminance`, `hue` and `hue_distance` are the WCAG figures a brand's
+    tests hold its colors to; `brand::ico_sizes` reads the sizes in a Windows icon file;
+    `brand::decode_png` decodes a PNG within a size bound.
+- **A project as a folder of plain files: `jcj_project::folder`** (decision 0018; decision
+  0009, amended; core issue #45). The standard for an app's project is now a folder of plain
+  files, which two apps had each built for themselves; the single-file container stays for a
+  document that is one file. `crates/jcj-project/FOLDER.md` is the specification.
+  - `Format` describes one app's folder as data: the manifest and its schema, the files
+    written last, which paths belong, the packed form's `mimetype` and extension, the endings
+    stored uncompressed, whether conflict copies are kept, the `Limits`.
+  - `Folder::open` refuses a folder without the manifest and a project saved by a newer
+    version. The app reads through `Source`, which a `Folder` and files in memory (`Memory`)
+    both are, so one reader serves the folder, a packed project and a recovery copy.
+  - `Folder::save` writes only what changed, each file atomically, the manifest last, and
+    removes what the app no longer renders; text the app read and did not change is never
+    rewritten. `Folder::outside_changes` finds files changed elsewhere, and a save keeps a copy
+    of one before writing over it. `Sink` and `Disk` let a test fail a save part way.
+  - `pack`, `pack_folder`, `folder_files`, `unpack` and `unpack_into`: the folder as one file,
+    the same bytes for the same files, read back within limits.
+  - `write_recovery`, `recovered`, `discard_recovery`, `recovery_path` and
+    `Folder::save_safely`: unsaved work kept inside the folder and found after a crash.
+  - `backup`, `backup_packed` and `backups`: dated packed copies, the oldest removed.
+  - `schema_of`, `read_manifest`, `toml_nesting` and `plain_path`: the checks on a manifest
+    and on a path, for an app's own code.
+  - `files::backup_bytes` is `files::backup` for bytes that are not a file yet.
+  `jcj-project` now depends on `toml`.
+- **The app template starts whole.** `template/apps/app/src/main.rs` is its data and a
+  `DesktopApp`, with `DESKTOP.main(...)` for its `main`. `template/apps/app/build.rs` embeds
+  the Windows icon and reads the program's name, company and copyright from
+  `[package.metadata.winresource]` in the package's `Cargo.toml`, so the script is the same in
+  every app.
+- `core-testbed` opens its window through `jcj_shell::desktop`, with a brand of its own loaded
+  through `jcj_theme::brand` and a preferences file; its self-test has a `folder` step that
+  uses every part of the folder layer; and it makes the updater's call first in `main`.
+
 ### Changed
 
 - **What the shared CI workflow keeps between runs** (decision 0003, amended;
@@ -77,6 +149,8 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 - In the core: `release.yml` no longer starts when a `v*` tag is pushed.
 
 ### What apps must do
+
+**The gate and CI.**
 
 1. Move every `jcj-` dependency to this release's tag, then run
    `cargo metadata --format-version 1 >/dev/null` to bring `Cargo.lock` in line.
@@ -117,6 +191,30 @@ keeps running its tests with `cargo test` until it moves here. After the tag has
 first run on an app's `main` builds everything once from nothing, because the archives have new
 names; `gh workflow run ci.yml --repo <owner>/<app> -f full=true` starts that run by hand, so
 that it is nobody's push that waits for it.
+
+**Start-up, brand loading and folder projects.**
+
+**The start-up, brand loading and folder projects.** Nothing is required, and nothing an app
+does today changes: every item above is new, and the start-up is behind a feature that is
+off. What an app may switch to, when it chooses:
+
+- **Its start-up.** Give `jcj-shell` the feature (`features = ["window"]`), put the app's data
+  in a `Desktop`, implement `DesktopApp` for the type that implements `App`, and make `main`
+  `DESKTOP.main(|start| ...)`, or `DESKTOP.finish_update()` first and `DESKTOP.run(files, ...)`
+  after the app's own command line. The app's own `eframe::App`, its preferences plumbing,
+  its icon decoding and its `eframe` dependency go. What changes for a user is what the app's
+  copy left out: see core issue #46 for each app.
+- **The updater's call**, for an app that keeps its own start-up: first thing in `main`,
+  `if let Some(done) = RELEASES.finish_update(&args) { ... return }`, with the arguments
+  without the program's name. Without it an update cannot finish in place on Windows.
+- **Its brand.** `Brand::new(include_str!(...), include_bytes!(...))` in place of the app's
+  own token reading and icon decoding; `Mask` in place of its own mask texture;
+  `brand::contrast` in place of the helpers in its tests.
+- **Its build script.** The template's `build.rs`, with the four names moved to
+  `[package.metadata.winresource]`.
+- **Its project folder.** Decision 0018 lists, for each of the two apps that have one, what
+  moves to `jcj_project::folder` and what stays; neither app's files on disk nor its packed
+  form change.
 
 ## 0.1.20 (2026-11-26)
 

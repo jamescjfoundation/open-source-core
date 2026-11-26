@@ -29,6 +29,10 @@
 //! total read and the number of documents, assets and snapshots are bounded ([`Limits`]), and
 //! damage is an [`Error`], never a panic.
 //!
+//! An app whose project is a folder of plain files uses [`folder`] instead of the container:
+//! the same atomic saves, limits, recovery and backups for a folder the user can read, with a
+//! packed form for sending it as one file (decision 0018).
+//!
 //! On disk ([`files`]): saves go through craft-atomic, so a failed or interrupted save leaves the
 //! old file whole; [`files::backup`] keeps rotating, dated copies; [`files::write_recovery`] keeps
 //! a recovery copy next to the file between saves; [`AutoSave`] says when to write one.
@@ -39,6 +43,7 @@
 mod autosave;
 mod container;
 pub mod files;
+pub mod folder;
 mod project;
 
 pub use autosave::AutoSave;

@@ -68,6 +68,142 @@ fn check(ok: bool, what: &str) -> Result<(), String> {
     if ok { Ok(()) } else { Err(what.to_owned()) }
 }
 
+/// How the testbed would lay a project out as a folder: a manifest and an outline written
+/// last, chapters as text, pictures carried along, a copy kept of what a save would write over.
+pub const FOLDER: jcj_project::folder::Format = jcj_project::folder::Format {
+    last: &["testbed.toml", "outline.txt"],
+    belongs: folder_belongs,
+    stored: &[".png"],
+    conflicts: Some("conflicts"),
+    ..jcj_project::folder::Format::new("testbed.toml", 2, "application/x-jcj-core-testbed-packed", "jcjtestz")
+};
+
+fn folder_belongs(path: &str) -> bool {
+    path == "outline.txt" || ["chapters/", "pictures/", "conflicts/"].iter().any(|dir| path.starts_with(dir))
+}
+
+/// The testbed's reader of a folder project, written once over any source: the folder on disk,
+/// a packed file, a recovery copy. It gives the chapters' text in the outline's order, and
+/// tells the source what each file it parsed is written back as.
+fn read_chapters(source: &mut dyn jcj_project::folder::Source) -> jcj_project::Result<Vec<String>> {
+    use jcj_project::folder::read_manifest;
+    let (manifest, _schema) = read_manifest(&FOLDER, source)?;
+    source.rendered("testbed.toml", manifest.as_bytes());
+    let outline = source.read_text("outline.txt", 1 << 20)?.unwrap_or_default();
+    source.rendered("outline.txt", outline.as_bytes());
+    let mut chapters = Vec::new();
+    for name in outline.lines().filter_map(|line| line.trim().strip_prefix("- ")) {
+        let path = format!("chapters/{name}.md");
+        let text = source.read_text(&path, 1 << 20)?.ok_or_else(|| jcj_project::Error::Damaged(format!("{path} is missing")))?;
+        // The testbed writes a chapter with one line break at its end, however it was typed.
+        source.rendered(&path, format!("{}\n", text.trim_end()).as_bytes());
+        chapters.push(text.trim_end().to_owned());
+    }
+    Ok(chapters)
+}
+
+fn chapter_files(chapters: &[(&str, &str)]) -> jcj_project::folder::Files {
+    let mut files = jcj_project::folder::Files::new();
+    files.insert("testbed.toml".into(), b"schema = 2\ntitle = \"Folder\"\n".to_vec());
+    files.insert("outline.txt".into(), chapters.iter().map(|(name, _)| format!("- {name}\n")).collect::<String>().into_bytes());
+    for (name, text) in chapters {
+        files.insert(format!("chapters/{name}.md"), format!("{text}\n").into_bytes());
+    }
+    files
+}
+
+/// The folder layer, used the way an app uses it: create, read through a source, save what
+/// changed, notice a change made elsewhere, pack and unpack, recover, back up.
+fn folder_project() -> Result<String, String> {
+    use jcj_project::folder::{self, Disk, Folder, Memory, Sink, Source, Stamp};
+    let err = |e: jcj_project::Error| e.to_string();
+    let n = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+    let dir = std::env::temp_dir().join(format!("core-testbed-folder-{}-{n}", std::process::id()));
+    let root = dir.join("Folder");
+
+    // A new project, opened again and read.
+    let first = chapter_files(&[("one", "The first chapter."), ("two", "The second chapter.")]);
+    check(first.keys().all(|path| FOLDER.allows(path) && folder::plain_path(path, FOLDER.limits.name)), "the testbed's files are its own")?;
+    check(folder::any_path("anything") && !FOLDER.allows("readme.txt") && folder::toml_nesting("a = [[1]]") == 2, "names and nesting are checked")?;
+    Folder::create(&root, &FOLDER, &first).map_err(err)?;
+    std::fs::write(root.join("chapters/two.md"), "The second chapter.\n\n\n").map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(root.join("pictures"))
+        .and_then(|()| std::fs::write(root.join("pictures/map.png"), b"a picture"))
+        .map_err(|e| e.to_string())?;
+    let mut project = Folder::open(&root, &FOLDER).map_err(err)?;
+    check(project.schema() == 2 && folder::schema_of("schema = 2").ok() == Some(2), "the manifest says its schema")?;
+    check(project.root() == root && project.format().manifest == "testbed.toml", "the folder knows where and what it is")?;
+    let chapters = read_chapters(&mut project).map_err(err)?;
+    check(chapters == ["The first chapter.", "The second chapter."], "the chapters read in the outline's order")?;
+    check(project.list("chapters").map_err(err)? == ["one.md", "two.md"], "a folder of the project lists its files")?;
+    check(project.read_tree("pictures", 1 << 20).map_err(err)?.len() == 1, "a folder is read whole")?;
+    check(
+        project.stamp("chapters/two.md") == Some(Stamp::of(b"The second chapter.\n\n\n", b"The second chapter.\n")),
+        "a file is known as read and as written",
+    )?;
+
+    // Saving writes what changed, the manifest's companions last, and leaves hand-typed text.
+    let mut second = chapter_files(&[("one", "The first chapter, revised."), ("two", "The second chapter."), ("three", "A third.")]);
+    second.insert("pictures/map.png".into(), b"a picture".to_vec());
+    let saved = project.save_safely(&second).map_err(err)?;
+    check(saved.written == ["chapters/one.md", "chapters/three.md", "outline.txt"], "only what changed is written, the outline last")?;
+    check(std::fs::read(root.join("chapters/two.md")).ok().as_deref() == Some(b"The second chapter.\n\n\n"), "text typed by hand is not rewritten")?;
+    check(folder::recovered(&FOLDER, &root).is_none() && project.known().count() == 6, "a good save leaves no recovery copy")?;
+
+    // A change made elsewhere is found, kept when a save writes over it, and taken in.
+    std::fs::write(root.join("chapters/one.md"), "Changed on another device.\n").map_err(|e| e.to_string())?;
+    let outside = project.outside_changes(&|path| path.starts_with("chapters/")).map_err(err)?;
+    check(outside.len() == 1 && outside[0].path == "chapters/one.md" && outside[0].now.is_some(), "the change made elsewhere is found")?;
+    second.insert("chapters/one.md".into(), b"The first chapter, revised again.\n".to_vec());
+    let mut disk = Disk::new(&root);
+    let kept = project.save_to(&second, &mut disk).map_err(err)?;
+    check(kept.conflicts.len() == 1 && kept.conflicts[0].starts_with("conflicts/"), "a copy of their change is kept")?;
+    check(
+        FOLDER.conflict_name("chapters/one.md", SystemTime::UNIX_EPOCH).is_some_and(|name| name.ends_with("chapters-one.md")),
+        "a conflict copy is named for its file",
+    )?;
+    disk.write("chapters/four.md", b"Added elsewhere.\n").map_err(err)?;
+    let added = project.outside_changes(&|path| path.starts_with("chapters/")).map_err(err)?;
+    check(added.len() == 1 && added[0].path == "chapters/four.md", "a file added elsewhere is found")?;
+    project.accept("chapters/four.md", Some(Stamp::of(b"Added elsewhere.\n", b"Added elsewhere.\n")));
+    second.insert("chapters/four.md".into(), b"Added elsewhere.\n".to_vec());
+    check(project.save(&second).map_err(err)? == folder::Saved::default(), "a change taken in is not written again")?;
+
+    // One file: the same bytes each time, read back within limits, unpacked into a new folder.
+    let packed = folder::pack_folder(&FOLDER, &root).map_err(err)?;
+    let on_disk = folder::folder_files(&FOLDER, &root).map_err(err)?;
+    let again = folder::pack(&FOLDER, &on_disk).map_err(err)?;
+    check(again == packed && folder::hash(&again) == folder::hash(&packed), "packing gives the same bytes")?;
+    let unpacked = folder::unpack(&FOLDER, &packed).map_err(err)?;
+    check(unpacked == on_disk, "a packed project unpacks to its files")?;
+    check(read_chapters(&mut Memory(&unpacked)).map_err(err)?.len() == 3, "the same reader reads a packed project")?;
+    let (copy, _) = folder::unpack_into(&FOLDER, &packed, &dir.join("Copy"), |files| read_chapters(&mut Memory(files)).map(|_| ())).map_err(err)?;
+    check(copy.root().join("pictures/map.png").is_file(), "a packed project unpacks into a new folder")?;
+    let tiny = jcj_project::folder::Format { limits: folder::Limits { entry: 4, ..folder::Limits::DEFAULT }, ..FOLDER };
+    check(matches!(folder::unpack(&tiny, &packed), Err(jcj_project::Error::TooLarge(_))), "a packed project is read within limits")?;
+
+    // Recovery: unsaved work kept inside the folder, found again, then discarded.
+    let unsaved = chapter_files(&[("one", "Typed and not saved.")]);
+    folder::write_recovery(&FOLDER, &root, &unsaved).map_err(err)?;
+    check(folder::recovery_path(&FOLDER, &root).is_file(), "the recovery copy is inside the folder")?;
+    let found = folder::recovered(&FOLDER, &root).ok_or("the unsaved work is found")?;
+    check(read_chapters(&mut Memory(&found)).map_err(err)? == ["Typed and not saved."], "the unsaved work reads")?;
+    folder::discard_recovery(&FOLDER, &root).map_err(err)?;
+
+    // Backups: dated packed copies, the oldest removed.
+    let backups = dir.join("Backups");
+    let at = SystemTime::UNIX_EPOCH + Duration::from_secs(1_800_000_000);
+    folder::backup(&FOLDER, &root, &backups, "Folder", 2, at).map_err(err)?;
+    folder::backup_packed(&FOLDER, &packed, &backups, "Folder", 2, at).map_err(err)?;
+    let newest =
+        jcj_project::files::backup_bytes(&packed, std::path::Path::new("Folder.jcjtestz"), &backups, 2, at + Duration::from_secs(1)).map_err(err)?;
+    let listed = folder::backups(&FOLDER, &backups, "Folder");
+    check(listed.len() == 2 && listed.last() == Some(&newest), "two backups are kept, oldest first")?;
+
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(format!("{} files, {} bytes packed, {} conflict copy, {} backups kept", on_disk.len(), packed.len(), kept.conflicts.len(), listed.len()))
+}
+
 /// Run every step; stop at the first failure.
 pub fn run() -> Result<Vec<Step>, String> {
     let mut steps = Vec::new();
@@ -288,6 +424,9 @@ pub fn run() -> Result<Vec<Step>, String> {
     check(back.to_bytes().map_err(|e| e.to_string())? == bytes, "saving again gives the same bytes")?;
     step("project", format!("{} bytes, {} documents, {} snapshot(s)", bytes.len(), back.document_count(), back.snapshots().len()));
 
+    // jcj-project's folder layer: a project as a folder of plain files.
+    step("folder", folder_project()?);
+
     // jcj-board: cards.
     let mut board = jcj_board::Board::default();
     let a = board.add_card("First", "A card.").map_err(|e| format!("{e:?}"))?;
@@ -351,6 +490,7 @@ mod tests {
                 "proof",
                 "file access",
                 "project",
+                "folder",
                 "board",
                 "entries",
                 "theme",

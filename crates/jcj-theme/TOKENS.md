@@ -77,3 +77,19 @@ something absurd: `body` and `caption` 6 to 48, `title` 6 to 72, `heading` 6 to 
 
 A product's logo and app icon are not tokens: the app paints its own mark where the shell asks for
 it.
+
+## Loading it
+
+An app embeds the file and its icon and hands both to `jcj_theme::Brand`:
+`Brand::new(include_str!("…/tokens.json"), include_bytes!("…/icon-256.png"))`.
+
+- `Brand::tokens()` is the tokens, or the neutral set when the file does not read, so the window
+  always opens. `Brand::read_tokens()` gives the error instead: a test of the app calls it, so a
+  damaged file fails the build.
+- **An app's own section.** Top-level keys this page does not name are ignored by the theme, so
+  an app may keep colors of its own in the same file under one key (an editor's page colors,
+  say) and read them with `Brand::section::<T>("key")`.
+- `Brand::icon()` is the window's icon, decoded from the PNG.
+- `jcj_theme::Mask` paints a mark kept as a white mask in whatever ink the theme gives.
+- `jcj_theme::brand::contrast` is the WCAG contrast ratio of two colors, for the app's test that
+  its text can be read on every surface in every theme.

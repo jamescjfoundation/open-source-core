@@ -4,10 +4,15 @@ Started from open-source-core's `template/`. To make it yours:
 
 1. Copy this folder into a new repository. Take it from the core release the app will pin, so the
    files agree with that release from the start.
-2. Rename the package `app` (in `Cargo.toml` and `apps/app`), set `APP` (the app's identifier)
-   and `NAME` in `apps/app/src/main.rs`, and `product` and `shipped` in `xtask/src/main.rs`.
-   That file is the app's own and holds only its data and its own tasks; the gate is the core's
-   (`xtask/src/gate.rs`).
+2. Rename the package `app` (in `Cargo.toml` and `apps/app`), set `APP` (the app's identifier
+   in project files) and `DESKTOP` (its name, machine name, app id, and later its brand and
+   where its releases are) in `apps/app/src/main.rs`, the names under
+   `[package.metadata.winresource]` in `apps/app/Cargo.toml` (what Windows shows for the
+   program; `apps/app/build.rs` embeds them, and `assets/brand/icon.ico` once it exists), and
+   `product` and `shipped` in `xtask/src/main.rs`. That last file is the app's own and holds
+   only its data and its own tasks; the gate is the core's (`xtask/src/gate.rs`). The start-up
+   is the core's too (`jcj_shell::desktop`): `main.rs` holds the app's data and what only the
+   app can do, and no step of opening the window.
 3. Pin the core: every `jcj-` dependency in `Cargo.toml` at the same release tag. Add a line for
    each other `jcj-` crate the app uses.
 4. Run `cargo xtask sync`. This folder already holds the shared xtask modules, the CI and

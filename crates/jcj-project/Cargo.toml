@@ -1,6 +1,6 @@
 [package]
 name = "jcj-project"
-description = "The project container: one document or many, assets, atomic saves, backups, recovery, snapshots"
+description = "Projects on disk: the single-file container and the folder of plain files, with atomic saves, backups and recovery"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -17,6 +17,8 @@ jcj-doc = { workspace = true }
 jcj-upstream = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+# A folder project's manifest (its schema number).
+toml = { workspace = true }
 thiserror = { workspace = true }
 chrono = { workspace = true }
 zip = { workspace = true }

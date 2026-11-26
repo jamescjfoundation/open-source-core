@@ -12,15 +12,21 @@
 //!
 //! Interface code reads the theme in use with [`Theme::get`], so every widget draws with the
 //! product's colors without being handed them.
+//!
+//! An app's brand files are loaded the same way in every app ([`brand`]): [`Brand`] gives the
+//! tokens, the app's own section of the tokens file and the window's icon; [`Mask`] paints a
+//! mark in any color.
 
 #![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
+pub mod brand;
 mod color;
 mod fonts;
 mod tokens;
 mod visuals;
 
+pub use brand::{Brand, Mask};
 pub use color::{ColorError, hex, parse_hex};
 pub use fonts::{
     FAMILY_MEDIUM, FAMILY_SEMIBOLD, FontFace, default_faces, font_definitions, install_fonts, medium, mono, regular, semibold, with_defaults,

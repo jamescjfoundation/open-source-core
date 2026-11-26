@@ -17,6 +17,17 @@ jcj-engine = { workspace = true }
 jcj-output = { workspace = true }
 jcj-project = { workspace = true }
 jcj-features = { workspace = true }
-jcj-shell = { workspace = true }
-eframe = { workspace = true }
+# With the window: the core's start-up opens it (`jcj_shell::desktop`).
+jcj-shell = { workspace = true, features = ["window"] }
 serde_json = { workspace = true }
+
+# Embeds the Windows icon and the program's name (build.rs); nothing for other targets.
+[build-dependencies]
+winresource = { workspace = true }
+
+# What Windows shows for the program (Explorer, the taskbar): read by build.rs.
+[package.metadata.winresource]
+ProductName = "App"
+FileDescription = "App"
+CompanyName = "The app's maker"
+LegalCopyright = "Copyright (c) the app's contributors. MIT OR Apache-2.0"

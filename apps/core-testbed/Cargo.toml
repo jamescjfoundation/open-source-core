@@ -22,10 +22,11 @@ jcj-project = { workspace = true }
 jcj-theme = { workspace = true }
 jcj-board = { workspace = true }
 jcj-entries = { workspace = true }
-jcj-shell = { workspace = true }
+# With the window: the core's start-up opens it (`jcj_shell::desktop`).
+jcj-shell = { workspace = true, features = ["window"] }
 jcj-agents = { workspace = true }
 jcj-features = { workspace = true }
-eframe = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]

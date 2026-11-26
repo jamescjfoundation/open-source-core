@@ -69,6 +69,7 @@
 "Pin beside the document" = "Fijar junto al documento"
 "Preferences" = "Preferencias"
 "Preferences could not be read ({why}); the defaults are used." = "No se pudieron leer las preferencias ({why}); se usan las predeterminadas."
+"Preferences could not be saved: {why}" = "No se pudieron guardar las preferencias: {why}"
 "Press the new key for {command} (Escape to cancel)" = "Pulse la nueva tecla para {command} (Escape para cancelar)"
 "Print" = "Imprimir"
 "Recent" = "Recientes"

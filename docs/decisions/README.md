@@ -17,7 +17,7 @@ records with the same numbers.
 | [0006](0006-extension-data.md) | Extension data on documents, paragraphs and runs |
 | [0007](0007-engine-agents-output.md) | The full engine, general commands, agents, output and proofing |
 | [0008](0008-interchange.md) | Format interchange over WordCraft's own format crates |
-| [0009](0009-project-container.md) | The project container, saving, backups and recovery |
+| [0009](0009-project-container.md) | The project container, saving, backups and recovery (for a document that is one file; see 0018) |
 | [0010](0010-document-features.md) | Document features every app shares |
 | [0011](0011-releases-and-versioning.md) | Core releases and versioning |
 | [0012](0012-working-in-the-open.md) | Working in the open |
@@ -26,3 +26,4 @@ records with the same numbers.
 | [0015](0015-apps-that-depend-on-apps.md) | Apps that depend on apps |
 | [0016](0016-entries-and-translations.md) | Entries and interface translations |
 | [0017](0017-command-lines-and-agent-tools.md) | One convention for command lines and agent tools |
+| [0018](0018-folder-projects.md) | A project is a folder of plain files |

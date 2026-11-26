@@ -13,6 +13,8 @@ workspace = true
 
 [dependencies]
 egui = { workspace = true }
+# Decodes an app's icon and the masks of its mark (PNG only).
+image = { workspace = true }
 jcj-layout = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

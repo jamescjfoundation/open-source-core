@@ -47,6 +47,34 @@ impl ReleaseSource {
     }
 }
 
+/// The first argument of a program started to finish an update: on Windows the updater starts
+/// a copy of the app with it, which waits for the app to exit, puts the new files in place and
+/// starts the new version.
+pub const FINISH_FLAG: &str = "--finish-update";
+
+/// Whether `args` (the program's arguments without its name) are those of a program started to
+/// finish an update.
+pub fn is_finish_update(args: &[std::ffi::OsString]) -> bool {
+    args.first().is_some_and(|first| first == FINISH_FLAG)
+}
+
+impl ReleaseSource {
+    /// Finish an update when this program was started to do that. An app calls this first
+    /// thing in `main` with its arguments (without the program's name), before it reads them
+    /// itself. `None`: an ordinary start, carry on. `Some`: the process was the update's
+    /// helper and its work is done or has failed; the app returns without opening a window.
+    /// The helper checks that it is the app's own update, signed like itself, before it
+    /// touches anything.
+    pub fn finish_update(&self, args: &[std::ffi::OsString]) -> Option<Result<(), String>> {
+        if !is_finish_update(args) {
+            return None;
+        }
+        // Only Windows finishes through a helper; elsewhere the arguments are a mistake, and
+        // the answer is still "not an ordinary start".
+        Some(self_update::finish(&self.app(), args).unwrap_or_else(|| Err("an update is finished by a helper only on Windows".into())))
+    }
+}
+
 enum Message {
     Checked { found: Result<Option<Release>, String>, asked: bool },
     Phase(String),
@@ -268,6 +296,22 @@ mod tests {
     fn releases_come_from_the_app_s_repository() {
         assert_eq!(SOURCE.releases_url(), "https://github.com/example-org/sample-app/releases");
         assert_eq!(SOURCE.app().developer, "the sample contributors");
+    }
+
+    #[test]
+    fn only_the_helper_s_flag_makes_a_start_the_update_helper() {
+        let os = |args: &[&str]| args.iter().map(std::ffi::OsString::from).collect::<Vec<_>>();
+        assert_eq!(FINISH_FLAG, self_update::FINISH_FLAG, "the flag is the updater's own");
+        for ordinary in [os(&[]), os(&["draft.txt"]), os(&["--version"]), os(&["draft.txt", FINISH_FLAG]), os(&["--finish"])] {
+            assert!(!is_finish_update(&ordinary), "{ordinary:?}");
+            assert_eq!(SOURCE.finish_update(&ordinary), None, "{ordinary:?}");
+        }
+        // Started as the helper with arguments that are not a whole update: an error, and
+        // never an ordinary start that would open a window.
+        for helper in [os(&[FINISH_FLAG]), os(&[FINISH_FLAG, "not a pid", "app.exe", "msi", "a.msi"])] {
+            assert!(is_finish_update(&helper));
+            assert!(SOURCE.finish_update(&helper).is_some_and(|done| done.is_err()), "{helper:?}");
+        }
     }
 
     #[test]

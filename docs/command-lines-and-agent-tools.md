@@ -22,6 +22,13 @@ the same way is `jcj_agents::cli`; `apps/core-testbed` follows this page, and
 A desktop program that is also its app's window opens the window when run with no argument. It
 follows the rest.
 
+One start of a desktop program is not its user's and is answered before the command line is
+read: on Windows the updater starts a copy of the program with `--finish-update` as its first
+argument, to put a downloaded update in place once the app has exited. A program that installs
+updates makes the shell's call for it first thing in `main`
+(`jcj_shell::desktop::Desktop::finish_update`), and returns the code it is given. That start
+opens no window, runs no command and prints no usage.
+
 ## Exit codes
 
 | Code | `jcj_agents::cli::Exit` | Means |

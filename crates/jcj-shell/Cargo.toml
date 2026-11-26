@@ -11,6 +11,11 @@ publish.workspace = true
 [lints]
 workspace = true
 
+[features]
+# Opens the app's window: `desktop::Desktop::run` and `main`, and `desktop::Window` as an
+# `eframe::App`. Off by default, so an app that writes its own start-up builds as before.
+window = ["dep:eframe"]
+
 [dependencies]
 jcj-i18n = { workspace = true }
 jcj-theme = { workspace = true }
@@ -21,6 +26,8 @@ serde_json = { workspace = true }
 log = { workspace = true }
 image = { workspace = true }
 raw-window-handle = { workspace = true }
+# The window toolkit, only for the `window` feature.
+eframe = { workspace = true, optional = true }
 
 [dev-dependencies]
 egui_kittest = { workspace = true }

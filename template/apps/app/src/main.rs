@@ -3,6 +3,11 @@
 //! shell with one document, shown as rendered pages, and saves it as a project file. Replace the
 //! names, add the app's commands, tabs and panels, and keep the app's own rules here; anything a
 //! second app would want belongs in the core (AGENTS.md).
+//!
+//! The start-up is the core's (`jcj_shell::desktop`): this file gives the app's data
+//! ([`DESKTOP`]) and what only the app can do ([`DesktopApp`]). The window's title, app id and
+//! icon, the settings folder, preferences, the update check, the file dialogs and the steps of
+//! every frame and of the end are not written here, so none of them can be left out.
 
 #![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
@@ -11,14 +16,24 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use jcj_shell::commands::ids;
+use jcj_shell::desktop::{Desktop, DesktopApp};
 use jcj_shell::egui;
-use jcj_shell::{About, App, Cmd, CommandInfo, Commands, Shell, theme::Tokens};
+use jcj_shell::prefs::{NoPrefs, Prefs};
+use jcj_shell::{About, App, Cmd, CommandInfo, Commands, Shell};
 use serde_json::json;
 
 /// This app's identity in project files: change the id, and raise the version when the app's own
 /// data changes shape (with a migration, `jcj_project::App::with_migration`).
 const APP: jcj_project::App = jcj_project::App::new("org.example.app", 1);
-const NAME: &str = "App";
+
+/// This app's data for its start-up: its name, its machine name (the settings folder on Linux,
+/// the stem of its release files), the window's app id and its version. Add what the app has,
+/// each a field of `Desktop`:
+/// - `brand`: `Brand::new(include_str!(...tokens.json), include_bytes!(...icon-256.png))`, the
+///   product's design tokens (the core's `crates/jcj-theme/TOKENS.md`) and the window's icon;
+/// - `releases`: where its releases are published, which turns the update check on;
+/// - `profile_env`: a variable naming another settings folder, for a run kept apart.
+const DESKTOP: Desktop = Desktop::new("App", "app", "org.example.app", env!("CARGO_PKG_VERSION"));
 
 struct Doc {
     session: jcj_engine::Session,
@@ -113,27 +128,49 @@ impl App for Doc {
     }
 }
 
-struct Window {
-    shell: Shell,
-    doc: Doc,
-}
+/// What only this app can do at start-up. Every step has a default but the preferences: this
+/// app keeps none of its own yet, so its file holds the shell's alone (`NoPrefs`). When it has
+/// some, they are a struct here in place of `NoPrefs`, put into effect and read back below.
+impl DesktopApp for Doc {
+    type Prefs = Prefs<NoPrefs>;
 
-impl eframe::App for Window {
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        self.shell.ui(ui, &mut self.doc);
+    fn apply_prefs(&mut self, _prefs: &NoPrefs, _shell: &mut Shell) {}
+
+    fn prefs(&self, _last: &NoPrefs) -> NoPrefs {
+        NoPrefs {}
+    }
+
+    fn window_title(&self) -> Option<String> {
+        Some(format!("{} - {}", self.document_name(), DESKTOP.name))
     }
 }
 
 fn main() -> ExitCode {
-    let path = std::env::args().nth(1).map_or_else(|| PathBuf::from("untitled.app"), PathBuf::from);
-    // The app's own look: replace with the product's tokens.json (jcj-theme's TOKENS.md).
-    let shell = Shell::new(NAME, env!("CARGO_PKG_VERSION"), Tokens::default());
-    let window = Window { shell, doc: Doc::new(path) };
-    match eframe::run_native(NAME, eframe::NativeOptions::default(), Box::new(|_cc| Ok(Box::new(window)))) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(e) => {
-            eprintln!("could not open a window: {e}");
-            ExitCode::FAILURE
-        }
+    // The first file named on the command line is the document; with none, a new one.
+    DESKTOP.main(|start| Doc::new(start.files.first().cloned().unwrap_or_else(|| PathBuf::from("untitled.app"))))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The start-up without a window: the app is built with the file it was started with, its
+    /// preferences file is where the settings folder is, and the window is told its title.
+    #[test]
+    fn the_app_starts_from_its_data() {
+        let dir = std::env::temp_dir().join(format!("app-start-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let ctx = egui::Context::default();
+        let files = vec![dir.join("draft.app")];
+        let mut window = jcj_shell::desktop::Window::start(&DESKTOP, &ctx, Some(dir.join("settings")), files, |start| {
+            Doc::new(start.files.first().cloned().unwrap_or_default())
+        });
+        assert_eq!(window.app.document_name(), "draft.app");
+        assert_eq!(window.app.window_title().as_deref(), Some("draft.app - App"));
+        assert_eq!(window.prefs_path(), Some(dir.join("settings").join("preferences.json").as_path()));
+        assert_eq!(DESKTOP.viewport().app_id.as_deref(), Some("org.example.app"));
+        window.exit();
+        drop(window);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

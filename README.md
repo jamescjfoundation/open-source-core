@@ -27,11 +27,11 @@ crosses them.
 | `jcj-proof` | Spelling and hyphenation |
 | `jcj-entries` | Entries beside documents: typed records, templates, names, mentions, backlinks |
 | `jcj-i18n` | Interface translation catalogs: texts keyed by their English, plurals, placeholders, layered lookup |
-| `jcj-project` | The project file: one document or many, assets, atomic saves, backups, recovery, snapshots |
+| `jcj-project` | Projects on disk. A folder of plain files (the standard for an app's project): what changed is saved atomically, changes made elsewhere are found, the folder packs to one file, with recovery and backups. And the single-file container: one document or many, assets, snapshots |
 | `jcj-features` | Document features every app shares: bookmarks, notes, revision sets, change tracking, page locks, watermarks, headers and footers, comparison |
-| `jcj-theme` | A product's design tokens turned into the shell's theme |
+| `jcj-theme` | A product's design tokens turned into the shell's theme, and its brand files loaded: tokens, the window's icon, a mark painted from a mask |
 | `jcj-board` | Cards, corkboard and canvas |
-| `jcj-shell` | Window, ribbon, panels, File page, dialogs, the system's file dialogs, preferences, keys, auto-save, updates, and the door to interface translations |
+| `jcj-shell` | Window, ribbon, panels, File page, dialogs, the system's file dialogs, preferences, keys, auto-save, updates, the door to interface translations, and an app's whole start-up from its data |
 | `jcj-agents` | An app's commands as MCP tools for agents, on a document or on the app's own state, and the parts of a command line every app shares (exit codes, `mcp` arguments) |
 | `jcj-upstream` | Internal: the one crate that names upstream code. Apps never use it |
 

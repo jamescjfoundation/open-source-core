@@ -142,6 +142,44 @@ pub struct Prefs<A> {
     pub app: A,
 }
 
+/// What a preferences file holds, for code that works with any app's file: the shell's part and
+/// the app's. [`Prefs`] is the usual one. An app whose file has a history of its own (an older
+/// shape it still reads, a first start that differs from the defaults) keeps its own struct
+/// and says here where the two parts are.
+pub trait Contents: Serialize + DeserializeOwned + Default + PartialEq + Clone {
+    /// The app's own preferences.
+    type App;
+
+    /// The shell's part.
+    fn shell(&self) -> &ShellPrefs;
+
+    /// The app's part.
+    fn app(&self) -> &Self::App;
+
+    /// A file's contents from its two parts.
+    fn of(shell: ShellPrefs, app: Self::App) -> Self;
+}
+
+impl<A: Serialize + DeserializeOwned + Default + PartialEq + Clone> Contents for Prefs<A> {
+    type App = A;
+
+    fn shell(&self) -> &ShellPrefs {
+        &self.shell
+    }
+
+    fn app(&self) -> &A {
+        &self.app
+    }
+
+    fn of(shell: ShellPrefs, app: A) -> Self {
+        Prefs { shell, app }
+    }
+}
+
+/// The preferences of an app that keeps none of its own yet (`"app": {}` in the file).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NoPrefs {}
+
 /// Largest preferences file read, bytes.
 pub const MAX_PREFS_BYTES: u64 = 1 << 20;
 /// Least time between two writes of the file while preferences change (a slider being dragged).
@@ -268,6 +306,19 @@ mod tests {
         assert_eq!(file.save(&p, t0 + Duration::from_millis(300), false), Ok(Some(Duration::from_millis(700))));
         assert_eq!(file.save(&p, t0 + Duration::from_millis(300), true), Ok(None));
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_file_s_two_parts_are_reached_through_contents() {
+        let shell = ShellPrefs { user_name: "A. Writer".into(), ..ShellPrefs::default() };
+        let whole = <Prefs<AppPrefs> as Contents>::of(shell.clone(), AppPrefs { zoom: 2.0, page_view: false });
+        assert_eq!((Contents::shell(&whole), Contents::app(&whole).zoom), (&shell, 2.0));
+        // An app with no preferences of its own still has a whole file.
+        let none = <Prefs<NoPrefs> as Contents>::of(shell, NoPrefs {});
+        let text = serde_json::to_string(&none).unwrap();
+        assert!(text.contains(r#""app":{}"#), "{text}");
+        assert_eq!(serde_json::from_str::<Prefs<NoPrefs>>(&text).unwrap(), none);
+        assert_eq!(serde_json::from_str::<Prefs<NoPrefs>>(r#"{"shell": {}}"#).unwrap(), Prefs::default());
     }
 
     #[test]
