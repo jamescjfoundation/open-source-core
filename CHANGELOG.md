@@ -46,6 +46,15 @@ minor release may, and then **What apps must do** says exactly what (decision 00
   `export(Format::Epub, doc)` and `export_epub(doc, &EpubOptions::default())` write the same
   bytes as before: a test holds the content of every file in the package to a hash taken before
   the change. `core-testbed` writes a book with all three choices and checks its words.
+- `jcj-shell`: the rule for a shifted key with no command of its own (core issue #29).
+  `KeyMap::command_for(shortcut) -> Option<Cmd>` is what a key press runs: the command bound to
+  it, or else what `KeyMap::shifted(shortcut)` gives: when the key without Shift runs a caret
+  movement (an id starting `keys::CARET_COMMANDS`, `caret.`), the same movement with
+  `{"extend": true}`; when it deletes back (`keys::BACKSPACE`, `text.backspace`), the same. A
+  key the user turned off runs nothing. `bound_to` and the shell's own key handling are
+  unchanged: the shell still takes only keys with Mod, Ctrl or Alt and function keys that are
+  bound, and leaves the rest to the document, whose view asks `command_for`. `core-testbed`
+  runs Shift+Right through the rule on a session and sees the selection grow.
 
 ## 0.1.19 (2026-11-26)
 

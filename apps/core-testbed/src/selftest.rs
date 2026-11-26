@@ -115,6 +115,19 @@ pub fn run() -> Result<Vec<Step>, String> {
     check(!marks.to_string().contains("Start"), "undo removes the bookmark")?;
     step("features", format!("find.all: {hits} matches; bookmark and note added and undone"));
 
+    // jcj-shell's keys: a shifted caret key extends the selection, by the key map's own rule,
+    // with the keys the registry's commands declare.
+    let mut keyed = self::session(doc.clone());
+    let infos: Vec<jcj_shell::CommandInfo> = keyed.registry.all().iter().map(|c| jcj_shell::CommandInfo::new(c.id, c.label, c.shortcut)).collect();
+    let keys = jcj_shell::keys::KeyMap::from_commands(&infos);
+    let extend = keys.command_for("Shift+Right").ok_or("Shift+Right runs a command")?;
+    check(keys.shifted("Shift+Right").as_ref() == Some(&extend) && extend.id.starts_with(jcj_shell::keys::CARET_COMMANDS), "the rule gives it")?;
+    keyed.run("caret.docStart", &json!({})).map_err(|e| format!("caret.docStart: {e:?}"))?;
+    keyed.run(&extend.id, &extend.params).map_err(|e| format!("{}: {e:?}", extend.id))?;
+    check(keyed.sel.anchor != keyed.sel.focus, "a shifted caret key extends the selection")?;
+    check(keys.command_for("Shift+Backspace").map(|c| c.id).as_deref() == Some(jcj_shell::keys::BACKSPACE), "Shift+Backspace deletes back")?;
+    step("keys", format!("Shift+Right runs {} extending the selection; Shift+Backspace deletes back", extend.id));
+
     // jcj-doc's section settings: a second section starting on an odd page, numbered in roman.
     let mut sectioned = doc.clone();
     sectioned.last_section = jcj_doc::SectionProps {
@@ -327,6 +340,7 @@ mod tests {
                 "doc",
                 "engine",
                 "features",
+                "keys",
                 "sections",
                 "layout",
                 "output",
