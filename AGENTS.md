@@ -20,12 +20,20 @@ every app. Their source is `template/AGENTS.md` (and `template/SECURITY.md`,
 `template/CONTRIBUTING.md` for the blocks in those files): change a block there, run
 `cargo xtask template --write` to bring this repository's own copies in line, and the next core
 release carries it to every app through `cargo xtask sync`. The `template` task of the gate fails
-when a copy here differs.
+when a copy here differs. The same holds for the settings an app carries as blocks
+(`template/Cargo.toml`, of which this repository's `Cargo.toml` carries the lints and build
+profiles; `template/.cargo/config.toml`, `template/.gitignore`, `template/.gitattributes`).
+
+**The gate apps share.** An app's `cargo xtask ci` is `template/xtask/src/gate.rs`, compiled into
+this repository's own xtask with the other shared modules so the core tests them. An app's
+`xtask/src/main.rs` holds only its data and its own tasks. So a check added to `CHECKS` there, or
+a module added to `template/xtask/src/shared.rs`, reaches every app with the next release and no
+edit in an app: keep it that way, and give a new field of `App` a value in `App::DEFAULT`.
 
 ## Before you commit
 
 ```sh
-cargo xtask install-hooks     # once: pre-commit (fmt, privacy, no dev-link) and pre-push (ci --changed)
+cargo xtask install-hooks     # once: pre-commit (fmt, privacy, no dev-link in a tracked file) and pre-push (ci --changed)
 cargo xtask ci --changed      # what CI will run for your change; `cargo xtask ci` for everything
 cargo xtask template --write  # after changing a block or the code of conduct under template/
 cargo xtask template-check    # after any change under template/: builds it against this checkout
@@ -106,21 +114,34 @@ interface back out is not.
 - **Core change an app needs:**
   1. Open a core issue describing the general need, not the app's feature.
   2. Check out both side by side. In the app: `cargo xtask dev-link ../open-source-core`
-     (`cargo xtask dev-unlink` removes it). Never commit the link; the app's CI rejects it.
+     (`cargo xtask dev-unlink` removes it). The link changes no file Git tracks: it is a folder
+     Git ignores, `.cargo/dev-link/`, and `Cargo.lock` is left alone. While linked, builds,
+     tests and the editor use the local core, and `cargo xtask ci --linked` runs the gate
+     against it. The plain gate refuses to run linked, because CI builds the pinned release.
   3. Build the general part in the core with its own tests and a use in `apps/core-testbed`, so it
      is proven without any product.
   4. Build the app's use of it in the app.
-  5. Land the core change first, with the core's gate green. Then release the core.
-  6. Move the app's pin to that release (`cargo xtask sync`), then land the app change, which
-     names the core issue it needed.
+  5. To have CI check the app's half before the core is released, give the app's branch a
+     temporary pin. Push the core change (a branch will do). On the app's branch, on every
+     `jcj-` line, write `rev = "<that core commit, all 40 characters>"` in place of the tag; then
+     `cargo metadata --format-version 1 >/dev/null` and `cargo xtask sync`. The gate passes on
+     that branch and in its pull request, with a warning. It fails on `main`, on a tag and in a
+     release, so the pull request is not merged while it holds the pin.
+  6. Land the core change first, with the core's gate green. Then release the core.
+  7. Move the app's pin to that release's tag (`cargo xtask sync`), then land the app change,
+     which names the core issue it needed.
 - **Prototype first, promote later.** If the general shape is not clear yet, build it in the app,
-  mark it `// core-candidate:` and open a core issue labelled `core-candidate`. Move it once it works
-  and a second app wants it. Never copy code between app repositories.
+  mark it `// core-candidate: open-source-core#N` and open that core issue, labelled
+  `core-candidate`. Move it once it works and a second app wants it. A promotion is finished only
+  when the app the code came from uses the core's copy and its own copy is deleted: the core
+  issue stays open until then, and the marker on the app's copy names it. Never copy code
+  between app repositories.
 - **Something one app needs from another app**
   ([core decision 0015](https://github.com/jamescjfoundation/open-source-core/blob/main/docs/decisions/0015-apps-that-depend-on-apps.md)):
   open an issue in the providing app's repository. The provider's change lands and is tagged
   there first; the consumer then moves its pin. Never edit the provider as part of the consumer's
-  change.
+  change. To try the two together, the consumer names the provider in its `xtask/src/main.rs`
+  (`providers`) and links a checkout of it like the core: `cargo xtask dev-link <name>=<folder>`.
 
 ### Step 3: let it reach the other apps safely
 

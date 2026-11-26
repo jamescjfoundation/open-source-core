@@ -1,7 +1,8 @@
 # 0013: Building between an app and the core
 
 Date: 2026-11-24 · Status: accepted · Amended 2026-11-26 (how changes land; what "no product
-name" covers) · From the plan's "Building between an app and the core"
+name" covers; when a promotion is finished; the dev-link and the temporary pin) · From the plan's
+"Building between an app and the core"
 
 ## Decision
 
@@ -15,13 +16,36 @@ Where a change belongs, asked in order (the first "yes" decides):
    wrong general interface back out is not.
 
 A core change an app needs: an issue in the core describing the general need; both repositories
-side by side (`cargo xtask dev-link ../open-source-core` in the app, never committed:
-`dev-link --check` fails in CI); the general part in the core with its own tests and a use in
-`core-testbed`; the app's use in the app; the core change lands first; release the core; move the
-app's pin; then the app's change lands, naming the core issue it needed.
+side by side (`cargo xtask dev-link ../open-source-core` in the app); the general part in the
+core with its own tests and a use in `core-testbed`; the app's use in the app; the core change
+lands first; release the core; move the app's pin; then the app's change lands, naming the core
+issue it needed.
 
-Prototype first, promote later: mark it `// core-candidate:` in the app with a core issue labelled
-`core-candidate`. Code is never copied between app repositories.
+The dev-link (amended 2026-11-26) changes no file Git tracks. It is a folder Git ignores,
+`.cargo/dev-link/`, with a Cargo configuration file that the app's tracked `.cargo/config.toml`
+includes when it exists, and the lock file of the linked build. The app's own `Cargo.lock` is
+not rewritten while linked, so link, build, unlink leaves `git status` clean. The gate refuses
+to run linked, because it says what CI will say and CI builds the pinned release;
+`cargo xtask ci --linked` runs it against the link on purpose. No tracked file may hold a
+`[patch]` to a local path, and the pre-commit hook and the gate check that. The link relies on
+two things the Cargo of the pinned toolchain does (decision 0003): reading an included
+configuration file, and keeping a lock file at another path. `dev-link` checks both took
+effect and keeps no link when they did not.
+
+A temporary pin (amended 2026-11-26) lets CI check the app's half before the core is released.
+On a branch of the app, every `jcj-` line names the same whole commit of the core, `rev` in
+place of `tag`. `cargo xtask core-pin` passes there, and in the branch's pull request, with a
+warning that GitHub shows on the checks page. It fails on `main`, on a tag and wherever the run
+cannot be told to be a branch, so `main` and every release build on a core release. Nothing
+stops the merge itself: the pull request's author moves the pin to the release's tag first, and
+a `main` that received the pin is red at once.
+
+Prototype first, promote later: mark it `// core-candidate: open-source-core#N` in the app, with
+that core issue labelled `core-candidate`. Code is never copied between app repositories.
+
+When a promotion is finished (amended 2026-11-26): when the app the code came from uses the
+core's copy and its own copy is deleted. The core issue stays open until then, and the marker on
+the app's copy names it. A core release that carries the code does not close the issue.
 
 How a change lands, while no app built on the core has a public release:
 
@@ -52,6 +76,25 @@ of `template/AGENTS.md`, copied and checked by `cargo xtask sync` (decision 0003
   product's identity. That is a rule about what ships and what an app inherits. A changelog or a
   decision that says where code was promoted from is a true record, and removing it would lose
   the reason the interface has its shape.
+
+## Why the promotion rule, the dev-link in an ignored folder and the temporary pin
+
+- The first promotions were released and their issues closed while the app each came from still
+  held its own copy. The code then existed twice and the two copies changed separately, with
+  nothing open that said a move was half done: the marker named a closed issue, which the `docs`
+  task accepts. One open issue per unfinished move is the smallest thing that keeps the list
+  true (issue #30).
+- The link used to be written into `.cargo/config.toml`, which every app tracks, with the full
+  path of a folder on one machine, and a build while linked rewrote `Cargo.lock`. One
+  `git commit -a` published the path; after unlinking, the gate failed until the lock file was
+  restored by hand. It also replaced nothing when the checkout's version differed from the
+  pinned one, because Cargo keeps what a lock file holds. Cargo reads an included configuration
+  file and a lock file at another path, so the link needs no tracked file at all, and the lock
+  file of the linked build can start as the app's own, less the linked packages.
+- An app change could be checked in CI only after the core change it needed was released, which
+  pushed toward one core release per feature and found problems after the release. A commit is
+  as exact as a tag, and cargo-deny already accepts one. What a commit is not is a release, so
+  it is refused where releases are built from.
 
 ## Revisit when
 

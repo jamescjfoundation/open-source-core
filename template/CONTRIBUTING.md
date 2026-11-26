@@ -21,7 +21,7 @@ cargo run -p app                 # the app
 | Path | What it is |
 | --- | --- |
 | `apps/app` | The app |
-| `xtask` | The gate and maintenance tasks. `src/main.rs` and any module the app adds are the app's; the other modules are the core's |
+| `xtask` | The gate and maintenance tasks. `src/main.rs` (the app's data and its own tasks) and any module the app adds are the app's; the other modules, the gate among them, are the core's |
 | `docs/decisions` | Why things are the way they are |
 
 <!-- BEGIN open-source-core: contributing -->

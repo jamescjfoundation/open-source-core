@@ -1,201 +1,51 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! `cargo xtask <task>` for a foundation app built on open-source-core.
 //!
-//! Started from the core's `template/`. This file is the app's own (add app tasks here); the other
-//! modules in this folder are owned by the core and kept identical by `cargo xtask sync`.
+//! Started from the core's `template/`. This file is the app's own, and it holds only what is the
+//! app's: its data (`APP`) and its own tasks (`TASKS`). The gate, every shared task and the list
+//! of them are in the modules under `shared`, which the core owns and `cargo xtask sync` keeps
+//! identical in every app; `cargo xtask help` lists them. A module the app adds beside this
+//! file is the app's too.
 
 #![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
-mod changed;
-mod corepin;
-mod docs;
-mod json;
-mod licenses;
-mod link;
-mod lintroots;
-mod privacy;
-mod spdx;
-// `core_task` is the core's side of sync.
-#[allow(dead_code)]
-mod sync;
-mod util;
+mod shared;
 
-use std::collections::BTreeSet;
-use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use changed::Affected;
-use util::{TaskResult, cargo, cargo_output, report, workspace_members};
+use shared::gate::{self, App, Task};
 
-/// The programs this app ships (for THIRD-PARTY-LICENSES.txt). Change to the app's binaries.
-const SHIPPED: &[&str] = &["app"];
-/// The product name used in generated files. Change to the app's name.
-const PRODUCT: &str = "This app";
+/// What the shared tasks need to know about this app. Set the fields the app has; the rest come
+/// from `App::DEFAULT` (`xtask/src/gate.rs` describes each):
+///
+/// - `providers`: the repositories the app builds on besides the core, as
+///   `&[Provider { name: "other", git: "https://github.com/<owner>/<repository>" }]`
+///   (`shared::link::Provider`);
+/// - `no_indexing`: packages whose roots must also deny `clippy::indexing_slicing`;
+/// - `legal_files`: legal files beyond the ones every app carries;
+/// - `screenshots`: the package whose `screenshots` example draws `docs/images/`.
+const APP: App = App {
+    // The product's name, for generated files. Change to the app's name.
+    product: "This app",
+    // The programs the app ships (for THIRD-PARTY-LICENSES.txt). Change to the app's binaries.
+    shipped: &["app"],
+    tasks: TASKS,
+    ..App::DEFAULT
+};
 
-const TASKS: &[(&str, &str)] = &[
-    ("fmt", "rustfmt in check mode"),
-    ("lint-roots", "every crate root forbids unsafe and denies the panicking lints"),
-    ("unlinked", "no local core dev-link is left in .cargo/config.toml"),
-    ("core-pin", "every jcj- dependency names one core release tag, and Cargo.lock holds one core"),
-    ("sync", "shared files, marked blocks and the patch block match the pinned core release"),
-    ("layers", "only jcj- interfaces of the core are used, never upstream crates or jcj-upstream"),
-    ("docs", "links in Markdown lead somewhere, decision references name a record, core-candidate markers name an issue"),
-    ("privacy", "no personal details or secrets in files or commit identities"),
-    ("licenses", "every dependency's license is on the allowlist"),
-    ("clippy", "clippy on all targets, warnings are errors"),
-    ("test", "all tests"),
-];
+/// The app's own tasks: a name, a line for `cargo xtask help`, and a function that takes the
+/// workspace's folder and the arguments after the name. `Task::check` puts a task in the gate,
+/// after the shared checks and before clippy and the tests; `Task::other` is run by name only.
+///
+/// ```ignore
+/// const TASKS: &[Task] = &[
+///     Task::check("names", "no other product's name in the interface text", names::check),
+///     Task::other("bundle", "build a release bundle for this computer in dist/", |root, _| bundle::bundle(root)),
+/// ];
+/// ```
+const TASKS: &[Task] = &[];
 
 fn main() -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    let task = args.first().map(String::as_str).unwrap_or("help");
-    let rest = args.get(1..).unwrap_or_default();
-    let root = workspace_root();
-    let result = match task {
-        "ci" => ci(&root, rest),
-        "dev-link" => match rest.first() {
-            Some(a) if a == "--check" => link::check_unlinked(&root),
-            Some(core) => link::dev_link(&root, core),
-            None => Err("usage: cargo xtask dev-link <path to open-source-core>".to_owned()),
-        },
-        "dev-unlink" => link::dev_unlink(&root),
-        "sync" => sync::app_task(&root, rest.iter().any(|a| a == "--check")),
-        "core-pin" => corepin::task(&root, rest),
-        "affected" => changed::task(&root, rest),
-        "deny" => cargo(&root, &["deny", "--locked", "check"]),
-        "install-hooks" => util::git_output(&root, &["config", "core.hooksPath", "hooks"]).map(|_| println!("git hooks on")),
-        "third-party-licenses" => licenses::task(&root, SHIPPED, PRODUCT, rest.first().map(String::as_str)),
-        "privacy" => privacy::task(&root, rest),
-        name => match TASKS.iter().find(|(n, _)| *n == name) {
-            Some((n, _)) => run_task(n, &root, &Affected::All),
-            None => {
-                println!("usage: cargo xtask <ci [--changed] [--base <ref>] [--skip <tasks>] [--only <tasks>] | affected [--base <ref>]>");
-                println!("       cargo xtask <dev-link <core> | dev-unlink | sync [--check] | deny | install-hooks>");
-                println!("       cargo xtask core-pin [--behind] [--max-behind <n>]   --behind asks the core for its releases (network)");
-                for (name, about) in TASKS {
-                    println!("  {name:<12} {about}");
-                }
-                if name == "help" { Ok(()) } else { Err(format!("unknown task '{name}'")) }
-            }
-        },
-    };
-    match result {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(msg) => {
-            eprintln!("\nxtask: FAILED: {msg}");
-            ExitCode::FAILURE
-        }
-    }
-}
-
-fn workspace_root() -> PathBuf {
-    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
-    manifest.parent().map_or_else(|| manifest.to_path_buf(), Path::to_path_buf)
-}
-
-fn ci(root: &Path, args: &[String]) -> TaskResult {
-    let names: Vec<&str> = TASKS.iter().map(|(n, _)| *n).collect();
-    let mut skip_args = Vec::new();
-    let mut it = args.iter();
-    while let Some(a) = it.next() {
-        match a.as_str() {
-            "--changed" => {}
-            "--base" => {
-                it.next();
-            }
-            _ => skip_args.push(a.clone()),
-        }
-    }
-    let skip = util::skipped(&skip_args, &names)?;
-    util::warn_if_hooks_off(root, "hooks");
-    let scope = if args.iter().any(|a| a == "--changed") {
-        let base = args.iter().position(|a| a == "--base").and_then(|i| args.get(i + 1)).cloned().unwrap_or_else(|| "origin/main".to_owned());
-        changed::affected(root, &base)?
-    } else {
-        Affected::All
-    };
-    for (name, _) in TASKS {
-        if skip.iter().any(|s| s == name) {
-            continue;
-        }
-        run_task(name, root, &scope)?;
-    }
-    println!("\nxtask: all checks passed");
-    Ok(())
-}
-
-fn run_task(name: &str, root: &Path, scope: &Affected) -> TaskResult {
-    println!("\n==> {name}");
-    let result = match name {
-        "fmt" => cargo(root, &["fmt", "--all", "--", "--check"]),
-        "lint-roots" => lintroots::check_lint_roots(root, &[], &[]),
-        "unlinked" => link::check_unlinked(root),
-        "core-pin" => corepin::task(root, &[]),
-        "sync" => sync::app_task(root, true),
-        "layers" => check_layers(root),
-        "docs" => docs::app_task(root),
-        "privacy" => privacy::task(root, &[]),
-        "licenses" => check_licenses(root),
-        "clippy" => scoped(root, scope, &["clippy", "--locked", "--all-targets"], &["--", "-D", "warnings"]),
-        "test" => scoped(root, scope, &["test", "--locked"], &[]),
-        other => Err(format!("no runner for task '{other}'")),
-    };
-    result.map_err(|e| format!("{name}: {e}"))
-}
-
-fn scoped(root: &Path, scope: &Affected, head: &[&str], tail: &[&str]) -> TaskResult {
-    if scope.is_empty() {
-        println!("nothing to do: no package affected");
-        return Ok(());
-    }
-    let pkgs = scope.cargo_args();
-    let mut args: Vec<&str> = head.to_vec();
-    args.extend(pkgs.iter().map(String::as_str));
-    args.extend(tail);
-    cargo(root, &args)
-}
-
-/// Apps reach upstream only through the core's `jcj-` interfaces (core plan, "Things agents must
-/// not do").
-fn check_layers(root: &Path) -> TaskResult {
-    let members = workspace_members(root)?;
-    let names: BTreeSet<&str> = members.iter().map(|m| m.name.as_str()).collect();
-    let mut failures = Vec::new();
-    for member in &members {
-        if member.name == "xtask" {
-            continue;
-        }
-        for dep in util::direct_deps(root, &member.name)? {
-            if names.contains(dep.as_str()) {
-                continue;
-            }
-            if dep.starts_with("wordcraft-") || dep.starts_with("craft-") || dep == "jcj-upstream" {
-                failures.push(format!("{} depends on {dep}; use the core's jcj- interfaces", member.name));
-            }
-        }
-    }
-    report(failures, "the app uses only the core's jcj- interfaces")
-}
-
-fn check_licenses(root: &Path) -> TaskResult {
-    let out = cargo_output(
-        root,
-        &["tree", "--workspace", "--locked", "--target", "all", "-e", "normal,build,dev", "--prefix", "none", "--format", "{p}\t{l}"],
-    )?;
-    let mut failures = Vec::new();
-    let mut checked = BTreeSet::new();
-    for line in out.lines().filter(|l| !l.trim().is_empty()) {
-        let line = line.trim().trim_end_matches("(*)").trim_end();
-        let Some((pkg, license)) = line.split_once('\t') else { continue };
-        if !checked.insert(pkg.to_owned()) {
-            continue;
-        }
-        match spdx::is_allowed(license.trim()) {
-            Ok(true) => {}
-            Ok(false) => failures.push(format!("{pkg}: license '{license}' is not on the allowlist")),
-            Err(e) => failures.push(format!("{pkg}: {e}")),
-        }
-    }
-    report(failures, "licenses are on the allowlist")
+    gate::main(&APP)
 }

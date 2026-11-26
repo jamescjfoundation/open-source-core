@@ -13,40 +13,9 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
-// The shared modules carry items only an app xtask uses (dev-link, app-side sync).
-#[path = "../../template/xtask/src/changed.rs"]
-#[allow(dead_code)]
-mod changed;
-#[path = "../../template/xtask/src/corepin.rs"]
-#[allow(dead_code)]
-mod corepin;
-#[path = "../../template/xtask/src/docs.rs"]
-#[allow(dead_code)]
-mod docs;
-#[path = "../../template/xtask/src/json.rs"]
-#[allow(dead_code)]
-mod json;
-#[path = "../../template/xtask/src/licenses.rs"]
-#[allow(dead_code)]
-mod licenses;
-#[path = "../../template/xtask/src/link.rs"]
-#[allow(dead_code)]
-mod link;
-#[path = "../../template/xtask/src/lintroots.rs"]
-#[allow(dead_code)]
-mod lintroots;
-#[path = "../../template/xtask/src/privacy.rs"]
-#[allow(dead_code)]
-mod privacy;
-#[path = "../../template/xtask/src/spdx.rs"]
-#[allow(dead_code)]
-mod spdx;
-#[path = "../../template/xtask/src/sync.rs"]
-#[allow(dead_code)]
-mod sync;
-#[path = "../../template/xtask/src/util.rs"]
-#[allow(dead_code)]
-mod util;
+// The modules every app's xtask shares, compiled into this one from where apps copy them.
+#[path = "../../template/xtask/src/shared.rs"]
+mod shared;
 
 mod layers;
 mod pins;
@@ -55,8 +24,10 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
-use changed::Affected;
-use util::{TaskResult, cargo, cargo_output, report, workspace_members};
+use shared::changed::{self, Affected};
+use shared::gate::scoped;
+use shared::util::{self, TaskResult, cargo, cargo_output, report, workspace_members};
+use shared::{corepin, docs, gate, licenses, link, lintroots, privacy, spdx, sync};
 
 /// The gate, in order. Cheap checks first so a mistake fails fast.
 const TASKS: &[(&str, &str)] = &[
@@ -76,8 +47,8 @@ const TASKS: &[(&str, &str)] = &[
 const SHIPPED: &[&str] = &["core-testbed"];
 
 /// The marked blocks of `sync::BLOCKS` the core's own files do not carry: it has its own "Before
-/// you commit" and house rules for code.
-const NOT_IN_THE_CORE: &[&str] = &["app"];
+/// you commit" and house rules for code, and its own Cargo settings and ignore rules.
+const NOT_IN_THE_CORE: &[&str] = &["app", "cargo", "ignore", "attributes"];
 
 /// (file under `template/`, the core's own file): whole managed files the core itself uses too.
 const SAME_IN_THE_CORE: &[(&str, &str)] = &[("template/CODE_OF_CONDUCT.md", "CODE_OF_CONDUCT.md")];
@@ -106,7 +77,7 @@ fn main() -> ExitCode {
         },
         // On a folder: an app, or a repository without Cargo, which has no other way to be checked.
         "docs" if rest.first().is_some_and(|a| !a.starts_with("--")) => docs::core_task(&root, rest.first().map(String::as_str)),
-        // The hooks are shared with the apps, whose pre-commit rejects a dev-link; the core has none to leave.
+        // The hooks are shared with the apps, whose pre-commit rejects a dev-link in a tracked file; the core has none.
         "unlinked" => link::check_unlinked(&root),
         "vendor" => vendor(&root, rest.first().map(String::as_str)),
         "install-hooks" => install_hooks(&root),
@@ -157,7 +128,9 @@ fn print_help() {
     println!("  vendor [out file]         archive the vendored sources of every dependency (release asset)");
     println!("  upstream-status           the pinned WordCraft release and the newest upstream (the train's trigger)");
     println!("  template-check            build the app template against this checkout, and run its own checks");
-    println!("  install-hooks             use the repository's git hooks (pre-commit: fmt, privacy, no dev-link; pre-push: ci --changed)");
+    println!(
+        "  install-hooks             use the repository's git hooks (pre-commit: fmt, privacy, no dev-link in a tracked file; pre-push: ci --changed)"
+    );
     println!("  third-party-licenses [file]  write the dependency license texts");
 }
 
@@ -168,35 +141,12 @@ fn workspace_root() -> PathBuf {
 
 fn ci(root: &Path, args: &[String]) -> TaskResult {
     let names: Vec<&str> = TASKS.iter().map(|(n, _)| *n).collect();
-    // `--changed` and `--base <ref>` are ours; the rest are `--skip` and `--only` arguments.
-    let mut skip_args = Vec::new();
-    let mut it = args.iter();
-    while let Some(a) = it.next() {
-        match a.as_str() {
-            "--changed" => {}
-            "--base" => {
-                it.next();
-            }
-            _ => skip_args.push(a.clone()),
-        }
-    }
-    let skip = util::skipped(&skip_args, &names)?;
+    let asked = gate::asked(args, &names, &|| changed::base_ref(root, &[]))?;
     util::warn_if_hooks_off(root, "template/hooks");
-    let scope = if args.iter().any(|a| a == "--changed") {
-        let base = changed::base_ref(root, args);
-        let a = changed::affected(root, &base)?;
-        match &a {
-            Affected::All => println!("changes since {base} affect every package"),
-            Affected::Some(p) if p.is_empty() => println!("changes since {base} affect no package"),
-            Affected::Some(p) => println!("changes since {base} affect: {}", p.join(", ")),
-        }
-        a
-    } else {
-        Affected::All
-    };
+    let scope = gate::scope(root, &asked)?;
     let started = std::time::Instant::now();
     for (name, _) in TASKS {
-        if skip.iter().any(|s| s == name) {
+        if asked.skip.iter().any(|s| s == name) {
             println!("\n==> {name} (skipped)");
             continue;
         }
@@ -236,19 +186,6 @@ fn fmt_template(root: &Path) -> TaskResult {
         .status()
         .map_err(|e| format!("could not run rustfmt: {e}"))?;
     if status.success() { Ok(()) } else { Err("the template's Rust files need `rustfmt --edition 2024` (see the diff above)".to_owned()) }
-}
-
-/// Run a cargo command over the affected packages, or not at all when none are.
-fn scoped(root: &Path, scope: &Affected, head: &[&str], tail: &[&str]) -> TaskResult {
-    if scope.is_empty() {
-        println!("nothing to do: no package affected");
-        return Ok(());
-    }
-    let pkgs = scope.cargo_args();
-    let mut args: Vec<&str> = head.to_vec();
-    args.extend(pkgs.iter().map(String::as_str));
-    args.extend(tail);
-    cargo(root, &args)
 }
 
 fn has_nextest(root: &Path) -> bool {
@@ -318,20 +255,31 @@ fn check_template(root: &Path) -> TaskResult {
     // the ones that are about more than an app, word for word.
     for (from, own, name) in sync::BLOCKS {
         let text = read(from)?;
-        let Some(block) = sync::marked_block(&text, name) else {
-            failures.push(format!("{from}: no `{name}` block (the lines `{}` and `{}`)", sync::block_begin(name), sync::block_end(name)));
+        let marks = sync::marks(from, name);
+        let Some(block) = sync::marked_block(&text, &marks) else {
+            failures.push(format!("{from}: no `{name}` block (the lines `{}` and `{}`)", marks.begin, marks.end));
             continue;
         };
         if NOT_IN_THE_CORE.contains(name) {
             continue;
         }
-        match sync::marked_block(&read(own)?, name) {
+        match sync::marked_block(&read(own)?, &sync::marks(own, name)) {
             Some(b) if b == block => {}
             Some(_) => {
                 failures.push(format!("{own}: the `{name}` block differs from {from}'s (change it in {from}, then `cargo xtask template --write`)"))
             }
             None => failures.push(format!("{own}: no `{name}` block ({from} shows where it goes)")),
         }
+    }
+    // The managed file with a part that is the app's: the core's own copy leaves that part empty.
+    let deny = read(sync::DENY)?;
+    if sync::with_sources(&deny, &[]) != deny || !deny.contains(sync::SOURCES_BEGIN) {
+        failures.push(format!(
+            "{}: the lines `{}` and `{}` hold an app's own sources, and nothing in the core (it names no product)",
+            sync::DENY,
+            sync::SOURCES_BEGIN,
+            sync::SOURCES_END
+        ));
     }
     for (from, own) in SAME_IN_THE_CORE {
         if std::fs::read(root.join(from)).ok() != std::fs::read(root.join(own)).ok() {
@@ -385,10 +333,10 @@ fn write_own_copies(root: &Path) -> TaskResult {
     let mut written = 0usize;
     for (from, own, name) in sync::BLOCKS.iter().filter(|(_, _, name)| !NOT_IN_THE_CORE.contains(name)) {
         let template = read(from)?;
-        let block = sync::marked_block(&template, name).ok_or_else(|| format!("{from} has no `{name}` block"))?;
+        let block = sync::marked_block(&template, &sync::marks(from, name)).ok_or_else(|| format!("{from} has no `{name}` block"))?;
         let have = read(own)?;
-        let new =
-            sync::replace_marked_block(&have, name, block).ok_or_else(|| format!("{own} has no `{name}` block ({from} shows where it goes)"))?;
+        let new = sync::replace_marked_block(&have, &sync::marks(own, name), block)
+            .ok_or_else(|| format!("{own} has no `{name}` block ({from} shows where it goes)"))?;
         if new != have {
             std::fs::write(root.join(own), new).map_err(|e| format!("{own}: {e}"))?;
             written += 1;
@@ -496,13 +444,13 @@ fn vendor(root: &Path, out: Option<&str>) -> TaskResult {
 
 /// `cargo xtask template-check`: a copy of `template/` in `target/template-check`, synced from this
 /// checkout and depending on it by path instead of by release tag, must build and pass its own
-/// lint-roots, core-pin, layers and sync checks. The scheduled CI run does this, so the template
+/// lint-roots, core-pin, unlinked, layers, app-layers, sync and docs checks. The scheduled CI run does this, so the template
 /// never rots between releases.
 fn template_check(root: &Path) -> TaskResult {
     let dir = root.join("target").join("template-check");
     let _ = std::fs::remove_dir_all(&dir);
     copy_dir(&root.join("template"), &dir, 0)?;
-    sync::write(root, &dir)?;
+    sync::write(root, &dir, Some(&[]))?;
     let manifest_path = dir.join("Cargo.toml");
     let manifest = std::fs::read_to_string(&manifest_path).map_err(|e| format!("template Cargo.toml: {e}"))?;
     let mut out = String::new();
@@ -534,7 +482,9 @@ fn template_check(root: &Path) -> TaskResult {
     run(&["clippy", "--workspace", "--all-targets", "--", "-D", "warnings"])?;
     run(&["run", "--quiet", "-p", "xtask", "--", "lint-roots"])?;
     run(&["run", "--quiet", "-p", "xtask", "--", "core-pin"])?;
+    run(&["run", "--quiet", "-p", "xtask", "--", "unlinked"])?;
     run(&["run", "--quiet", "-p", "xtask", "--", "layers"])?;
+    run(&["run", "--quiet", "-p", "xtask", "--", "app-layers"])?;
     run(&["run", "--quiet", "-p", "xtask", "--", "sync", "--check"])?;
     run(&["run", "--quiet", "-p", "xtask", "--", "docs"])?;
     run(&["test", "--workspace"])?;

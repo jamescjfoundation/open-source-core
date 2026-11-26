@@ -102,9 +102,14 @@ egui = { version = "0.37", default-features = false }
 eframe = { version = "0.37", default-features = false, features = ["accesskit", "glow", "wayland", "x11"] }
 egui_kittest = "0.37"
 
-# Lint policy shared by every crate, the same as WordCraft's and Script's.
+# The lint policy and build profiles of every crate here and of every app: the block below.
+# BEGIN open-source-core: lints-and-profiles
+# Owned by open-source-core (template/Cargo.toml). Change it there, never in a copy: its tooling rewrites the copies.
+# One lint standard and one set of build profiles for the core and every app. A lint or a profile
+# setting an app needs is asked for in the core; a table this block does not hold is the app's.
 [workspace.lints.rust]
 unsafe_code = "forbid"
+# cargo llvm-cov sets `--cfg coverage`; a timing test may skip itself under it.
 unexpected_cfgs = { level = "warn", check-cfg = ["cfg(coverage)"] }
 
 [workspace.lints.clippy]
@@ -131,6 +136,7 @@ opt-level = 3
 lto = "thin"
 codegen-units = 16
 debug = 0
+# END open-source-core: lints-and-profiles
 
 # ---------------------------------------------------------------------------------------------
 # THE PATCH BLOCK. Cargo honours [patch] only in the top-level project, so every app repository

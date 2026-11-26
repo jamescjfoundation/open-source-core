@@ -1,7 +1,8 @@
 # 0003: Toolchain, the gate, and CI that rarely makes anyone wait
 
 Date: 2026-11-24 · Status: accepted · Amended 2026-11-26 (what `sync` carries; the `docs` task
-and the hooks; the shared workflows, what a change affects, and checks on every push) · Ported
+and the hooks; the shared workflows, what a change affects, and checks on every push; the gate an
+app shares, its layer table, and one run of `sync`) · Ported
 from Wordsmith Script decisions 0003 and 0040
 
 ## Decision
@@ -30,6 +31,31 @@ from Wordsmith Script decisions 0003 and 0040
   that are not only about an app in its own files; its `template` task checks them and
   `cargo xtask template --write` writes them. Before this the rules were about 115 lines copied
   by hand into five files, with nothing to notice a copy that had fallen behind.
+- **An app's gate is shared code** (amended 2026-11-26). An app's `xtask/src/main.rs` used to
+  be a copy of the template's: the runner, the list of tasks and two checks, repeated in every
+  app, so each core release that added a task asked for hand edits in every app, and a fix to
+  the runner reached none. Now `main.rs` holds only the app's data (the product's name, the
+  programs it ships, the repositories it builds on besides the core) and the app's own tasks,
+  and ends in `gate::main(&APP)`. The runner, the list and order of the shared tasks and each
+  check are in `template/xtask/src/gate.rs`, which `sync` carries; `main.rs` declares one
+  module, `shared`, which lists the others. A release that adds a check or a module needs no
+  edit in an app. The shared gate also holds what each app had written for itself: one `assets`
+  check, one `screenshots` task, and one `app-layers`.
+- **An app's layers are a table in its `AGENTS.md`** (amended 2026-11-26), between two marker
+  lines, and `cargo xtask app-layers` reads it there. The table people and agents read is the
+  rule the check enforces, so the two cannot differ; the copies kept in code before had drifted
+  from the tables beside them. `template/xtask/src/applayers.rs` says how a table is read.
+- **More of an app's settings are blocks** (amended 2026-11-26). The marked blocks also cover
+  files that are not Markdown, between `# BEGIN open-source-core: NAME` and
+  `# END open-source-core: NAME`: the workspace lints and build profiles in `Cargo.toml` (the
+  core carries the same block), the Cargo configuration, and the shared lines of `.gitignore`
+  and `.gitattributes`. `xtask/Cargo.toml` is a managed file. `deny.toml` is a managed file
+  with one part that is the app's (decision 0015).
+- **One run of `sync` is enough** (amended 2026-11-26). `sync` runs as the app's xtask, built
+  from the app's copy of the shared modules, so a release that changed its lists was written by
+  the old lists and needed a second run. A run that changed any shared xtask source now builds
+  the new xtask and runs it once more. It builds it in a folder of its own, because a program
+  cannot be replaced while it runs on Windows.
 - **Only what changed.** `cargo xtask ci --changed --base <ref>` runs clippy and tests only for the
   packages a change touches and everything that depends on them (`template/xtask/src/changed.rs`).
   A change to a manifest, the lock file or the toolchain affects everything. Tests run under

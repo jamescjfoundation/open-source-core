@@ -34,7 +34,7 @@ when present.
 | `crates/jcj-theme`, `jcj-board`, `jcj-shell` | Theming from tokens, cards and boards, the app shell |
 | `apps/core-testbed` | A small app that uses every crate |
 | `contract-tests` | Behavior apps rely on, run against every upstream candidate |
-| `template` | Starter files for a new app repository, and the source of what `cargo xtask sync` keeps identical in every app: the shared xtask modules, the two files that call the shared workflows, the Dependabot settings, hooks, code of conduct and the marked blocks |
+| `template` | Starter files for a new app repository, and the source of what `cargo xtask sync` keeps identical in every app: the shared xtask modules (the gate every app runs is `template/xtask/src/gate.rs`), the two files that call the shared workflows, the Dependabot settings, hooks, code of conduct and the marked blocks of rules and settings |
 | `xtask` | The core's own gate and maintenance tasks |
 | `.github/workflows` | The core's own workflows, and the two shared workflows every app's CI calls; its `README.md` says what each runs and when, and how a change to a shared one reaches the apps |
 | `docs/decisions` | Why things are the way they are |
@@ -113,11 +113,22 @@ be under an allowed license and listed in `ATTRIBUTION.md`.
 
 ### The marked blocks
 
-The rules every app carries are the marked blocks under `template/` (`BLOCKS` in
-`template/xtask/src/sync.rs`). Change a block there, never in this repository's own copy, then run
-`cargo xtask template --write`; the `template` task of the gate fails when a copy here differs. A
-changed block reaches the apps with the next release, so keep it true for every app and for the
-core, and say in the changelog what an app must do.
+The rules and settings every app carries are the marked blocks under `template/` (`BLOCKS` in
+`template/xtask/src/sync.rs`): rules in the Markdown files, and in `Cargo.toml`,
+`.cargo/config.toml`, `.gitignore` and `.gitattributes` the settings every app shares. Change a
+block there, never in this repository's own copy, then run `cargo xtask template --write`; the
+`template` task of the gate fails when a copy here differs. A changed block reaches the apps with
+the next release, so keep it true for every app and for the core, and say in the changelog what
+an app must do.
+
+### The shared gate
+
+An app's gate is this repository's code: `template/xtask/src/gate.rs` and the modules beside it,
+listed in `template/xtask/src/shared.rs`. An app's `xtask/src/main.rs` is the app's own and holds
+only its data and its own tasks. Keep a release from asking for an edit there: a new check goes
+in `CHECKS`, a new module in `shared.rs` and in `MANAGED`, and a new field of `App` gets a value
+in `App::DEFAULT`. `cargo xtask template-check` builds the template against this checkout and
+runs its checks.
 
 ### The shared workflows
 

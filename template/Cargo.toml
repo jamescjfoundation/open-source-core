@@ -29,16 +29,26 @@ serde_json = "1"
 # The window, at the egui version the core pins (the patch block points it at the same fork).
 eframe = { version = "0.37", default-features = false, features = ["accesskit", "glow", "wayland", "x11"] }
 
+# BEGIN open-source-core: lints-and-profiles
+# Owned by open-source-core (template/Cargo.toml). Change it there, never in a copy: its tooling rewrites the copies.
+# One lint standard and one set of build profiles for the core and every app. A lint or a profile
+# setting an app needs is asked for in the core; a table this block does not hold is the app's.
 [workspace.lints.rust]
 unsafe_code = "forbid"
+# cargo llvm-cov sets `--cfg coverage`; a timing test may skip itself under it.
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(coverage)"] }
 
 [workspace.lints.clippy]
+# The six panicking lints (unwrap_used, expect_used, panic, unimplemented, todo, unreachable) are
+# denied by attributes at every product crate root, so integration tests can unwrap.
+# `cargo xtask lint-roots` checks every root carries them.
 cognitive_complexity = "deny"
 wildcard_imports = "deny"
 too_many_arguments = "deny"
 dbg_macro = "warn"
 type_complexity = "allow"
 
+# Dependencies are optimized even in dev builds: layout and PDF tests are slow otherwise.
 [profile.dev.package."*"]
 opt-level = 2
 debug = false
@@ -52,6 +62,7 @@ opt-level = 3
 lto = "thin"
 codegen-units = 16
 debug = 0
+# END open-source-core: lints-and-profiles
 
 # The core's patch block: written by `cargo xtask sync`, checked by `cargo xtask sync --check`.
 # Never edit it here.

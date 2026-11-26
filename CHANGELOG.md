@@ -3,6 +3,260 @@
 Each release says what changed for apps. While at 0.x, a patch release never breaks an app; a
 minor release may, and then **What apps must do** says exactly what (decision 0011).
 
+## Unreleased
+
+### Added
+
+- **An app's gate is the core's code, and `xtask/src/main.rs` holds only what is the app's**
+  (decision 0003, amended). Each app's `main.rs` was a copy of the template's: the `ci` runner,
+  the list of tasks, the layer and license checks. Every release that added a task asked for
+  hand edits in each app, and a fix to the runner reached none.
+  - The runner, the list and order of the shared tasks and every shared check are in
+    `xtask/src/gate.rs` (`template/xtask/src/gate.rs` here), a managed file.
+  - `main.rs` holds the app's data, `const APP: App` (the product's name, the programs it
+    ships, the repositories it builds on besides the core, and a few options), and the app's
+    own tasks, `Task::check(name, help, function)` for the gate and `Task::other(...)` for a
+    task run by name. It ends in `gate::main(&APP)`.
+  - `main.rs` declares one module of the core's, `mod shared;`. `xtask/src/shared.rs` lists the
+    others, which sit beside it as before.
+  - So a release that adds a check, a shared task, a module or a field of `App` needs no edit
+    in an app: `cargo xtask sync` brings it, and `..App::DEFAULT` fills a new field.
+  - The gate runs the shared checks, then the app's own, then clippy and the tests.
+    `cargo xtask help` prints all of it.
+- **`cargo xtask app-layers` in every app, reading the table in `AGENTS.md`.** Two apps had each
+  written the check, with the rule in code and a table beside it for people; the two had
+  drifted. The table agents read is now the rule: it sits between the lines
+  `<!-- BEGIN layer table (cargo xtask app-layers reads it) -->` and `<!-- END layer table -->`,
+  and nothing else holds the layers. `xtask/src/applayers.rs` says how it is read; in short:
+  - rows are layers, lowest first; with a `Layer` column, rows with one number are one layer;
+  - the packages column names workspace packages in backticks, by package name, by folder
+    (`crates/app-model`), by the folder's last part, or `apps/*` for every package under a
+    folder; every package but `xtask` is in exactly one row;
+  - the last column with "use" or "depend" in its heading names, in backticks, the crates from
+    outside the workspace a layer may use; a crate is allowed from the layer that names it
+    upwards, and `(only here)` after a name keeps it to that row's packages;
+  - it fails on a package in no row or in two, a name that is no package, a dependency on a
+    package of the same or a higher layer, and a use of a core crate (`jcj-`), a provider's
+    crate or any crate the table names that the table does not allow there. Other libraries
+    are not its business.
+- **One `assets` check and one `screenshots` task**, in place of three of each.
+  `cargo xtask assets`: every file under `assets/` that Git tracks or would add is named in
+  `ATTRIBUTION.md` in backticks, by its path or by a folder above it and below `assets/`; no
+  asset is a symbolic link; `LICENSE-MIT`, `LICENSE-APACHE`, `NOTICE`, `ATTRIBUTION.md` and
+  `SECURITY.md` exist, and the files the app adds in `legal_files`. `cargo xtask screenshots`
+  runs the `screenshots` example of the package named in `screenshots`, into `docs/images/`.
+- **A dev-link changes no tracked file** (decision 0013, amended).
+  `cargo xtask dev-link ../open-source-core` used to write the link, with the full path of a
+  folder on one machine, into `.cargo/config.toml`, which every app tracks, and a build while
+  linked rewrote `Cargo.lock`.
+  - The link is now the folder `.cargo/dev-link/`, which Git ignores. It holds a Cargo
+    configuration file with the `[patch]` tables, which the tracked `.cargo/config.toml`
+    includes when it exists (`include = [{ path = "dev-link/config.toml", optional = true }]`),
+    and the lock file of the linked build (`resolver.lockfile-path`).
+  - Plain `cargo build`, `cargo test` and an editor's rust-analyzer build against the link with
+    no flag. The app's own `Cargo.lock` is not written while linked, so `dev-unlink` has
+    nothing to restore: link, build, unlink leaves `git status` clean.
+  - A relative folder is read from the app's root, wherever the command is run.
+  - `cargo xtask dev-link` alone says what is linked. It refuses to link where Git would not
+    ignore the folder or Cargo would not read it, and it checks that Cargo took the link.
+  - It needs the Cargo that `rust-toolchain.toml` names (1.100). An older Cargo ignores
+    `resolver.lockfile-path` (1.95 does) and would write the app's own `Cargo.lock`: with one,
+    `dev-link` puts the lock file back, keeps no link and says why.
+  - The gate's `unlinked` task still fails while linked: the gate says what CI will say, and CI
+    builds the pinned release. `cargo xtask ci --linked` runs the whole gate against the link
+    and says so in its last line.
+  - `unlinked` also fails, linked or not, on a `[patch]` table or a `paths` entry in
+    `.cargo/config.toml` and on a `[patch]` entry with a local path in `Cargo.toml`. The
+    pre-commit hook runs only that part (`cargo xtask unlinked --tracked`), so committing
+    while linked is fine.
+- **A second address for the link: a provider.** An app that builds on another app's crates
+  (decision 0015) names that repository in its `main.rs`,
+  `providers: &[Provider { name: "other", git: "https://github.com/<owner>/<repository>" }]`,
+  and links a checkout of it by that name: `cargo xtask dev-link other=../other-app`, alone or
+  with the core in one command. The core names no app for this.
+- **A temporary pin, so a pull request can be checked against a core change before its
+  release** (decision 0013, amended). On a branch of the app, every `jcj-` line names the same
+  whole commit of the core, `rev = "<40 characters>"` in place of `tag`. `cargo xtask core-pin`
+  passes there and in the branch's pull request, with a warning that GitHub shows on the
+  checks page; `sync --check` compares with that commit's files and cargo-deny accepts it. The
+  same pin fails on `main`, on a tag, in a merge queue and where the run cannot be told to be
+  a branch. A line at a branch, a short commit, or lines at different commits fail everywhere.
+  The shared workflows are unchanged and `workflows-v1` does not move for this.
+- **An app's own git sources in `deny.toml`.** The file stays the core's but for the lines
+  between `# BEGIN app sources` and `# END app sources` in `allow-git`. `cargo xtask sync`
+  writes the addresses of the app's `providers` there, and `sync --check` fails when they are
+  not exactly those. The core's own file has nothing between the two lines.
+- **More shared settings, as marked blocks** in files that are otherwise the app's, between
+  `# BEGIN open-source-core: NAME` and `# END open-source-core: NAME`:
+  - `Cargo.toml`, `lints-and-profiles`: `[workspace.lints.rust]`, `[workspace.lints.clippy]`
+    and the three build profiles. The core's own `Cargo.toml` carries the same block;
+  - `.cargo/config.toml`, `cargo`: the line that reads a dev-link, and the `xtask` alias;
+  - `.gitignore`, `ignore`: `/target`, `/dist`, `/.private`, `/.cargo/dev-link/`, `.DS_Store`,
+    `*.swp`;
+  - `.gitattributes`, `attributes`: `* text=auto eol=lf`.
+  `xtask/Cargo.toml` is a managed file.
+- **One rule in the `app-and-core` block: when a promotion is finished** (decision 0013,
+  amended; issue #30). Code promoted from an app is finished only when the app it came from
+  uses the core's copy and its own copy is deleted. The core issue stays open until then, and
+  the `core-candidate` marker on the app's copy names it.
+
+### Changed
+
+- **One run of `cargo xtask sync` is enough.** A release that changed `sync.rs` or its lists
+  used to be written by the app's older copy of them, and asked for a second run. A run that
+  changed any shared xtask source now builds the new xtask, in `target/xtask-sync`, and runs it
+  once more. The folder of its own is what makes that work on Windows, where a program cannot
+  be replaced while it runs. The move to this release is the last that needs a second run by
+  hand, because the program that starts it is the old one.
+- **`sync` reads everything from the core before it writes anything**, and refuses a core that
+  lacks a file or a block it manages: that core is an older release than the app's shared
+  files are from, and writing half of it would leave an xtask that does not build. It says to
+  move the pin or to link a checkout. A file that is already right is not rewritten.
+- The `app-and-core` block's steps for a core change an app needs say what the link is, name
+  `cargo xtask ci --linked` and gain the temporary pin as their step 5. "Something one app
+  needs from another app" says how a provider is linked. The `app` block lists what the core
+  owns in three groups and says what `main.rs` holds and where the layers are.
+- `cargo xtask ci` in an app prints `(skipped)` for a task left out and says which packages a
+  `--changed` run covers. With `--changed` and no `--base`, the base is `origin/main` when the
+  clone has it and `HEAD` otherwise (it was always `origin/main`).
+- What the unified checks ask that an app's own did not:
+  - `assets`: a path counts only in backticks (Wordsmith Script's check took a bare path); the
+    legal files are checked in every app, `SECURITY.md` among them (Wordsmith Manuscript's
+    check had none); files Git would add count, not only tracked ones (Wordsmith Book's read
+    tracked files); the folder `assets/` itself names nothing.
+  - `app-layers`: every package is in the table, programs included (Wordsmith Manuscript's
+    left `apps/` out); a core crate no row names fails (Wordsmith Book's checked only the
+    crates its code listed); Wordsmith Script had a table and no check.
+
+### Fixed
+
+- **A dev-link to a core checkout of another version than the pinned one linked nothing.**
+  Cargo keeps what a lock file holds, so the pinned packages stayed and the `[patch]` entries
+  were reported unused. The lock file of the linked build now starts as the app's own without
+  the packages of the linked addresses, so exactly those are resolved again, to the checkout,
+  and every other dependency stays where the app pins it.
+- `dev-link` patched every crate of the core, used or not, which made Cargo warn about each
+  unused one on every command. It patches the packages the app takes from the address.
+- `deny.toml` named an app's repository so that another app could depend on it, and the comment
+  above the workspace lints named a product. The core's files name none (decision 0013).
+- The core's `.gitignore` ignored a dev-link file no tool ever wrote.
+
+### What apps must do
+
+`vX.Y.Z` below is this release's tag. Steps 2 to 9 change files only; nothing in an app's
+product code changes. An app that stops after step 5 has a working gate with its old
+`main.rs`; `sync` says on every run that it is not on the shared gate yet.
+
+1. Move every `jcj-` dependency to `tag = "vX.Y.Z"`, then run
+   `cargo metadata --format-version 1 >/dev/null` to bring `Cargo.lock` in line.
+2. Run `cargo xtask sync`. The program that runs is the app's older one: it writes the files
+   it knows and says to run it again.
+3. Run `cargo xtask sync` again. It adds `xtask/src/shared.rs`, `gate.rs`, `applayers.rs` and
+   `assets.rs`, runs itself once more, and ends with "marked block(s) have no place yet",
+   naming four blocks (three in an app with no `.gitattributes`: the file is written whole).
+   That is expected. From here on a core release needs one run.
+4. Give each of those blocks its place: put its BEGIN line above, and its END line below, the
+   lines the block replaces. Do not delete those lines yet: `cargo` needs the `xtask` alias and
+   the lint tables to run the next step, and `sync` replaces whatever is between the two lines.
+   - `.cargo/config.toml`: `# BEGIN open-source-core: cargo` as the first line of the file,
+     and `# END open-source-core: cargo` after the line `xtask = "run --quiet --package xtask --"`.
+   - `Cargo.toml`: `# BEGIN open-source-core: lints-and-profiles` above `[workspace.lints.rust]`,
+     and `# END open-source-core: lints-and-profiles` after the last line of
+     `[profile.release]`. The five tables between them (`[workspace.lints.rust]`,
+     `[workspace.lints.clippy]`, `[profile.dev.package."*"]`, `[profile.dev]`,
+     `[profile.release]`) become the core's; a table of the app's own that stands among them
+     moves below the END line.
+   - `.gitignore`: `# BEGIN open-source-core: ignore` and `# END open-source-core: ignore`
+     around the lines `/target`, `/dist`, `/.private`, `.DS_Store` and `*.swp` and their
+     comments. Any other line is the app's and goes outside.
+   - `.gitattributes`: `# BEGIN open-source-core: attributes` and
+     `# END open-source-core: attributes` around the line `* text=auto eol=lf` and its comment.
+     The app's own lines go after the END line, where they take precedence.
+5. Run `cargo xtask sync`. It fills the four blocks. In an app that had no `.gitattributes`,
+   run `git ls-files --eol | grep crlf`: a file listed there is stored with Windows line ends,
+   and one that must keep them gets a line of the app's own after the block,
+   `<path> -text`.
+6. Put the app's layers in `AGENTS.md` as the table `app-layers` reads ("Added" above has the
+   rules, and `template/AGENTS.md` an example): the line
+   `<!-- BEGIN layer table (cargo xtask app-layers reads it) -->` above the table and
+   `<!-- END layer table -->` below it; rows lowest layer first; package names and crate names
+   in backticks; each core crate named once, in the lowest row that uses it, and marked
+   `(only here)` where only that row may. Correct the text around the table: it is the rule
+   now, and no constant in `xtask/` repeats it.
+7. Replace `xtask/src/main.rs` with the app's data and its own tasks. The whole file, for an
+   app with one task of its own:
+
+   ```rust
+   // SPDX-License-Identifier: MIT OR Apache-2.0
+   //! `cargo xtask <task>` for <the app>, built on open-source-core.
+
+   #![forbid(unsafe_code)]
+   #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
+
+   mod shared;
+
+   use std::path::Path;
+   use std::process::ExitCode;
+
+   use shared::gate::{self, App, Task};
+   use shared::util::{TaskResult, cargo};
+
+   const APP: App = App {
+       product: "<the product's name>",
+       shipped: &["<program>", "<program>"],
+       screenshots: Some("<the package with the `screenshots` example>"),
+       tasks: TASKS,
+       ..App::DEFAULT
+   };
+
+   const TASKS: &[Task] = &[Task::other("wasm", "build the web program", |root, _| wasm(root))];
+
+   fn main() -> ExitCode {
+       gate::main(&APP)
+   }
+
+   fn wasm(root: &Path) -> TaskResult {
+       cargo(root, &["build", "--locked", "-p", "<package>", "--target", "wasm32-unknown-unknown"])
+   }
+   ```
+
+   - `PRODUCT` and `SHIPPED` become `product` and `shipped`. The second argument of
+     `lintroots::check_lint_roots` becomes `no_indexing`. Legal files the app's `assets` check
+     asked for beyond `LICENSE-MIT`, `LICENSE-APACHE`, `NOTICE`, `ATTRIBUTION.md` and
+     `SECURITY.md` become `legal_files`. The package of the app's `screenshots` task becomes
+     `screenshots`; leave the field out when the app has no such task.
+   - An app that builds on another app's crates adds
+     `providers: &[Provider { name: "<a short name>", git: "<the address its Cargo.toml names>" }]`
+     and `use shared::link::Provider;`.
+   - Delete the app's copies of what is shared now: `TASKS` as a list of names, `ci`,
+     `run_task`, `scoped`, `workspace_root`, `check_layers`, `check_licenses`, the `match` in
+     `main`, its own `assets` and `app-layers` checks with their tables, its `screenshots`
+     function, and the tests of those. Delete every `mod` line but `mod shared;` and the app's
+     own modules.
+   - A check of the app's own that the gate ran stays, as `Task::check("name", "help", function)`;
+     a task run by name is `Task::other(...)`. The function takes the workspace's folder and
+     the arguments after the task's name. A task may not take a shared task's name.
+   - In a module of the app's own beside `main.rs`, `crate::util` becomes `crate::shared::util`,
+     and so for every shared module; `crate::SHIPPED` and `crate::PRODUCT` become
+     `crate::APP.shipped` and `crate::APP.product`.
+8. Run `cargo xtask sync` once more. In an app with `providers` it writes their addresses
+   into `deny.toml`, which step 2 emptied of them. Then `cargo xtask sync --check`.
+9. Run `cargo xtask ci` and fix what the two unified checks report ("Changed" above says what
+   each asks that the app's own did not): in `ATTRIBUTION.md`, put an asset's path in
+   backticks; in the layer table, name a core crate a row uses, or give a program its row.
+10. Correct what the app's own documents say: that the dev-link is written into
+    `.cargo/config.toml`, must be removed before a commit, or leaves `Cargo.lock` to restore;
+    that the layers are also a constant in `xtask/`; which files of `xtask/src/` are the
+    app's. Run `cargo xtask install-hooks` in a clone whose hooks are off.
+
+An app that follows another app's tag, and so cannot move its pin until that app has, can take
+the files first, as before: in a core checkout at this release, `cargo xtask sync <the app's
+folder>` does what steps 2, 3, 5 and 8 do, and the app writes its providers' addresses between
+the two `app sources` lines of `deny.toml` by hand, one quoted address and a comma per line.
+Until its pin has moved, the app's own `cargo xtask sync` and `sync --check` say that the
+pinned core is an older release and write nothing; `cargo xtask dev-link <that checkout>` and
+`cargo xtask ci --linked` run its gate meanwhile.
+
 ## 0.1.19 (2026-11-26)
 
 ### Added

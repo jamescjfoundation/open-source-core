@@ -21,7 +21,7 @@ get.
 
 | Shared workflow | Called by | What |
 | --- | --- | --- |
-| `shared-ci.yml` | `ci.yml` here (from the same commit) and `ci.yml` in every app (at `workflows-v1`) | The three jobs above. In an app the checks include `sync --check` (the shared files, the patch block and the marked blocks match the pinned core release), `core-pin`, `unlinked`, `docs`, and every task the app added to its own gate. |
+| `shared-ci.yml` | `ci.yml` here (from the same commit) and `ci.yml` in every app (at `workflows-v1`) | The three jobs above. In an app the checks include `sync --check` (the shared files, the patch block and the marked blocks match the pinned core release), `core-pin`, `unlinked`, `app-layers`, `docs`, `assets`, and every task the app added to its own gate. The list is the app's pinned core release's (`gate.rs`), not this file's. On a pull request whose branch pins the core at a commit instead of a release, the jobs build against that commit and `core-pin` passes with a warning shown on the checks page; the same pin fails on `main` (decision 0013). |
 | `shared-core-pin.yml` | `core-pin.yml` in every app (at `workflows-v1`), Mondays and on demand | `cargo xtask core-pin --max-behind 3`: when the app's core pin is more than three releases behind the newest, opens an issue in the app ("Move to open-source-core vX.Y.Z"), or brings the open one up to date (decision 0011). |
 
 A called workflow runs in the repository that calls it: that repository's code, commit and

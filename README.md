@@ -52,10 +52,12 @@ asks of an app.
 
 Copy `template/` to start an app ([template/README.md](template/README.md) has the steps);
 `cargo xtask sync` (in the app) keeps the toolchain, lint,
-cargo-deny settings, shared xtask modules, workflows, code of conduct, the core's `[patch]` block
-and the core's rules (marked blocks in the app's `AGENTS.md`, `SECURITY.md` and
-`CONTRIBUTING.md`) identical to the pinned core release, and the app's gate checks they stay so.
-To work on the core and an app together, `cargo xtask dev-link ../open-source-core` in the app.
+cargo-deny settings, shared xtask modules (the gate among them), workflows, code of conduct, the
+core's `[patch]` block and the core's rules and settings (marked blocks in the app's `AGENTS.md`,
+`SECURITY.md`, `CONTRIBUTING.md`, `Cargo.toml`, `.cargo/config.toml`, `.gitignore` and
+`.gitattributes`) identical to the pinned core release, and the app's gate checks they stay so.
+To work on the core and an app together, `cargo xtask dev-link ../open-source-core` in the app:
+the link lives in a folder Git ignores and changes no tracked file.
 
 The rules for deciding whether a change belongs in an app or the core are in
 [AGENTS.md](AGENTS.md), and the reasons in [docs/decisions/](docs/decisions/README.md). Finished
@@ -66,7 +68,7 @@ plans and published reviews are kept under [docs/history/](docs/history/); they 
 ```sh
 cargo run -p core-testbed     # the test app
 cargo xtask ci                # the full gate; `cargo xtask ci --changed` for just your change
-cargo xtask install-hooks     # once: pre-commit (fmt, privacy, no dev-link) and pre-push (ci --changed) hooks
+cargo xtask install-hooks     # once: pre-commit (fmt, privacy, no dev-link in a tracked file) and pre-push (ci --changed) hooks
 ```
 
 Rust is pinned in `rust-toolchain.toml` (1.100.0; minimum 1.95). [CONTRIBUTING.md](CONTRIBUTING.md) says where things are and how a release is cut.

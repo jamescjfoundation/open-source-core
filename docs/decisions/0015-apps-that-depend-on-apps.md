@@ -1,6 +1,7 @@
 # 0015: Apps that depend on apps
 
-Date: 2026-11-26 · Status: accepted · Qualifies decision 0002 (rule 3) and extends decision 0013
+Date: 2026-11-26 · Status: accepted · Amended 2026-11-26 (an app's own sources; linking a
+provider) · Qualifies decision 0002 (rule 3) and extends decision 0013
 
 ## Context
 
@@ -35,10 +36,18 @@ An app may depend on crates of another app built on the core, under a contract.
   provider first.
 - **Only layers that carry no interface.** The provider offers crates that do not depend on the
   shell, the engine or its own interface code, so a consumer can use them from a command line.
-- **Sources.** cargo-deny allows git dependencies only from listed addresses (decision 0001). A
-  provider's repository must be on the consumer's list. While that list is in the core-owned
-  `deny.toml`, the core's file names the provider; an app-owned list of extra sources is the
-  better home and is to be added.
+- **Sources** (amended 2026-11-26). cargo-deny allows git dependencies only from listed
+  addresses (decision 0001), and a provider's repository must be on the consumer's list. The
+  consumer declares its providers in its own `xtask/src/main.rs`, each a name and a git address.
+  `deny.toml` stays the core's file, but for the lines between `# BEGIN app sources` and
+  `# END app sources` in its `allow-git` list: `cargo xtask sync` writes the providers'
+  addresses there, and `sync --check` fails when they are not exactly the ones declared. The
+  core's own file has nothing between the two lines and names no app.
+- **Working on both at once** (amended 2026-11-26). The same declaration lets the consumer build
+  against a local checkout of a provider: `cargo xtask dev-link <name>=<folder>`, in the same
+  ignored folder as a link to the core (decision 0013). `cargo xtask app-layers` treats a
+  provider's crates like the core's: a package uses one only where the consumer's layer table
+  allows it.
 
 Something a second app needs still goes to the core when it is general (decision 0013, question
 3). This decision is for what is about the provider's own subject: its model and its file format.
