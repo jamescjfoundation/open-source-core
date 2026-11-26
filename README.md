@@ -19,7 +19,7 @@ crosses them.
 
 | Crate | What apps get from it |
 | --- | --- |
-| `jcj-doc` | The document model (documents, paragraphs, runs, styles, notes, revisions) and typed extension data each app attaches to it |
+| `jcj-doc` | The document model (documents, paragraphs, runs, styles, notes, revisions), typed extension data each app attaches to it, and a text's words: the word list, the word-for-word check and the word-level comparison of two versions |
 | `jcj-layout` | Pages: lay out a document, page boxes, hit testing, the primitives a pagination pass needs, fonts |
 | `jcj-engine` | Editing sessions, undo and redo, the command registry, recovery, general editing commands |
 | `jcj-output` | PDF, page images, printing |

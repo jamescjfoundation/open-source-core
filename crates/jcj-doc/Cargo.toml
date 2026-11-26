@@ -1,6 +1,6 @@
 [package]
 name = "jcj-doc"
-description = "Document model interface for foundation apps: documents, paragraphs, runs, styles, typed extension data"
+description = "Document model interface for foundation apps: documents, paragraphs, runs, styles, typed extension data; the word list and word-level comparison"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -3,6 +3,23 @@
 Each release says what changed for apps. While at 0.x, a patch release never breaks an app; a
 minor release may, and then **What apps must do** says exactly what (decision 0011).
 
+## Unreleased
+
+### Added
+
+- `jcj-doc`: the word list and the word-level comparison, where a crate with no engine and no
+  layout can use them (core issue #31). They were in `jcj-features`, which needs `jcj-engine` and
+  `jcj-layout`, so an app's model crate kept its own copy of both.
+  - `jcj_doc::verify` is the whole word-for-word check: `words`, `paragraph_words`,
+    `document_words`, `compare`, `Difference`, `Check`, `CONTEXT`. `jcj_doc::words` is the word
+    list again at the crate's root, beside `count_words`.
+  - `jcj_doc::wordiff` is the whole comparison: `Change`, `Segment`, `Diff`, `tokens`,
+    `paragraph`, `paragraphs`, `documents`.
+  - `jcj_features::verify` and `jcj_features::wordiff` are the same items under the old names:
+    the same types, fields and results, so nothing that uses them changes.
+  `core-testbed` lists words and compares two lists of paragraphs through `jcj-doc` alone, and
+  still checks its exports and compares documents through `jcj-features`.
+
 ## 0.1.19 (2026-11-26)
 
 ### Added

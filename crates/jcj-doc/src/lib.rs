@@ -12,14 +12,21 @@
 //! labels, a book's chapter roles) under its own namespace. The model carries, copies, compares,
 //! undoes and saves them without understanding them. The carrier, [`Ext`], is the extension-data
 //! patch in our WordCraft fork (docs/UPSTREAM.md).
+//!
+//! It also holds two things about a text's words that need the model and nothing else, so that a
+//! crate below the engine and the layout can use them: the word list and the word-for-word check
+//! ([`words`], [`verify`]) and the word-level comparison of two versions ([`wordiff`]).
 
 #![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
 mod ext;
+pub mod verify;
 pub mod walk;
+pub mod wordiff;
 
 pub use ext::{ExtError, ExtKey, HasExt};
+pub use verify::words;
 
 use jcj_upstream::doc as up;
 

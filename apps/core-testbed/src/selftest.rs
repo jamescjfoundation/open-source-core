@@ -78,7 +78,18 @@ pub fn run() -> Result<Vec<Step>, String> {
     let paras = jcj_doc::walk::body_paragraphs(&doc);
     check(paras.len() == 7, "the sample has seven paragraphs")?;
     check(STATUS.get_or_none(paras[0].1).as_deref() == Some("draft"), "paragraph extension data reads back")?;
-    step("doc", format!("{} paragraphs, extension data on document, paragraph and run", paras.len()));
+    // The word list and the word-level comparison from the model crate alone, as an app's model
+    // crate (no engine, no layout) uses them on its own text type.
+    let lines: Vec<String> = paras.iter().map(|(_, p)| jcj_doc::plain_text(p)).collect();
+    let listed: usize = lines.iter().map(|l| jcj_doc::words(l).len()).sum();
+    check(listed == jcj_doc::verify::document_words(&doc).len(), "the word list is the document's words")?;
+    let mut reworded = lines.clone();
+    if let Some(last) = reworded.last_mut() {
+        *last = last.replacen("second", "last", 1);
+    }
+    let reworded = jcj_doc::wordiff::paragraphs(&lines, &reworded);
+    check(reworded.added == 1 && reworded.removed == 1 && !reworded.is_same(), "a changed word shows in two lists of paragraphs")?;
+    step("doc", format!("{} paragraphs, {listed} words listed, extension data on document, paragraph and run", paras.len()));
 
     // jcj-engine: a session, a command, undo and redo.
     let mut session = self::session(doc.clone());

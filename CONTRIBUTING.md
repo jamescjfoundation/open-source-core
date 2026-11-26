@@ -26,7 +26,7 @@ when present.
 | Path | What it is |
 | --- | --- |
 | `crates/jcj-upstream` | The one crate that names WordCraft and craft-libs |
-| `crates/jcj-doc` | Document model interface and typed extension data |
+| `crates/jcj-doc` | Document model interface, typed extension data, the word list and the word-level comparison |
 | `crates/jcj-entries`, `jcj-i18n` | Entries kept beside documents; interface translation catalogs |
 | `crates/jcj-layout`, `jcj-engine`, `jcj-output`, `jcj-proof`, `jcj-agents` | Adapters: pages, editing sessions, PDF and printing, spelling, agent tools |
 | `crates/jcj-project`, `jcj-interchange` | Project files, saving and backups; format import and export |
