@@ -183,8 +183,8 @@ mod tests {
     #[test]
     fn mcp_takes_a_file_and_two_roots_in_any_order() {
         assert_eq!(McpArgs::parse(&[]), Ok(McpArgs::default()));
-        let all = McpArgs::parse(&args(&["--write-root", "out", "book.proj", "--read-root", "in"])).unwrap();
-        assert_eq!(all, McpArgs { file: Some("book.proj".into()), read_root: Some("in".into()), write_root: Some("out".into()) });
+        let all = McpArgs::parse(&args(&["--write-root", "out", "notes.proj", "--read-root", "in"])).unwrap();
+        assert_eq!(all, McpArgs { file: Some("notes.proj".into()), read_root: Some("in".into()), write_root: Some("out".into()) });
         for (bad, why) in [
             (vec!["--read-root"], "needs a folder"),
             (vec!["--read-root", "--write-root", "x"], "needs a folder"),

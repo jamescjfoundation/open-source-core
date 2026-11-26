@@ -128,7 +128,7 @@ pub fn export(format: Format, doc: &Document) -> Result<Vec<u8>, Error> {
 ///
 /// [`export`] with [`Format::Epub`] numbers notes from 1 in each chapter file and puts the
 /// English word "Back" under each as the link to its reference. Here the caller chooses the
-/// numbering ([`NoteNumbering`]), the link ([`NoteBacklink`]: its text in the book's language, a
+/// numbering ([`NoteNumbering`]), the link ([`NoteBacklink`]: its text in the document's language, a
 /// symbol with a name, or none) and a heading above each chapter's notes, and gets back
 /// [`EpubExport::added_words`], so a word-for-word check of the file can leave out exactly the
 /// words that are the writer's. With `EpubOptions::default()` the bytes are [`export`]'s.
@@ -140,7 +140,7 @@ pub fn export(format: Format, doc: &Document) -> Result<Vec<u8>, Error> {
 /// let same = export_epub(&doc, &EpubOptions::default()).unwrap();
 /// assert_eq!(same.bytes, export(Format::Epub, &doc).unwrap());
 /// let quiet = export_epub(&doc, &EpubOptions::default().note_backlink(NoteBacklink::None)).unwrap();
-/// assert!(quiet.added_words.is_empty(), "a book with no notes gets no added words");
+/// assert!(quiet.added_words.is_empty(), "a document with no notes gets no added words");
 /// ```
 pub fn export_epub(doc: &Document, options: &EpubOptions) -> Result<EpubExport, Error> {
     let failed = |reason: String| Error::Failed { format: Format::Epub, reason };

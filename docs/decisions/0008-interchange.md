@@ -22,7 +22,7 @@ pins, none of those crates exist: WordCraft carries its own `wordcraft-docx` (DO
   a gap when this was written; the core's own reader came with release 0.1.3 (core issue #13).
   - Added 2026-11-26 (core issues #21, #33): notes are kept as a numbered reference and a list
     at the end of the chapter file. What the writer adds there is the caller's to choose and to
-    know: `export_epub` takes the numbering (per chapter file, or through the book), the link
+    know: `export_epub` takes the numbering (per chapter file, or continuous), the link
     back (a text, a symbol with a name, or none) and an optional heading, and returns the words
     it added, because an app that checks its exports word for word, or whose book is not in
     English, cannot ship words it did not choose. The defaults are the bytes `export` writes.

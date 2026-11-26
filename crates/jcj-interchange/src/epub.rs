@@ -42,19 +42,19 @@ pub enum NoteNumbering {
     /// From 1 in each chapter file.
     #[default]
     PerChapter,
-    /// Once, through the whole book.
-    ThroughBook,
+    /// Once, from the first chapter file to the last.
+    Continuous,
 }
 
 /// The link under each note that leads back to where the note is called.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NoteBacklink {
-    /// A link with this text, in the book's language. An empty text writes no link.
+    /// A link with this text, in the document's language. An empty text writes no link.
     Text(String),
     /// A link shown as a return arrow (↩), with `label` as its name for screen readers and its
-    /// tooltip. It adds no word to the book's text.
+    /// tooltip. It adds no word to the text.
     Symbol {
-        /// What the link is called ("Back to the text"), in the book's language.
+        /// What the link is called ("Back to the text"), in the document's language.
         label: String,
     },
     /// No link back.
@@ -75,7 +75,7 @@ impl Default for NoteBacklink {
 /// use jcj_interchange::{EpubOptions, NoteBacklink, NoteNumbering};
 ///
 /// let options = EpubOptions::default()
-///     .note_numbering(NoteNumbering::ThroughBook)
+///     .note_numbering(NoteNumbering::Continuous)
 ///     .note_backlink(NoteBacklink::Symbol { label: "Volver al texto".into() })
 ///     .note_heading("Notas");
 /// assert_eq!(options.note_heading.as_deref(), Some("Notas"));
@@ -127,7 +127,7 @@ pub struct EpubExport {
     /// The file.
     pub bytes: Vec<u8>,
     /// The words in the chapter files that are the writer's and not the document's, by the
-    /// core's word rule ([`jcj_doc::words`]), in the order they stand in the book: each note's
+    /// core's word rule ([`jcj_doc::words`]), in the order they stand in the file: each note's
     /// mark where it is called; then, at the end of the chapter, the words of the heading and,
     /// for each note, its mark again and the words of the link back. A mark of the document's
     /// own (a custom mark such as `*`) is listed like a number when it holds a letter or digit.
@@ -197,7 +197,7 @@ struct Images {
     in_note: bool,
     /// How notes are written.
     options: EpubOptions,
-    /// The notes of the chapters before this one, when notes are numbered through the book.
+    /// The notes of the chapters before this one, when notes are numbered continuously.
     notes_before: usize,
     /// The words written that are not the document's ([`EpubExport::added_words`]).
     added: Vec<String>,
@@ -283,7 +283,7 @@ fn inlines(out: &mut String, items: &[Inline], images: &mut Images) {
             // A note: a numbered reference here, the note at the chapter's end (numbered per
             // chapter; a custom mark is kept).
             Inline::Note { custom, blocks, .. } if !images.in_note && images.notes.len() < MAX_NOTES => {
-                // `n` names the note inside its file; the number shown may run through the book.
+                // `n` names the note inside its file; the number shown may run on from the files before.
                 let n = images.notes.len() + 1;
                 let mark = if custom.trim().is_empty() { (images.notes_before + n).to_string() } else { custom.trim().to_string() };
                 images.added.extend(jcj_doc::words(&mark));
@@ -452,7 +452,7 @@ fn notes_xhtml(out: &mut String, images: &mut Images) {
         images.added.extend(backlink_words.iter().cloned());
     }
     out.push_str("</ol>\n</section>\n");
-    if images.options.note_numbering == NoteNumbering::ThroughBook {
+    if images.options.note_numbering == NoteNumbering::Continuous {
         images.notes_before += notes.len();
     }
 }

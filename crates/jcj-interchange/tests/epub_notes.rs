@@ -110,14 +110,14 @@ fn with_no_choice_made_the_file_is_what_it_always_was() {
 #[test]
 fn the_caller_chooses_the_numbering_the_link_and_a_heading() {
     let options = EpubOptions::default()
-        .note_numbering(NoteNumbering::ThroughBook)
+        .note_numbering(NoteNumbering::Continuous)
         .note_backlink(NoteBacklink::Symbol { label: "Volver al texto".into() })
         .note_heading("Notas");
     let out = export_epub(&noted(), &options).unwrap();
     let (one, two) = (chapter(&out.bytes, 1), chapter(&out.bytes, 2));
     well_formed(&one);
     well_formed(&two);
-    // The third note of the book is number 3 in the second chapter's file, where it is still
+    // The third note of the document is number 3 in the second chapter's file, where it is still
     // that file's first note; the list counts from 3 too.
     assert!(two.contains("id=\"noteref-1\" href=\"#note-1\"><sup>3</sup>"), "{two}");
     assert!(two.contains("<ol start=\"3\">") && two.contains("<span class=\"mark\">3</span>"), "{two}");
@@ -157,7 +157,7 @@ fn a_check_of_the_file_leaves_out_exactly_the_added_words() {
     let doc = noted();
     for options in [
         EpubOptions::default(),
-        EpubOptions::default().note_numbering(NoteNumbering::ThroughBook).note_heading("Notes to the chapter"),
+        EpubOptions::default().note_numbering(NoteNumbering::Continuous).note_heading("Notes to the chapter"),
         EpubOptions::default().note_backlink(NoteBacklink::Symbol { label: "Back to the text".into() }),
         EpubOptions::default().note_backlink(NoteBacklink::None),
     ] {
@@ -170,11 +170,11 @@ fn a_check_of_the_file_leaves_out_exactly_the_added_words() {
 }
 
 #[test]
-fn a_book_without_notes_is_unchanged_by_any_choice() {
+fn a_document_without_notes_is_unchanged_by_any_choice() {
     let mut doc = Document::new();
     doc.body = vec![para_block(Paragraph::with_text("No notes here.", CharProps::default()))];
     let plain = export(Format::Epub, &doc).unwrap();
-    let chosen = export_epub(&doc, &EpubOptions::default().note_numbering(NoteNumbering::ThroughBook).note_heading("Notes")).unwrap();
+    let chosen = export_epub(&doc, &EpubOptions::default().note_numbering(NoteNumbering::Continuous).note_heading("Notes")).unwrap();
     assert_eq!(chosen.bytes, plain);
     assert!(chosen.added_words.is_empty());
 }

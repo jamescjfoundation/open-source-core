@@ -32,10 +32,11 @@ minor release may, and then **What apps must do** says exactly what (decision 00
     catalogs gets the shell's in that language too, and says so in its own changelog.
 - `jcj-interchange`: the EPUB writer's notes are the caller's to choose, and the writer says
   which words it added (core issue #33). `export_epub(doc, &EpubOptions) -> EpubExport`:
-  - `EpubOptions::default().note_numbering(NoteNumbering::ThroughBook)`: notes are numbered once
-    through the book instead of from 1 in each chapter file (`PerChapter`, the default);
-  - `.note_backlink(..)`: the link under each note is `NoteBacklink::Text("…")` in the book's
-    language, `NoteBacklink::Symbol { label }` (a return arrow with a name for screen readers,
+  - `EpubOptions::default().note_numbering(NoteNumbering::Continuous)`: notes are numbered once,
+    from the first chapter file to the last, instead of from 1 in each (`PerChapter`, the
+    default);
+  - `.note_backlink(..)`: the link under each note is `NoteBacklink::Text("…")` in the
+    document's language, `NoteBacklink::Symbol { label }` (a return arrow with a name for screen readers,
     which adds no word), or `NoteBacklink::None`; the default is the word "Back";
   - `.note_heading("…")`: a heading above each chapter's notes (none by default);
   - `EpubExport { bytes, added_words }`: the file, and the words in its chapters that are the
@@ -141,7 +142,7 @@ open until the app that holds the copy uses the core's.
    today, and take the words to leave out of the word check from `added_words`. Wordsmith
    Manuscript: `notes_as_endnotes` in `crates/manuscript-io/src/export.rs`, which numbers
    through the book under a "Notes" heading with no link back:
-   `EpubOptions::default().note_numbering(NoteNumbering::ThroughBook).note_heading("Notes")
+   `EpubOptions::default().note_numbering(NoteNumbering::Continuous).note_heading("Notes")
    .note_backlink(NoteBacklink::None)`. Readers of the file will see three differences from
    that workaround, all on purpose: a note's number where it is called is a link to the note,
    the notes are a numbered list marked as endnotes for reading systems, and "Notes" is a

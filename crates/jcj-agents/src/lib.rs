@@ -33,31 +33,31 @@
 //! use jcj_agents::{AgentConfig, AgentInfo, AgentServer, AppCommand, AppCommands};
 //! use serde_json::{Value, json};
 //!
-//! struct Shelf(Vec<String>);
+//! struct Tasks(Vec<String>);
 //!
-//! impl AppCommands for Shelf {
+//! impl AppCommands for Tasks {
 //!     fn commands(&self) -> Vec<AppCommand> {
 //!         vec![
-//!             AppCommand::new("book.add", "Add a Book").params(r#"{"title": text}"#),
-//!             AppCommand::new("book.list", "List the Books").read_only(),
+//!             AppCommand::new("task.add", "Add a Task").params(r#"{"title": text}"#),
+//!             AppCommand::new("task.list", "List the Tasks").read_only(),
 //!         ]
 //!     }
 //!
 //!     fn run(&mut self, id: &str, params: &Value) -> Result<Value, String> {
 //!         match id {
-//!             "book.add" => {
+//!             "task.add" => {
 //!                 self.0.push(params["title"].as_str().ok_or("a title is needed")?.to_owned());
 //!                 Ok(json!(self.0.len()))
 //!             }
-//!             "book.list" => Ok(json!(self.0)),
+//!             "task.list" => Ok(json!(self.0)),
 //!             other => Err(format!("unknown command {other}")),
 //!         }
 //!     }
 //! }
 //!
-//! let info = AgentInfo::new("shelf", "Shelf", "0.1.0", "Shelf keeps a list of books.");
-//! let server = AgentServer::for_app(Box::new(Shelf(Vec::new())), "shelf", AgentConfig::new(info));
-//! assert_eq!(server.tool_names(), ["shelf_book_add", "shelf_book_list"]);
+//! let info = AgentInfo::new("todo", "To-do", "0.1.0", "To-do keeps a list of tasks.");
+//! let server = AgentServer::for_app(Box::new(Tasks(Vec::new())), "todo", AgentConfig::new(info));
+//! assert_eq!(server.tool_names(), ["todo_task_add", "todo_task_list"]);
 //! ```
 //!
 //! [`cli`] holds what every app's command line does the same way: the exit codes, `--help` and
