@@ -3,7 +3,7 @@
 Each release says what changed for apps. While at 0.x, a patch release never breaks an app; a
 minor release may, and then **What apps must do** says exactly what (decision 0011).
 
-## Unreleased
+## 0.1.18 (2026-11-26)
 
 ### Added
 
@@ -45,7 +45,7 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 ### What apps must do
 
-1. Move every `jcj-` dependency to this release's tag, then run
+1. Move every `jcj-` dependency to `tag = "v0.1.18"`, then run
    `cargo metadata --format-version 1 >/dev/null` to bring `Cargo.lock` in line.
 2. Run `cargo xtask sync` twice. The first run brings the new `sync.rs`, the reworded blocks
    and the pre-commit hook, and says to run it again; the second adds `xtask/src/docs.rs` and
