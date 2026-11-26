@@ -916,7 +916,6 @@ dependencies = [
 name = "core-testbed"
 version = "0.1.20"
 dependencies = [
- "eframe",
  "egui_kittest",
  "jcj-agents",
  "jcj-board",
@@ -931,6 +930,7 @@ dependencies = [
  "jcj-proof",
  "jcj-shell",
  "jcj-theme",
+ "serde",
  "serde_json",
 ]
 

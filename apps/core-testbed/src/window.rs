@@ -10,6 +10,7 @@ use jcj_board::{Board, Corkboard, Selection};
 use jcj_engine::Session;
 use jcj_interchange::Format;
 use jcj_shell::commands::{ids, shell_ids};
+use jcj_shell::desktop::{Desktop, DesktopApp};
 use jcj_shell::egui;
 use jcj_shell::files::FileAsk;
 use jcj_shell::i18n::{tl, trn};
@@ -37,6 +38,27 @@ pub mod cmd {
 /// The extension of the test app's project files.
 pub const EXTENSION: &str = "jcjtest";
 
+/// The test app's data for the core's start-up, but for its brand, which is made at run time
+/// ([`desktop`]). `CORE_TESTBED_PROFILE_DIR` names another settings folder, for a run kept
+/// apart from the developer's own.
+pub const DESKTOP: Desktop = Desktop {
+    profile_env: Some("CORE_TESTBED_PROFILE_DIR"),
+    ..Desktop::new("Core testbed", "core-testbed", "org.jcj.core-testbed", env!("CARGO_PKG_VERSION"))
+};
+
+/// The test app's data for the core's start-up, with its brand.
+pub fn desktop() -> Desktop {
+    Desktop { brand: crate::brand::brand(), ..DESKTOP }
+}
+
+/// The test app's own preferences, kept beside the shell's in the settings folder.
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct TestbedPrefs {
+    /// The interface language's code; empty for English.
+    pub language: String,
+}
+
 /// The test app's state.
 pub struct Testbed {
     pub session: Session,
@@ -58,6 +80,8 @@ pub struct Testbed {
     pub writing: jcj_shell::writing::Writing,
     /// The headings panel's tree state (the core's tree widget).
     pub headings: jcj_shell::tree::TreeState<usize>,
+    /// The interface language kept in the preferences; empty for English.
+    pub language: String,
 }
 
 impl Testbed {
@@ -76,6 +100,7 @@ impl Testbed {
             split_state: jcj_shell::split::SplitState::default(),
             writing: jcj_shell::writing::Writing::new(0).with_target(Some(500)),
             headings: jcj_shell::tree::TreeState::default(),
+            language: String::new(),
             page: None,
             log: Vec::new(),
         }
@@ -442,6 +467,46 @@ impl App for Testbed {
             website: Some("https://github.com/jamescjfoundation/open-source-core".into()),
         }
     }
+
+    fn mark_width(&self, height: f32) -> f32 {
+        crate::brand::mark_width(height)
+    }
+
+    fn paint_mark(&self, painter: &egui::Painter, rect: egui::Rect, ink: egui::Color32) {
+        crate::brand::paint_mark(painter, rect, ink);
+    }
+}
+
+/// What only the testbed can do at start-up; the core's start-up does the rest
+/// (`jcj_shell::desktop`).
+impl DesktopApp for Testbed {
+    type Prefs = jcj_shell::prefs::Prefs<TestbedPrefs>;
+
+    fn apply_prefs(&mut self, prefs: &TestbedPrefs, _shell: &mut Shell) {
+        self.language = prefs.language.clone();
+        // `CORE_TESTBED_LANG` is the language for one run; the preference is not changed by it.
+        let code = std::env::var("CORE_TESTBED_LANG").unwrap_or_else(|_| self.language.clone());
+        if !code.trim().is_empty() {
+            crate::languages::set(&code);
+        }
+    }
+
+    fn prefs(&self, _last: &TestbedPrefs) -> TestbedPrefs {
+        TestbedPrefs { language: self.language.clone() }
+    }
+
+    fn open(&mut self, files: &[PathBuf], _shell: &mut Shell) {
+        // A project file that exists is opened; any other name is where Save will write.
+        if let Some(path) = files.first().filter(|p| p.is_file() && p.extension().is_some_and(|e| e == EXTENSION))
+            && let Err(e) = self.open(path.clone())
+        {
+            self.log.push(format!("could not open {}: {e}", path.display()));
+        }
+    }
+
+    fn window_title(&self) -> Option<String> {
+        Some(format!("{} - {}", self.document_name(), DESKTOP.name))
+    }
 }
 
 #[cfg(test)]
@@ -521,6 +586,68 @@ mod tests {
         let app = &h.state().2;
         assert!(!app.is_dirty() && app.board.cards.len() == 1, "the saved file is open again");
         assert!(app.log.iter().any(|l| l.starts_with("opened ")));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The core's start-up runs the testbed with no window toolkit: its brand reaches the
+    /// window and the shell, a project file named at start is opened, its preferences are read
+    /// and written, and its title follows the document.
+    #[test]
+    fn the_core_s_start_up_starts_and_ends_the_testbed() {
+        use jcj_shell::desktop::Window;
+        use jcj_shell::prefs::Prefs;
+
+        let dir = std::env::temp_dir().join(format!("core-testbed-desktop-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let settings = dir.join("settings");
+        std::fs::create_dir_all(&settings).unwrap();
+        // A project saved by an earlier run, and that run's preferences.
+        let project = dir.join("kept.jcjtest");
+        let mut earlier = Testbed::new(project.clone());
+        earlier.board.add_card("Kept", "From the earlier run.").unwrap();
+        earlier.save().unwrap();
+        std::fs::write(settings.join("preferences.json"), r#"{"shell": {"theme": "dark", "userName": "A. Tester"}, "app": {"language": ""}}"#)
+            .unwrap();
+
+        let viewport = desktop().viewport();
+        assert_eq!((viewport.title.as_deref(), viewport.app_id.as_deref()), (Some("Core testbed"), Some("org.jcj.core-testbed")));
+        assert!(viewport.icon.is_some_and(|icon| icon.width == 64), "the window has the testbed's icon");
+        assert_eq!(DESKTOP.settings_dir_from(Some("elsewhere".into())), Some(PathBuf::from("elsewhere")));
+        assert_eq!(DESKTOP.release_source(), None, "the testbed installs no updates");
+        // An app that does says where its releases are, and the update check is told the rest.
+        let releases = jcj_shell::desktop::Releases { repo: "example-org/core-testbed", tagline: "A test app", developer: "its contributors" };
+        let updating = Desktop { releases: Some(releases), ..DESKTOP };
+        assert_eq!(updating.release_source().map(|s| (s.id, s.repo, s.version)), Some(("core-testbed", "example-org/core-testbed", DESKTOP.version)));
+
+        let ctx = egui::Context::default();
+        let files = jcj_shell::desktop::files_named(["--quiet".into(), project.clone().into_os_string()]);
+        let mut window = Window::start(&desktop(), &ctx, Some(settings.clone()), files, |start| {
+            assert!(start.settings.is_some_and(|folder| folder.is_dir()));
+            start.shell_with(|shell| shell.with_options(jcj_shell::ShellOptions { start_window: true, ..jcj_shell::ShellOptions::default() }));
+            Testbed::new(start.files.first().cloned().unwrap_or_default())
+        });
+        assert!(window.shell.options.start_window);
+        assert_eq!(window.shell.tokens().name, "core-testbed", "the brand's tokens");
+        assert_eq!((window.shell.mode, window.shell.user_name.as_str()), (jcj_shell::theme::Mode::Dark, "A. Tester"));
+        assert_eq!(window.app.board.cards.len(), 1, "the project named at start is open");
+        assert_eq!(window.prefs_path(), Some(settings.join("preferences.json").as_path()));
+
+        // A frame: the window is told its title; a change of a preference is written.
+        window.shell.mode = jcj_shell::theme::Mode::Light;
+        window.app.language = "es".into();
+        let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
+            window.logic(ui.ctx());
+            window.ui_offscreen(ui);
+        });
+        // No picture is made of the frame: its textures are not needed.
+        out.textures_delta.clear();
+        let commands = out.viewport_output.get(&egui::ViewportId::ROOT).map(|v| v.commands.clone()).unwrap_or_default();
+        assert!(commands.contains(&egui::ViewportCommand::Title("kept.jcjtest - Core testbed".into())), "{commands:?}");
+        window.exit();
+        let kept: Prefs<TestbedPrefs> = serde_json::from_str(&std::fs::read_to_string(settings.join("preferences.json")).unwrap()).unwrap();
+        assert_eq!((kept.shell.theme, kept.app.language.as_str()), (jcj_shell::theme::Mode::Light, "es"));
+        assert_eq!(kept.shell.user_name, "A. Tester", "what the window did not change is kept");
+        drop(window);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

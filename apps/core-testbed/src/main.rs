@@ -10,28 +10,12 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
+use std::ffi::OsString;
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use core_testbed::window::Testbed;
 use jcj_agents::cli::{Exit, McpArgs, Standard, standard, version_line};
-use jcj_shell::egui;
-use jcj_shell::{Shell, theme::Tokens};
-
-struct Window {
-    shell: Shell,
-    /// The window's part of the shell's file dialogs.
-    files: jcj_shell::files::FileDialogs,
-    app: Testbed,
-}
-
-impl eframe::App for Window {
-    fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
-        self.shell.ui(ui, &mut self.app);
-        // Show the next file dialog the shell was asked for, over this window, once the frame
-        // is drawn; an answer runs its command in a later frame.
-        self.files.show(&mut self.shell, ui.ctx(), Some(&*frame));
-    }
-}
 
 const PROGRAM: &str = "core-testbed";
 
@@ -86,26 +70,29 @@ fn selftest() -> Result<Exit, (Exit, String)> {
     Ok(Exit::Done)
 }
 
-fn window(file: Option<&str>) -> Result<Exit, (Exit, String)> {
-    // The interface language, when asked for (English otherwise).
-    if let Ok(code) = std::env::var("CORE_TESTBED_LANG") {
-        core_testbed::languages::set(&code);
-    }
-    let path = file.map_or_else(|| std::path::PathBuf::from("untitled.jcjtest"), std::path::PathBuf::from);
-    let window = Window {
-        shell: Shell::new("Core testbed", env!("CARGO_PKG_VERSION"), Tokens::default())
-            .with_options(jcj_shell::ShellOptions { start_window: true, ..jcj_shell::ShellOptions::default() }),
-        files: jcj_shell::files::FileDialogs::new(),
-        app: Testbed::new(path),
-    };
-    let options = eframe::NativeOptions::default();
-    eframe::run_native("Core testbed", options, Box::new(|_cc| Ok(Box::new(window))))
+/// The window, on the core's start-up (`jcj_shell::desktop`): the testbed gives its data and
+/// builds itself; the window's icon and app id, the settings folder, preferences, the file
+/// dialogs and the steps of every frame and of the end are the core's.
+fn window(files: Vec<PathBuf>) -> Result<Exit, (Exit, String)> {
+    core_testbed::window::desktop()
+        .run(files, |start| {
+            start.shell_with(|shell| shell.with_options(jcj_shell::ShellOptions { start_window: true, ..jcj_shell::ShellOptions::default() }));
+            // The first file named is where Save writes; one that is a project is opened.
+            Testbed::new(start.files.first().cloned().unwrap_or_else(|| PathBuf::from("untitled.jcjtest")))
+        })
         .map_err(|e| (Exit::Failed, format!("could not open a window: {e}")))?;
     Ok(Exit::Done)
 }
 
 fn main() -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    // First, before the command line is read: a start as the helper that finishes an update
+    // opens no window and runs no command. (The testbed installs none, so it only refuses.)
+    if let Some(code) = core_testbed::window::DESKTOP.finish_update() {
+        return code;
+    }
+    // The arguments as the system gave them: a file whose name is not Unicode still opens.
+    let given: Vec<OsString> = std::env::args_os().skip(1).collect();
+    let args: Vec<String> = given.iter().map(|a| a.to_string_lossy().into_owned()).collect();
     let rest = args.get(1..).unwrap_or_default();
     let outcome = match (standard(&args), args.first().map(String::as_str)) {
         (Some(Standard::Help), _) => {
@@ -117,12 +104,12 @@ fn main() -> ExitCode {
             Ok(Exit::Done)
         }
         // A desktop program: with nothing asked, its window.
-        (Some(Standard::NoCommand), _) => window(None),
+        (Some(Standard::NoCommand), _) => window(Vec::new()),
         (None, Some("selftest")) => selftest(),
         (None, Some("verify")) => verify(rest),
         (None, Some("mcp")) => mcp(rest),
         (None, Some(option)) if option.starts_with('-') => Err((Exit::Usage, format!("unknown option {option}"))),
-        (None, file) => window(file),
+        (None, _) => window(jcj_shell::desktop::files_named(given)),
     };
     match outcome {
         Ok(exit) => exit.into(),

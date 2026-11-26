@@ -61,6 +61,20 @@ fn a_wrong_command_line_is_a_usage_error_on_standard_error() {
     assert_eq!(code(&o), exit(Exit::Usage));
 }
 
+/// Started as the helper that finishes an update, the program opens no window and runs no
+/// command: the start-up answers before the command line is read. The testbed installs no
+/// updates, so its answer is a refusal.
+#[test]
+fn a_start_as_the_update_helper_never_reaches_the_command_line() {
+    for args in [&["--finish-update"][..], &["--finish-update", "1", "core-testbed", "msi", "a.msi"]] {
+        let o = run(args, "");
+        assert_eq!(code(&o), exit(Exit::Failed), "{args:?}");
+        assert!(o.stdout.is_empty(), "{args:?}");
+        assert!(text(&o.stderr).starts_with("core-testbed: the update could not be finished"), "{args:?}: {}", text(&o.stderr));
+        assert!(!text(&o.stderr).contains("usage:"), "{args:?}: not taken for an unknown option");
+    }
+}
+
 #[test]
 fn a_difference_is_not_a_failure() {
     let dir = std::env::temp_dir().join(format!("core-testbed-cli-{}", std::process::id()));
