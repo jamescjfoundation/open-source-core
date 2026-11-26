@@ -505,3 +505,12 @@ impl Shell {
         }
     }
 }
+
+// At the end of the file: the catalog check reads a source file up to its first test-only line.
+#[cfg(test)]
+impl Shell {
+    /// As if an installed update had asked for a restart (tests of what a window does then).
+    pub(crate) fn request_close(&mut self) {
+        self.close_requested = true;
+    }
+}
