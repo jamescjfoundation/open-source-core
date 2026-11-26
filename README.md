@@ -1,9 +1,9 @@
 # open-source-core
 
-The J. C. J. Foundation's shared base for its open-source desktop apps. It holds the code every
-app needs and none should write twice — the app shell, project files, format conversion, cards and
-boards, theming, agent control — and it is the only place that talks to the open-source projects
-the apps build on: [WordCraft](https://github.com/storytold/wordcraft) and
+The James C. J. Foundation's shared base for its open-source desktop apps. It holds the code
+every app needs and none should write twice — the app shell, project files, format conversion,
+cards and boards, theming, agent control — and it is the only place that talks to the open-source
+projects the apps build on: [WordCraft](https://github.com/storytold/wordcraft) and
 [craft-libs](https://github.com/storytold/craft-libs) by the ArtCraft team, used at pinned
 releases through the foundation's forks.
 

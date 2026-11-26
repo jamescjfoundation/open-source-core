@@ -1,0 +1,56 @@
+# A scheduled Nightly run that fails shows only as a red mark on the Actions page, which nobody
+# is sent to. This opens an issue for it, or adds a comment to the one already open, so the
+# failure is in the place where work is picked up (decision 0003).
+#
+# Only scheduled runs: someone who starts Nightly by hand, or pushes a release tag, is watching
+# that run. Starting this workflow by hand opens the issue for the newest Nightly run whatever
+# its result, to try the workflow out; close that issue afterwards.
+#
+# Only this run's own token, which may read the code and write issues.
+name: Nightly failed
+
+on:
+  workflow_run:
+    workflows: [Nightly]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    name: open or update the issue
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.event == 'schedule' && github.event.workflow_run.conclusion == 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+      actions: read
+    steps:
+      - name: Open the issue, or add to the open one
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          title="Nightly run failed"
+          if [ -z "$RUN_URL" ]; then
+            # Started by hand: report the newest Nightly run.
+            RUN_URL=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow nightly.yml --limit 1 --json url --jq '.[0].url')
+            RUN_SHA=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow nightly.yml --limit 1 --json headSha --jq '.[0].headSha')
+          fi
+          text="The scheduled Nightly run failed on commit $RUN_SHA: $RUN_URL
+
+          It is the full gate on Linux, macOS and Windows, the minimum Rust version, cargo-deny with the day's advisories and the app template. A release is cut only on a commit where it passes (decision 0011). Fix the cause on \`main\`, or re-run the failed jobs when a runner or the network was at fault, and close this issue when a Nightly run is green again."
+          # Every open issue (the list also holds pull requests), not a search: a search can lag.
+          open=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues?state=open&per_page=100" \
+                 --jq '.[] | select(.pull_request == null) | "\(.number) \(.title)"' \
+                 | grep -E "^[0-9]+ $title\$" | head -n 1 || true)
+          if [ -z "$open" ]; then
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$text"
+          else
+            gh issue comment "${open%% *}" --repo "$GITHUB_REPOSITORY" --body "Failed again on commit $RUN_SHA: $RUN_URL"
+          fi

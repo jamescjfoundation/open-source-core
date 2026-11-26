@@ -7,10 +7,10 @@ Licensed under either of
 at your option.
 
 open-source-core builds on WordCraft by the ArtCraft team and on craft-libs,
-used as dependencies at pinned versions through the J. C. J. Foundation's forks
-(docs/UPSTREAM.md). WordCraft and craft-libs are copyright (c) 2026 ArtCraft
-Team and their contributors, MIT OR Apache-2.0. The fork carries changes of
-ours, each recorded in docs/UPSTREAM.md.
+used as dependencies at pinned versions through The James C. J. Foundation's
+forks (docs/UPSTREAM.md). WordCraft and craft-libs are copyright (c) 2026
+ArtCraft Team and their contributors, MIT OR Apache-2.0. The fork carries
+changes of ours, each recorded in docs/UPSTREAM.md.
 
 The ArtCraft and WordCraft names, wordmarks and logos are not licensed to this
 project and are not used by it. The plain-text credit above is the only

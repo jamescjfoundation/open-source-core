@@ -62,6 +62,7 @@ fn main() -> ExitCode {
         "dev-unlink" => link::dev_unlink(&root),
         "sync" => sync::app_task(&root, rest.iter().any(|a| a == "--check")),
         "core-pin" => corepin::task(&root, rest),
+        "affected" => changed::task(&root, rest),
         "deny" => cargo(&root, &["deny", "--locked", "check"]),
         "install-hooks" => util::git_output(&root, &["config", "core.hooksPath", "hooks"]).map(|_| println!("git hooks on")),
         "third-party-licenses" => licenses::task(&root, SHIPPED, PRODUCT, rest.first().map(String::as_str)),
@@ -69,7 +70,8 @@ fn main() -> ExitCode {
         name => match TASKS.iter().find(|(n, _)| *n == name) {
             Some((n, _)) => run_task(n, &root, &Affected::All),
             None => {
-                println!("usage: cargo xtask <ci [--changed] [--base <ref>] | dev-link <core> | dev-unlink | sync [--check] | deny | install-hooks>");
+                println!("usage: cargo xtask <ci [--changed] [--base <ref>] [--skip <tasks>] [--only <tasks>] | affected [--base <ref>]>");
+                println!("       cargo xtask <dev-link <core> | dev-unlink | sync [--check] | deny | install-hooks>");
                 println!("       cargo xtask core-pin [--behind] [--max-behind <n>]   --behind asks the core for its releases (network)");
                 for (name, about) in TASKS {
                     println!("  {name:<12} {about}");

@@ -9,8 +9,8 @@ Started from open-source-core's `template/`. To make it yours:
 3. Pin the core: every `jcj-` dependency in `Cargo.toml` at the same release tag. Add a line for
    each other `jcj-` crate the app uses.
 4. Run `cargo xtask sync`. This folder already holds the shared xtask modules, the CI and
-   core-pin workflows, the pull request template, the hooks, the code of conduct and the three
-   files with the core's marked blocks. The first run adds the four settings files kept at the core's root
+   core-pin workflows, the Dependabot settings, the pull request template, the hooks, the code
+   of conduct and the three files with the core's marked blocks. The first run adds the four settings files kept at the core's root
    (`rust-toolchain.toml`, `rustfmt.toml`, `clippy.toml`, `deny.toml`) and rewrites the rest and
    the patch block in `Cargo.toml` from the pinned release. Cargo writes `Cargo.lock` on that run;
    commit it. Then `cargo xtask install-hooks` and `cargo xtask ci`. The gate says so each time
@@ -34,7 +34,9 @@ Started from open-source-core's `template/`. To make it yours:
    that names no record.
 9. In the repository's settings on GitHub, turn on private vulnerability reporting (the
    `security` block and the code of conduct send reports there) and keep issues on (the
-   core-pin workflow opens one when the pin falls behind).
+   core-pin workflow opens one when the pin falls behind). `ci.yml` and `core-pin.yml` call
+   workflows kept in `jamescjfoundation/open-source-core`: an organisation that limits which
+   actions and workflows may run must allow that repository's (its own are always allowed).
 
 Moving to a newer core release later: change the tag on every `jcj-` line, run
 `cargo metadata --format-version 1 >/dev/null` to bring `Cargo.lock` in line, run

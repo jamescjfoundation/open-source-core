@@ -3,8 +3,9 @@
 //!
 //! `cargo xtask ci` is the gate: the same command runs on a laptop, in the pre-push hook and in
 //! GitHub Actions, so a change that passes locally passes in CI. `cargo xtask ci --changed` runs
-//! clippy and tests only for the packages a change can affect (and their dependents), which is
-//! what the pre-push hook runs; CI runs the full gate on every push to main.
+//! clippy and tests only for the packages a change can affect (and their dependents). The
+//! pre-push hook runs that, and so does CI on a push or a pull request; the scheduled run and
+//! the run before a release are the full gate on three platforms.
 //!
 //! The modules under `template/xtask/src/` are shared with every app repository's xtask (copied by
 //! `cargo xtask sync <app>`); they are compiled into this xtask from there, so the core tests them.
@@ -92,7 +93,7 @@ fn main() -> ExitCode {
     let root = workspace_root();
     let result = match task {
         "ci" => ci(&root, rest),
-        "affected" => affected_task(&root, rest),
+        "affected" => changed::task(&root, rest),
         "deny" => cargo(&root, &["deny", "--locked", "check"]).map_err(|e| format!("{e} (install: cargo install --locked cargo-deny)")),
         "sync" => match rest.iter().find(|a| !a.starts_with("--")) {
             Some(app) => sync::core_task(&root, app, rest.iter().any(|a| a == "--check")),
@@ -137,13 +138,14 @@ fn main() -> ExitCode {
 
 fn print_help() {
     println!("usage: cargo xtask <task>\n");
-    println!("  ci [--changed] [--base <git ref>] [--skip <task>]");
+    println!("  ci [--changed] [--base <git ref>] [--skip <tasks>] [--only <tasks>]");
     println!("                 the gate: every task below in order; --changed limits clippy and tests to");
-    println!("                 the packages changed since --base (default: origin/main) and their dependents");
+    println!("                 the packages changed since --base (default: origin/main) and their dependents;");
+    println!("                 --skip a,b leaves tasks out, --only a,b runs those alone");
     for (name, about) in TASKS {
         println!("  {name:<14} {about}");
     }
-    println!("\n  affected [--base <ref>]   print the packages a change affects");
+    println!("\n  affected [--base <ref>]   print the packages a change affects (`all`, names, or an empty line); why, on standard error");
     println!("  deny                      cargo-deny: licenses, advisories, sources");
     println!("  template --write          copy the shared blocks and files from template/ into the core's own AGENTS.md,");
     println!("                            SECURITY.md, CONTRIBUTING.md and CODE_OF_CONDUCT.md (after changing one in template/)");
@@ -164,20 +166,9 @@ fn workspace_root() -> PathBuf {
     manifest.parent().map_or_else(|| manifest.to_path_buf(), Path::to_path_buf)
 }
 
-/// `--base <ref>`, or `origin/main` when it exists, else `HEAD`.
-fn base_ref(root: &Path, args: &[String]) -> String {
-    if let Some(b) = args.iter().position(|a| a == "--base").and_then(|i| args.get(i + 1)) {
-        return b.clone();
-    }
-    match util::git_output(root, &["rev-parse", "--verify", "--quiet", "origin/main"]) {
-        Ok(_) => "origin/main".to_owned(),
-        Err(_) => "HEAD".to_owned(),
-    }
-}
-
 fn ci(root: &Path, args: &[String]) -> TaskResult {
     let names: Vec<&str> = TASKS.iter().map(|(n, _)| *n).collect();
-    // `--changed` and `--base <ref>` are ours; the rest are `--skip` arguments.
+    // `--changed` and `--base <ref>` are ours; the rest are `--skip` and `--only` arguments.
     let mut skip_args = Vec::new();
     let mut it = args.iter();
     while let Some(a) = it.next() {
@@ -192,11 +183,11 @@ fn ci(root: &Path, args: &[String]) -> TaskResult {
     let skip = util::skipped(&skip_args, &names)?;
     util::warn_if_hooks_off(root, "template/hooks");
     let scope = if args.iter().any(|a| a == "--changed") {
-        let base = base_ref(root, args);
+        let base = changed::base_ref(root, args);
         let a = changed::affected(root, &base)?;
         match &a {
             Affected::All => println!("changes since {base} affect every package"),
-            Affected::Some(p) if p.is_empty() => println!("changes since {base} affect no package (documentation only)"),
+            Affected::Some(p) if p.is_empty() => println!("changes since {base} affect no package"),
             Affected::Some(p) => println!("changes since {base} affect: {}", p.join(", ")),
         }
         a
@@ -288,15 +279,6 @@ fn test(root: &Path, scope: &Affected) -> TaskResult {
     }
 }
 
-fn affected_task(root: &Path, args: &[String]) -> TaskResult {
-    let base = base_ref(root, args);
-    match changed::affected(root, &base)? {
-        Affected::All => println!("all"),
-        Affected::Some(p) => println!("{}", p.join(" ")),
-    }
-    Ok(())
-}
-
 fn check_layers(root: &Path) -> TaskResult {
     let members = workspace_members(root)?;
     let names: BTreeSet<&str> = members.iter().map(|m| m.name.as_str()).collect();
@@ -356,7 +338,44 @@ fn check_template(root: &Path) -> TaskResult {
             failures.push(format!("{own} differs from {from} (change {from}, then `cargo xtask template --write`)"));
         }
     }
+    // An app's workflow files call the shared workflows kept here. Nothing runs that call
+    // before an app does, so a file that was renamed, or a tag written two ways, is caught here.
+    let mut tags = BTreeSet::new();
+    for (from, _) in sync::MANAGED.iter().filter(|(from, _)| from.starts_with("template/.github/workflows/")) {
+        let calls = shared_workflow_calls(&read(from)?);
+        if calls.is_empty() {
+            failures.push(format!("{from} calls no shared workflow of the core"));
+        }
+        for (file, tag) in calls {
+            match read(&format!(".github/workflows/{file}")) {
+                Ok(text) if text.lines().any(|l| l.trim() == "workflow_call:") => {}
+                Ok(_) => failures.push(format!("{from} calls .github/workflows/{file}, which is not a reusable workflow (no `workflow_call:`)")),
+                Err(_) => failures.push(format!("{from} calls .github/workflows/{file}, which does not exist")),
+            }
+            if !is_workflows_tag(&tag) {
+                failures.push(format!("{from} calls {file} at `{tag}`: apps call the shared workflows at a `workflows-vN` tag"));
+            }
+            tags.insert(tag);
+        }
+    }
+    if tags.len() > 1 {
+        failures.push(format!("the template's workflow files name different tags: {}", tags.into_iter().collect::<Vec<_>>().join(", ")));
+    }
     report(failures, "the app template is in step with the core")
+}
+
+/// The calls to the core's shared workflows in a workflow file: (file under
+/// `.github/workflows/`, the ref it is called at).
+fn shared_workflow_calls(workflow: &str) -> Vec<(String, String)> {
+    let repository = link::CORE_GIT.trim_start_matches("https://github.com/");
+    let prefix = format!("uses: {repository}/.github/workflows/");
+    let calls = workflow.lines().filter_map(|line| line.trim().strip_prefix(&prefix)?.split_once('@'));
+    calls.map(|(file, tag)| (file.to_owned(), tag.split_whitespace().next().unwrap_or_default().to_owned())).collect()
+}
+
+/// Whether `tag` is `workflows-v` and a number: the tags the shared workflows are called at.
+fn is_workflows_tag(tag: &str) -> bool {
+    tag.strip_prefix("workflows-v").is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
 }
 
 /// `cargo xtask template --write`: after a change under `template/`, bring the core's own copies
@@ -548,6 +567,22 @@ fn install_hooks(root: &Path) -> TaskResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_the_calls_to_shared_workflows() {
+        let workflow = "jobs:\n  gate:\n    uses: jamescjfoundation/open-source-core/.github/workflows/shared-ci.yml@workflows-v1\n    \
+                        with:\n      full: true\n  own:\n    uses: ./.github/workflows/own.yml\n  step:\n    - uses: actions/checkout@abc # v1\n  \
+                        pin:\n    uses: jamescjfoundation/open-source-core/.github/workflows/shared-core-pin.yml@main # moved\n";
+        assert_eq!(
+            shared_workflow_calls(workflow),
+            [("shared-ci.yml".to_owned(), "workflows-v1".to_owned()), ("shared-core-pin.yml".to_owned(), "main".to_owned())]
+        );
+        assert!(shared_workflow_calls("jobs:\n  build:\n    runs-on: ubuntu-latest\n").is_empty());
+        assert!(is_workflows_tag("workflows-v1") && is_workflows_tag("workflows-v12"));
+        for other in ["main", "v0.1.19", "workflows-v", "workflows-v1.2", "workflows-vx", ""] {
+            assert!(!is_workflows_tag(other), "{other}");
+        }
+    }
 
     #[test]
     fn every_ci_task_has_a_runner() {

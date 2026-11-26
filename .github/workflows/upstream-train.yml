@@ -1,7 +1,9 @@
 # The two-week upstream train's trigger (decision 0004, docs/UPSTREAM.md). Every other Monday it
 # compares the pinned WordCraft release with the newest one and, when there is a newer one, opens
 # an issue with the train's checklist. The train itself (moving pins, rebuilding the fork's `jcj`
-# branch, the contract tests) is done by a person or an agent in pull requests a person merges.
+# branch, the contract tests) is done by a person or an agent, who may move a pin and cut the
+# release once the contract tests and the full gate have passed on the commit (decisions 0004
+# and 0011).
 name: Upstream train
 
 on:
@@ -22,7 +24,9 @@ jobs:
         id: week
         if: github.event_name == 'schedule'
         run: |
-          if [ $(( $(date +%V) % 2 )) -ne 0 ]; then echo "skip=true" >> "$GITHUB_OUTPUT"; fi
+          # Whole weeks since 1970, which alternate without end. The week of the year does not:
+          # a year of 53 weeks is followed by week 1, two odd weeks in a row.
+          if [ $(( $(date -u +%s) / 604800 % 2 )) -ne 0 ]; then echo "skip=true" >> "$GITHUB_OUTPUT"; fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: steps.week.outputs.skip != 'true'
         with:
@@ -53,4 +57,4 @@ jobs:
           - [ ] Move the pins (Cargo.toml and template/Cargo.toml patch block, docs/UPSTREAM.md, jcj-upstream's constants), taking the craft-libs commits $NEWER pins.
           - [ ] \`cargo xtask ci\`, \`cargo xtask deny\`, \`cargo xtask template-check\`; the contract tests decide.
           - [ ] Record follow / hold / own for each source in docs/UPSTREAM.md.
-          - [ ] With a person's approval: tag a core release and open a pull request in each app."
+          - [ ] Once the full gate has passed on the commit (CONTRIBUTING.md, Releasing): tag a core release. Each app then moves its pin."

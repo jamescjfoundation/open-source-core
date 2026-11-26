@@ -3,6 +3,173 @@
 Each release says what changed for apps. While at 0.x, a patch release never breaks an app; a
 minor release may, and then **What apps must do** says exactly what (decision 0011).
 
+## Unreleased
+
+### Added
+
+- **An app's CI is the core's shared workflow, called at a tag the core moves** (decision 0003,
+  amended). Until now an app's `ci.yml` was a whole workflow copied by `cargo xtask sync`, so a
+  fix to CI reached an app only with a core release and a pin move, and apps on different pins
+  ran different generations of CI.
+  - The jobs are two reusable workflows in the core's `.github/workflows/`: `shared-ci.yml`
+    (checks, cargo-deny, clippy and tests) and `shared-core-pin.yml` (the weekly look at the
+    pin).
+  - What an app carries is two short managed files, `.github/workflows/ci.yml` and
+    `core-pin.yml`. They say when to run and which token the jobs get, and call the shared
+    workflows at the tag `workflows-v1`.
+  - The core moves `workflows-v1` to a commit of its `main` on which its own CI has passed; the
+    core's `ci.yml` calls `shared-ci.yml` from its own commit, so a change is tried there first.
+    One tag move carries a CI fix to every app, with no release and no change in an app.
+    Nothing reaches an app by landing on the core's `main`.
+  - `workflows-v1` may ask of an app only what every core release from this one on gives it;
+    the core's `.github/workflows/README.md` has the list. A workflow that needs more gets a
+    new tag, named by the two files from the release that brings what it needs.
+  - A called workflow runs in the app: its code, its commit, its read-only token, no secrets.
+    The actions it uses are pinned to full commits in the core, where Dependabot updates them.
+- **`cargo xtask affected [--base <ref>]` in every app** (the core had it): the packages a
+  change affects, as one line (`all`, names, or empty), and why each is in it on standard
+  error. The shared module is `xtask/src/changed.rs`.
+- **`cargo xtask ci --only a,b`** runs those tasks alone; `--skip a,b` is as before. CI's build
+  job uses `--only clippy,test`.
+- **Dependabot settings for every app**, `.github/dependabot.yml`, a managed file: weekly update
+  proposals for GitHub Actions, so the commits an app's own workflows pin do not go stale. Cargo
+  is not listed: the `jcj-` crates move with the core pin, and a crate only the app uses moves
+  when the app refreshes its lock file. The core keeps its own file, with Cargo.
+- Two sentences in the marked blocks. `public`: the Foundation's name is always written "The
+  James C. J. Foundation", with its capital "The" wherever it stands in a sentence, never in a
+  shorter form. `contributing`: a pull request opened by Dependabot is merged by anyone with
+  write access once its checks pass.
+- In the core: `nightly-failed.yml` opens an issue when a scheduled nightly run has failed.
+
+### Changed
+
+- **`--changed` tests everything a change touches.** A file used to count only for the package
+  whose folder holds it, so a change to a built-in design, a font, a fixture or a golden file at
+  the root, or to a page of `docs/` that a test compares, ran no clippy and no test, in CI and
+  in the pre-push hook, and was reported green. Now:
+  - a changed file also counts for every package whose Rust sources name it, or a folder it is
+    in: the argument of `include_str!`, `include_bytes!`, `include!` and `#[path = ...]` from
+    the source file's folder; any other string literal from the package's folder
+    (`"../../tests/fixtures"`); and a literal with a `/` or a `.` in it from the root as well
+    (`root().join("docs/guide/keys.md")`);
+  - a changed file under the root `assets/` or `tests/` that no package names affects every
+    package;
+  - the `xtask` package is left out: the files it names are read by its checks, which always
+    run.
+  The sources are read as text, so this is a guess that errs toward testing. It cannot see a
+  path put together from bare words (`root().join("docs").join("guide")`) or from values that
+  are not literals.
+- **CI runs on every push and pull request, a change to Markdown alone included.** Such a push
+  used to start no workflow, so the checks of the marked blocks, the links and the privacy scan
+  never ran for the changes they exist for. The checks job always runs. The build job asks
+  `cargo xtask affected` first and ends without restoring a build cache when the change affects
+  no package.
+- **A task an app adds to its gate runs once in CI**, in the checks job. The build job named
+  the tasks to skip, could not know an app's own, and ran them a second time (`docs` too).
+- The cargo-deny job restores the cargo home, so git dependencies are not cloned again on every
+  run.
+- The `app` block lists `.github/dependabot.yml` among the files the core owns and says that
+  the two workflow files only say when CI runs.
+- The `security` and `contributing` blocks read true in a repository that has no `cargo xtask`,
+  no changelog or no releases (a website, say): "the repository's gate", "where the repository
+  keeps a changelog", "as the repository's license files say".
+- `deny.toml` cited `template/xtask/src/spdx.rs`, a path that exists only in the core; it now
+  names the shared module.
+- The Foundation's name is written in full in the core's `README.md`, `NOTICE`, `AGENTS.md` and
+  `template/AGENTS.md`.
+
+### Fixed
+
+- The opening comment of `core-pin.yml` said to run the workflow by hand after GitHub has
+  switched its schedule off, which it does when a repository is quiet for 60 days. The
+  documented step is to enable it again, `gh workflow enable core-pin.yml`, and the comment now
+  says so, and that nothing tells anyone it was off (`gh workflow list --all` shows it).
+- In the core: the upstream train ran on even weeks of the year, which leaves three weeks
+  between two runs after a year of 53 weeks (2026 is one); it now counts whole weeks. The
+  release and train workflows no longer say a person approves a release (decisions 0004 and
+  0011).
+- The cache step of the app `ci.yml` listed `target` with a different indent from the lines
+  around it. The step is now in `shared-ci.yml`, with one indent.
+
+### What apps must do
+
+1. Move every `jcj-` dependency to `tag = "v0.1.19"`, then run
+   `cargo metadata --format-version 1 >/dev/null` to bring `Cargo.lock` in line.
+2. Run `cargo xtask sync`. It brings the new `sync.rs`, `changed.rs` and `util.rs`, the two
+   short workflow files and the reworded blocks, and says to run it again. First:
+3. Add one line to the app's `xtask/src/main.rs`, in the `match task` of `main`, after the
+   `"core-pin" => corepin::task(&root, rest),` arm:
+
+   ```rust
+           "affected" => changed::task(&root, rest),
+   ```
+
+   `cargo xtask sync` says so while the line is missing, and CI's build job fails without it.
+4. Run `cargo xtask sync` again. This run adds `.github/dependabot.yml`.
+5. Leave `.github/workflows/ci.yml` and `core-pin.yml` as `sync` wrote them. Under its opening
+   comment, `ci.yml` is now this, and holds no job of its own:
+
+   ```yaml
+   name: CI
+
+   on:
+     push:
+       branches: [main]
+     pull_request:
+     workflow_dispatch:
+       inputs:
+         full:
+           description: "Run every test, not only what changed"
+           type: boolean
+           default: false
+
+   permissions:
+     contents: read
+
+   concurrency:
+     group: ci-${{ github.ref }}
+     cancel-in-progress: true
+
+   jobs:
+     gate:
+       permissions:
+         contents: read
+         actions: read
+       uses: jamescjfoundation/open-source-core/.github/workflows/shared-ci.yml@workflows-v1
+       with:
+         full: ${{ inputs.full == true }}
+   ```
+
+   An app's other workflows (a release workflow, say) are its own and do not change.
+6. Delete a test of the app's own that reads `.github/workflows/ci.yml` for the task names it
+   passes to `--skip`. The file names no task now, so such a test fails, and what it guarded
+   against can no longer happen. Wordsmith Script's `xtask/src/main.rs` has one,
+   `the_core_workflow_skips_only_tasks_that_exist`.
+7. Dependabot: `sync` has replaced an app's own `.github/dependabot.yml` (Wordsmith Script has
+   one; its Cargo updates and ignore rules end here, on purpose). Delete a settings file kept
+   under the other spelling, `.github/dependabot.yaml`: GitHub would read one of the two.
+   Correct any text in the app that describes the old settings.
+8. Write the Foundation's name as the `public` block now says, everywhere in the app: its
+   documents, `NOTICE`, the text the app shows, the properties compiled into its programs. A
+   golden file that holds the old form changes with it, on purpose. No task checks this.
+9. Correct what the app's own documents say about CI: a push that changes only Markdown now
+   runs the checks, and the jobs are in the core. A test that reads a file outside its package
+   should name it in one string literal (`"../../docs/format.md"`, or
+   `root().join("docs/format.md")`), not piece by piece, so that a change to the file runs the
+   test.
+10. `cargo xtask sync --check`, then `cargo xtask ci`. `cargo xtask affected --base origin/main`
+   shows what the next push will build and why.
+11. After the push, look at the CI run: its jobs are named `gate / ...` and come from the
+   shared workflow. The first run builds without a cache, because the cache's list of paths
+   changed. A repository that requires status checks by name must name the new ones.
+
+No change to an app's product code. The tag `workflows-v1` exists from this release on; an app
+on an older core keeps its own full `ci.yml` and is not touched. An app that follows another
+app's tag, and so cannot move its pin until that app has, can take the files first: in a core
+checkout at this release, `cargo xtask sync <the app's folder>` writes them, and step 3 makes
+the build job of its CI work. The app's own `cargo xtask sync --check` passes once its pin has
+moved.
+
 ## 0.1.18 (2026-11-26)
 
 ### Added

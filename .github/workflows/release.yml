@@ -1,5 +1,6 @@
-# A core release (decision 0011). Pushing a `v*` tag, which a person does after approval:
-# runs the full gate on every platform, then publishes a GitHub release with the changelog
+# A core release (decision 0011). A person or an agent pushes a `v*` tag once the full gate
+# (nightly.yml) has passed on the commit; CONTRIBUTING.md, "Releasing", has the steps. This
+# runs the full gate again on every platform, then publishes a GitHub release with the changelog
 # section, the vendored sources of every dependency and the third-party license texts.
 name: Release
 

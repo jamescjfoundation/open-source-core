@@ -1,5 +1,8 @@
 # Weekly update proposals (decision 0001). Upstream crates are pinned on purpose and move only
 # at the two-week train (docs/UPSTREAM.md), so they are left alone here.
+# The actions pinned in shared-ci.yml and shared-core-pin.yml run in every app: an update to
+# one reaches the apps when the tag `workflows-v1` is moved (.github/workflows/README.md).
+# Apps carry their own file, for GitHub Actions only (template/.github/dependabot.yml).
 version: 2
 updates:
   - package-ecosystem: github-actions

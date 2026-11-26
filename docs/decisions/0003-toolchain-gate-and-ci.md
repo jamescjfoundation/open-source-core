@@ -1,7 +1,8 @@
 # 0003: Toolchain, the gate, and CI that rarely makes anyone wait
 
-Date: 2026-11-24 · Status: accepted · Amended 2026-11-26 (what `sync` carries; the `docs` task and the hooks) · Ported from
-Wordsmith Script decisions 0003 and 0040
+Date: 2026-11-24 · Status: accepted · Amended 2026-11-26 (what `sync` carries; the `docs` task
+and the hooks; the shared workflows, what a change affects, and checks on every push) · Ported
+from Wordsmith Script decisions 0003 and 0040
 
 ## Decision
 
@@ -17,8 +18,9 @@ Wordsmith Script decisions 0003 and 0040
   modules apps share (`template/xtask/src/`) are compiled into the core's xtask, so the core tests
   them, and `cargo xtask sync` copies them into each app.
 - **What `sync` carries** (amended 2026-11-26). Whole files the core owns: the toolchain, lint,
-  format and cargo-deny settings, the shared xtask modules, the CI and core-pin workflows, the
-  hooks and the code of conduct (`MANAGED` in `template/xtask/src/sync.rs`). Blocks inside files
+  format and cargo-deny settings, the shared xtask modules, the two files that call the shared
+  workflows, the Dependabot settings, the hooks and the code of conduct (`MANAGED` in
+  `template/xtask/src/sync.rs`). Blocks inside files
   an app otherwise owns: the patch block in `Cargo.toml`, and the core's rules as marked blocks
   in `AGENTS.md`, `SECURITY.md` and `CONTRIBUTING.md` (`BLOCKS`), each between a
   `<!-- BEGIN open-source-core: NAME -->` and an `<!-- END open-source-core: NAME -->` line.
@@ -30,8 +32,21 @@ Wordsmith Script decisions 0003 and 0040
   by hand into five files, with nothing to notice a copy that had fallen behind.
 - **Only what changed.** `cargo xtask ci --changed --base <ref>` runs clippy and tests only for the
   packages a change touches and everything that depends on them (`template/xtask/src/changed.rs`).
-  A change to a manifest, the lock file or the toolchain affects everything; documentation affects
-  nothing. Tests run under cargo-nextest when installed.
+  A change to a manifest, the lock file or the toolchain affects everything. Tests run under
+  cargo-nextest when installed.
+- **What a change touches** (amended 2026-11-26). At first a file counted only for the package
+  whose folder holds it, so a change to a built-in design, a font, a fixture or a golden file at
+  the root, or to a page of `docs/` that a test compares, ran no test at all and was reported
+  green. Now a changed file also counts for every package whose Rust sources name it or a folder
+  it is in: the argument of `include_str!` and its like from the source file's folder, any other
+  string literal from the package's folder, and a literal with a `/` or a `.` in it and no `..`
+  from the root as well. The sources are read as text, so this is a guess, and it is made to
+  err toward testing: a changed file under the root `assets/` or `tests/` that no package names
+  affects everything.
+  The gate's own package is left out, since the files it names are read by its checks, which
+  always run. `cargo xtask affected` prints what a change affects and why. What the guess
+  cannot see is a path put together from bare words or from values that are not literals; a
+  test that reads a file that way should name the file in one literal.
 - **Hooks.** `cargo xtask install-hooks` turns on `pre-commit` (fmt and the privacy scan of the
   staged lines, a few seconds) and `pre-push` (`ci --changed` against what the remote has).
 - **What points across repositories is checked** (amended 2026-11-26). The routes between the
@@ -48,8 +63,42 @@ Wordsmith Script decisions 0003 and 0040
 - **CI** (GitHub-hosted runners only) is described in `.github/workflows/README.md`; its shape
   follows from the points above: quick checks in parallel with the build, changed-only clippy and
   tests on pushes, a full cross-platform run on a schedule and before a release, warm caches saved
-  only from `main`, documentation-only pushes skipped, superseded runs cancelled.
+  only from `main`, superseded runs cancelled.
+- **The checks run on every push** (amended 2026-11-26). Pushes that changed only Markdown used
+  to start no workflow. The marked blocks, the links and the decision references live in
+  Markdown, and the privacy scan reads every file, so exactly the changes those checks exist
+  for were the ones CI never saw. Every push and pull request now runs the tasks that need no
+  build. The build job asks `cargo xtask affected` first and ends without restoring a cache
+  when the change affects no package. It runs `cargo xtask ci --only clippy,test`, so a task an
+  app adds to its gate runs once, in the checks job, without the workflow knowing its name.
+- **Shared workflows** (amended 2026-11-26). An app's CI used to be a whole workflow file copied
+  by `sync`, so a fix to it reached an app only with a core release and a pin move, and apps on
+  different pins ran different generations of CI. The jobs are now two reusable workflows in
+  the core, `shared-ci.yml` and `shared-core-pin.yml`; what `sync` copies into an app is two
+  short files that say when to run and call them at the tag `workflows-v1`.
+  - The tag is moved by a person or an agent to a commit of `main` on which the core's own
+    `ci.yml` has passed. That workflow calls `shared-ci.yml` from its own commit, so a change is
+    tried in the core first, and one tag move then carries it to every app.
+  - Nothing reaches an app by landing on `main` or by a release of the crates, and the move is
+    undone by moving the tag back.
+  - Apps on different pins call the same tag, so it may use only what every core release from
+    0.1.19 on gives an app; `.github/workflows/README.md` lists it. A workflow that needs more
+    gets a new tag (`workflows-v2`), which the callers name from the release that brings what
+    it needs, and the old tag stays for apps that have not moved.
+  - Considered and not chosen: calling the workflow at `main` (every push to the core would
+    change every app's CI at once, a broken one included); naming a commit in each app (safe,
+    but a fix is then a change in every app again); taking the workflow from the pinned
+    release (what there was).
+  - The xtask modules stay with the pin. They are compiled together with the app's own
+    `xtask/src/main.rs`, and a module newer than the file that calls it may not build.
 - **Actions** are GitHub's own, pinned to full commit SHAs; checkouts do not keep their token.
+  The call to a shared workflow is the one reference by a tag that moves: it is the core's own
+  file, it runs with the caller's token and no secret, and the caller grants that token
+  read-only (the core-pin job may also write issues). Dependabot proposes updates to the pinned
+  actions weekly: in the core, and in each app for the app's own workflow files
+  (`template/.github/dependabot.yml`).
+- **A failed scheduled run is reported** (amended 2026-11-26): `nightly-failed.yml` opens an
+  issue, since a red mark on the Actions page reaches nobody.
 
 ## Revisit when
 

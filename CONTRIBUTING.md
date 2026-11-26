@@ -9,6 +9,7 @@ issue, pull request or review can be read by anyone and stays in the history for
 cargo xtask install-hooks        # once: pre-commit and pre-push hooks
 cargo xtask ci                   # the full gate (CI runs the same)
 cargo xtask ci --changed         # only the packages your change affects, and their dependents
+cargo xtask affected             # which packages those are, and why
 cargo xtask docs                 # links, decision references (part of the gate; quick after a docs change)
 cargo xtask docs <folder>        # the same on another checkout: an app, or a repository without Cargo
 cargo run -p core-testbed        # the test app that exercises every crate
@@ -33,9 +34,9 @@ when present.
 | `crates/jcj-theme`, `jcj-board`, `jcj-shell` | Theming from tokens, cards and boards, the app shell |
 | `apps/core-testbed` | A small app that uses every crate |
 | `contract-tests` | Behavior apps rely on, run against every upstream candidate |
-| `template` | Starter files for a new app repository, and the source of what `cargo xtask sync` keeps identical in every app: the shared xtask modules, workflows, hooks, code of conduct and the marked blocks |
+| `template` | Starter files for a new app repository, and the source of what `cargo xtask sync` keeps identical in every app: the shared xtask modules, the two files that call the shared workflows, the Dependabot settings, hooks, code of conduct and the marked blocks |
 | `xtask` | The core's own gate and maintenance tasks |
-| `.github/workflows` | The core's own workflows; its `README.md` says what each runs and when |
+| `.github/workflows` | The core's own workflows, and the two shared workflows every app's CI calls; its `README.md` says what each runs and when, and how a change to a shared one reaches the apps |
 | `docs/decisions` | Why things are the way they are |
 | `docs/UPSTREAM.md` | Pins, carried patches, follow / hold / own |
 | `docs/history/` | Finished plans and published reviews, kept as written and not maintained |
@@ -52,8 +53,8 @@ Never commit, or paste into an issue or pull request: anyone's name, email addre
 (other than your commit author line); local paths, user names, host names or machine details;
 files from a real machine (preferences, recovery, auto-save or backup files, logs, desktop
 screenshots); anyone's private writing; passwords, tokens or keys. Test fixtures are
-public-domain texts or written for the test. `cargo xtask privacy` checks files and commit
-identities.
+public-domain texts or written for the test. The repository's privacy check
+(`cargo xtask privacy` where it has `cargo xtask`) checks files and commit identities.
 
 ### Security problems
 
@@ -63,27 +64,31 @@ fixes it.
 ### Private working notes
 
 Reviews, audits and working notes go in `.private/` (ignored by Git). One is published only when
-a maintainer says so, under `docs/history/`, with a first line saying it is history
+a maintainer says so, under `docs/history/` where the repository has a `docs/` folder, with a
+first line saying it is history
 ([core decision 0012](https://github.com/jamescjfoundation/open-source-core/blob/main/docs/decisions/0012-working-in-the-open.md)).
 Write the public part as a decision record or changelog entry, giving the reason itself rather
 than "as discussed".
 
 ## Commits, pushes and pull requests
 
-- While no app built on the core has a public release, a push to `main` is allowed once
-  `cargo xtask ci` passes. A pull request is optional; its author may merge it once its checks
-  pass
+- While no app built on the core has a public release, a push to `main` is allowed once the
+  repository's gate passes (`cargo xtask ci` where it has `cargo xtask`). A pull request is
+  optional; its author may merge it once its checks pass
   ([core decision 0013](https://github.com/jamescjfoundation/open-source-core/blob/main/docs/decisions/0013-app-and-core.md)).
 - A release is cut, and in the core an upstream pin is moved, only on a commit whose full gate
   has passed; a person or an agent may do either (core decisions
   [0004](https://github.com/jamescjfoundation/open-source-core/blob/main/docs/decisions/0004-follow-hold-own.md)
   and
   [0011](https://github.com/jamescjfoundation/open-source-core/blob/main/docs/decisions/0011-releases-and-versioning.md)).
-- Contributions are licensed as the project is, MIT OR Apache-2.0, with no extra terms. No CLA.
+- Contributions are licensed as the repository's license files say (MIT OR Apache-2.0 for
+  code), with no extra terms. No CLA.
 - Use your GitHub no-reply address (`git config user.email <id>+<login>@users.noreply.github.com`).
 - One concern per commit or pull request; say what changed, why, and how you checked it.
-- Update `CHANGELOG.md` and the decision records when behavior changes. A core change that apps
-  must act on says so under "What apps must do".
+- A pull request opened by Dependabot is merged by anyone with write access once its checks
+  pass.
+- Update the changelog and the decision records, where the repository keeps them, when behavior
+  changes. A core change that apps must act on says so under "What apps must do".
 - AI-assisted contributions are welcome; you are responsible for every line.
 <!-- END open-source-core: contributing -->
 
@@ -113,6 +118,15 @@ The rules every app carries are the marked blocks under `template/` (`BLOCKS` in
 `cargo xtask template --write`; the `template` task of the gate fails when a copy here differs. A
 changed block reaches the apps with the next release, so keep it true for every app and for the
 core, and say in the changelog what an app must do.
+
+### The shared workflows
+
+`shared-ci.yml` and `shared-core-pin.yml` in `.github/workflows/` are the jobs of every app's CI.
+Apps call them at the tag `workflows-v1`, so a change to one reaches the apps when that tag is
+moved: not when the change lands, and not with a release. A person or an agent moves it, to a
+commit of `main` where `ci.yml` has passed. The steps, and the list of what these workflows may
+ask of an app, are in `.github/workflows/README.md`; a change that asks more gets a new tag
+(decision 0003).
 
 ## Releasing
 

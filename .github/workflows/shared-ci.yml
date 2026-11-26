@@ -1,0 +1,238 @@
+# The gate on GitHub, written once: this repository's own `ci.yml` calls this file, and so does
+# the `ci.yml` of every app built on open-source-core (decision 0003). An app calls it at the tag
+# `workflows-v1`, which is moved by hand to a commit of `main` whose own CI run passed, so a fix
+# here reaches every app in one step, with no release of the crates and no change in an app
+# (README.md in this folder says how the tag is moved, and when a `workflows-v2` is needed).
+#
+# What it may ask of the calling repository, and nothing more (the tag is used by apps on every
+# core release from 0.1.19 on):
+#
+# - `cargo xtask ci --skip clippy,test`: every task of the gate that needs no product build;
+# - `cargo xtask affected --base <commit>`: one line, `all`, package names, or empty;
+# - `cargo xtask ci [--changed --base <commit>] --only clippy,test`;
+# - `cargo deny --locked check` with the repository's `deny.toml`;
+# - a `rust-toolchain.toml` and a `Cargo.lock` at the root.
+#
+# Built so nobody waits on it:
+#
+# - The gate is `cargo xtask ci`, the same command the pre-push hook runs, so CI confirms what
+#   the developer already saw.
+# - Three jobs in parallel. `checks` runs on every push and pull request, a change to Markdown
+#   alone included: formatting, privacy, links and, in an app, that the shared files and marked
+#   blocks match the pinned core release. A task an app adds to its gate runs here, once.
+# - `build` runs clippy and the tests for what changed since the last commit that passed CI on
+#   `main` (found through the GitHub API, so a cancelled run's changes are never skipped), and
+#   for everything that depends on it. A changed file that a package's sources name (a design,
+#   a font, a fixture, a golden file, a page a test compares) counts as that package's.
+#   Manifests, the lock file or the toolchain changing means everything. When the change
+#   affects no package the job ends before it restores a build cache.
+# - Caches are restored everywhere but saved only from main, so they stay warm and small.
+#
+# The `github` context here is the calling repository's: its code is checked out, its commit is
+# tested, its token is used. That token is read-only; the caller grants `contents: read` and
+# `actions: read` (to find the last run that passed) and this file asks for no more.
+# Only GitHub's own actions, pinned to full commit SHAs.
+name: Shared CI
+
+on:
+  workflow_call:
+    inputs:
+      full:
+        description: "Run clippy and every test, not only what changed"
+        type: boolean
+        default: false
+      nextest:
+        description: "Install cargo-nextest for the tests (a gate that uses it when present)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  CARGO_NET_RETRY: "10"
+  RUST_BACKTRACE: "short"
+  CARGO_DENY_VERSION: "0.20.2"
+  CARGO_NEXTEST_VERSION: "0.9.152"
+
+jobs:
+  # Everything that needs no product build. About a minute.
+  checks:
+    name: checks (every task but clippy and test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # privacy checks every commit identity
+      - name: Toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Restore cargo home
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: cargo-home-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-home-
+      - name: cargo xtask ci (checks only)
+        run: cargo xtask ci --skip clippy,test
+
+  deny:
+    name: cargo-deny (licenses, advisories, sources)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      # Restored, never saved here: without it every git dependency is cloned again on each run,
+      # and a refused clone fails the job.
+      - name: Restore cargo home
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: cargo-home-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-home-
+      - name: Cached cargo-deny
+        id: deny-bin
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/bin/cargo-deny
+          key: cargo-deny-${{ env.CARGO_DENY_VERSION }}-${{ hashFiles('rust-toolchain.toml') }}
+      - name: Install cargo-deny
+        if: steps.deny-bin.outputs.cache-hit != 'true'
+        run: cargo install --locked cargo-deny --version "$CARGO_DENY_VERSION"
+      - name: cargo deny check
+        run: cargo deny --locked check
+
+  # Clippy and tests for the packages this change affects.
+  build:
+    name: clippy and tests (affected packages)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # to diff against the last green commit
+      - name: Toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Restore cargo home
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: cargo-home-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-home-
+      - name: What to check
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          FULL: ${{ inputs.full }}
+          # The calling workflow, as owner/repository/.github/workflows/<file>@<ref>.
+          CALLER: ${{ github.workflow_ref }}
+        run: |
+          base=""
+          if [ "$EVENT" = "pull_request" ]; then
+            base="$PR_BASE"
+          elif [ "$FULL" != "true" ]; then
+            # The newest commit on main whose run of the calling workflow passed; everything
+            # after it is checked.
+            workflow="${CALLER%@*}"
+            workflow="${workflow##*/}"
+            if ! passed=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --branch main \
+                          --status success --limit 20 --json headSha --jq '.[].headSha'); then
+              echo "::warning::could not list the runs of $workflow that passed: checking everything"
+              passed=""
+            fi
+            for sha in $passed; do
+              if git merge-base --is-ancestor "$sha" HEAD 2>/dev/null; then base="$sha"; break; fi
+            done
+          fi
+          if [ -z "$base" ]; then
+            echo "args=" >> "$GITHUB_OUTPUT"
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            echo "No green base found, or a full run was asked for: checking everything"
+            exit 0
+          fi
+          echo "Checking changes since $base"
+          if ! affected=$(cargo xtask affected --base "$base"); then
+            echo "::error::cargo xtask affected failed (see the log above). If the task is unknown, add it to xtask/src/main.rs as the core's CHANGELOG says for 0.1.19."
+            exit 1
+          fi
+          echo "args=--changed --base $base" >> "$GITHUB_OUTPUT"
+          if [ -n "$affected" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            echo "Affected: $affected"
+          else
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "The change affects no package: nothing to build or test"
+          fi
+      - name: Restore cargo home and target
+        if: steps.plan.outputs.build == 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ~/.cargo/bin/cargo-nextest
+            target
+          key: build-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            build-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}-
+            build-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}-
+      - name: Install cargo-nextest
+        if: steps.plan.outputs.build == 'true' && inputs.nextest
+        run: command -v cargo-nextest || cargo install --locked cargo-nextest --version "$CARGO_NEXTEST_VERSION"
+      - name: cargo xtask ci (clippy and tests)
+        if: steps.plan.outputs.build == 'true'
+        env:
+          ARGS: ${{ steps.plan.outputs.args }}
+        run: |
+          # $ARGS is empty or `--changed --base <commit>`: unquoted so that it is split into words.
+          # shellcheck disable=SC2086
+          cargo xtask ci $ARGS --only clippy,test
+      # A run that built nothing restored no target folder, and must not save an empty one as
+      # the newest cache.
+      - name: Trim the target folder before saving
+        if: steps.plan.outputs.build == 'true' && github.ref == 'refs/heads/main'
+        run: rm -rf target/debug/incremental target/debug/examples target/nextest
+      - name: Save cargo home and target (main only)
+        if: steps.plan.outputs.build == 'true' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ~/.cargo/bin/cargo-nextest
+            target
+          key: build-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}
+      - name: Save cargo home for the other jobs (main only)
+        if: steps.plan.outputs.build == 'true' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        continue-on-error: true # already saved for this lock file
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: cargo-home-${{ hashFiles('Cargo.lock') }}

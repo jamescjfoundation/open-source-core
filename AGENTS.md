@@ -1,9 +1,9 @@
 # Notes for coding agents (and people)
 
-open-source-core is the J. C. J. Foundation's shared base for its desktop apps. It holds what every
-app needs and none should write twice, and it is the only place that talks to the open-source
-projects we build on (WordCraft, craft-libs). It carries no product name in its code, its
-interface text or the files apps copy from it.
+open-source-core is The James C. J. Foundation's shared base for its desktop apps. It holds what
+every app needs and none should write twice, and it is the only place that talks to the
+open-source projects we build on (WordCraft, craft-libs). It carries no product name in its code,
+its interface text or the files apps copy from it.
 
 Read `CONTRIBUTING.md` (where things are, this repository's own rules, how a release is cut),
 `SECURITY.md` and `docs/decisions/` before you start. `README.md` says what each crate gives an
@@ -54,6 +54,9 @@ Before you write a commit, branch name, issue, pull request or comment, check it
 Commit with a GitHub no-reply address or a foundation bot identity. Where a repository has
 `cargo xtask`, `cargo xtask privacy` checks its files and every commit. Never push with `--all`
 or `--mirror`.
+
+The Foundation's name is always written "The James C. J. Foundation", with its capital "The"
+wherever it stands in a sentence, never in a shorter form.
 <!-- END open-source-core: public -->
 
 <!-- BEGIN open-source-core: app-and-core -->
