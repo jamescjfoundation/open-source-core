@@ -1,7 +1,8 @@
 # 0011: Core releases and versioning
 
 Date: 2026-11-24 · Status: accepted · Amended 2026-11-26 (who cuts a release; how far behind an
-app may be; the gate before the tag, and the apps in the gate)
+app may be; the gate before the tag, and the apps in the gate; the same order for an app's own
+release, decision 0018)
 
 ## Decision
 
@@ -34,6 +35,11 @@ app may be; the gate before the tag, and the apps in the gate)
   release's changelog section, one line for each such app:
   `**App gate override, <owner>/<repository>:** <the reason>`. The workflow reads that line
   and nothing else lets a red app through.
+- **An app's own release follows the same order** (amended 2026-11-26; decision 0018). A
+  workflow started by hand for the app's release commit runs the app's gate on the three
+  systems and builds every release file; only then does it make the tag and publish. The
+  workflow is the core's (`shared-release.yml`), and it refuses an app that is not on the
+  newest core unless it is told to go ahead.
 - **Changes that alter what users see in other apps** sit behind an option (a shell setting or a
   Cargo feature) that defaults to the old behavior until every app has turned it on (plan, "Step
   3").
@@ -68,6 +74,14 @@ app may be; the gate before the tag, and the apps in the gate)
   system would reach every app before the nightly run saw it); a person's approval before the
   tag (the first rule of this record, dropped for the reasons above); building the apps on
   macOS and Windows too (three times the cost for what an app's own release build checks).
+
+## Why an app's release takes the same order (2026-11-26)
+
+The apps had three release workflows of their own; two started on a pushed tag and one on a
+branch, and none had run. What holds for the core's tag holds more for an app's: an installed
+copy reads the app's releases and installs what it finds, so a tag or a release that exists
+before the gate has passed reaches users, not only other repositories. Decision 0018 has the
+contract and the reasons.
 
 ## Revisit when
 

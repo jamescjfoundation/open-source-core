@@ -46,6 +46,52 @@ minor release may, and then **What apps must do** says exactly what (decision 00
     used, not repeated. Pushing a tag by hand starts nothing; nobody does it.
   - A red app stops the release unless the release's section of this file carries, for that
     app, the line `**App gate override, <owner>/<repository>:** <the reason>`.
+- **One release contract and one release pipeline for every app** (decision 0018;
+  `docs/app-releases.md` is the contract). Three apps had each written a release workflow, a
+  way to package and names for the files; none had run, two named files the update check does
+  not find, one wrote checksum lines it does not read and one published no checksums.
+  - **The contract.** A release is the tag `vX.Y.Z` with four files: one package a system,
+    named `<id>-<version>-linux-x86_64.tar.gz`, `<id>-<version>-macos-aarch64.dmg` and
+    `<id>-<version>-windows-x64-portable.zip`, and `SHA256SUMS.txt` in the form `sha256sum`
+    writes. Every package holds the app's license files and `THIRD-PARTY-LICENSES.txt`. The
+    desktop program is named by the release id and every other program `<id>-<name>`. The
+    release's text is the changelog section. The document says what each package holds, file
+    by file, and what a launcher or a website may rely on.
+  - **`cargo xtask package`** in every app builds the package of the system it runs on into
+    `dist/`. `cargo xtask package --sums <folder>` checks a folder of release files and writes
+    the checksum file; `--describe` prints the release's id, version and file names.
+  - **`cargo xtask release <version>`** in every app makes the changes of a release commit:
+    the version in `Cargo.toml` and `Cargo.lock`, and `## Unreleased` in `CHANGELOG.md` as
+    `## <version> (<date>)`. `--check` says whether the checkout is a release commit;
+    `--notes` prints the release's text.
+  - **What a release carries is data**: `package: Some(Package { .. })` in `App`, with the
+    release id, the app's id on a desktop, icons, file types and the license texts of what the
+    programs embed. The menu entry, the description of the file types, the macOS property
+    list and icon, the scripts that register file types on Windows and the Linux install
+    script are written from it.
+  - **The gate has a `release-data` task**: the files the package data names are there, the
+    icons are the size they are said to be, the programs carry their names, and the
+    changelog's newest section is `## Unreleased` or a dated release. An app with no package
+    data passes.
+  - **`shared-release.yml`**, called by a third managed file, `.github/workflows/release.yml`,
+    at `workflows-v1`. Started by hand for a release commit on `main`, it runs the whole gate
+    on Linux, macOS and Windows with cargo-deny, builds and checks every file, attests them,
+    and only then makes the tag and publishes: the core's own order. `-f dry-run=true` builds
+    and checks every file on any commit and stops, and the same dry run starts by itself once
+    a week; a scheduled one that fails opens an issue in the app.
+  - **Signing is built in and waits for certificates.** The macOS and Windows steps run when
+    their secrets exist (named in the contract) and say so when they do not.
+- **`ReleaseSource::finish_update`** in `jcj-shell` (issue #36). On Windows the updater finishes an update
+  through a copy of the app's own program, started with the updater's flag; nothing in the
+  shell read that flag, so an in-place update there could not have been finished. An app calls
+  it first in `main` and exits when it answers. It answers `None` on every other system and
+  for every ordinary start. `apps/core-testbed` calls it.
+- In the core: the names and the checksum file of the contract are tested against
+  craft-update's own reader (`crates/jcj-shell/src/updates/desktop.rs`), and the packaging
+  code against the same example (`docs/app-release-example/`). `nightly.yml` makes the
+  template app's release package on Linux, macOS and Windows
+  (`cargo xtask template-check --package`), so the packaging of every system is tried each
+  night and before a core release.
 - In the core: the gate has a `workflows` task. Every workflow uses only GitHub's own actions,
   each at a full commit; two workflows that download the same tool name the same version and
   checksums; a script two workflows must run alike is the same text in both; and
@@ -80,9 +126,11 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 1. Move every `jcj-` dependency to this release's tag, then run
    `cargo metadata --format-version 1 >/dev/null` to bring `Cargo.lock` in line.
-2. Run `cargo xtask sync`, once. It brings three changed modules (`xtask/src/gate.rs`,
-   `changed.rs`, `corepin.rs`). Then `cargo xtask sync --check`. No file of the app's own
-   changes: not `xtask/src/main.rs`, not a workflow file.
+2. Run `cargo xtask sync`, once. It brings five changed modules (`xtask/src/gate.rs`,
+   `shared.rs`, `sync.rs`, `changed.rs`, `corepin.rs`) and one new managed file,
+   `.github/workflows/release.yml`, which replaces an app's own file of that name (step 4).
+   Then `cargo xtask sync --check`. The gate passes as before with no other change: its new
+   `release-data` task asks nothing of an app that has no package data yet.
 3. Install cargo-nextest where the gate is run by hand, if it is wanted there (the gate works
    without it): <https://nexte.st/docs/installation/pre-built-binaries/>. Run `cargo xtask ci`
    once with it installed. cargo-nextest runs each test in a process of its own and several
@@ -106,6 +154,80 @@ minor release may, and then **What apps must do** says exactly what (decision 00
      program ran before it, or because no other program ran beside it (two that write the
      same file, say). Make it stand alone; where two tests must not run together, put them in
      a test group in the same file.
+
+4. **Release data and names** (decision 0018). `cargo xtask sync` has replaced the app's
+   `.github/workflows/release.yml` with the managed one; that is meant. Then, in the app:
+   - In `xtask/src/main.rs`, give `APP` its `package`:
+
+     ```rust
+     use shared::package::{FileType, Package};
+
+     const APP: App = App {
+         product: "<the app's name>",
+         shipped: &["<the desktop program's package>", "<the command-line program's package>"],
+         package: Some(Package {
+             id: "<the release id>",
+             app_id: "<the id the window is given, such as org.example.app>",
+             summary: "<what the app is for, in a few words>",
+             categories: "Office;",
+             icons: &[(256, "assets/brand/icon-256.png")],
+             windows_icon: Some("assets/brand/icon.ico"), // when a build script embeds one
+             file_types: &[FileType { name: "<kind>", extensions: &["<ext>"], mime: "application/x-<type>", ..FileType::DEFAULT }],
+             license_files: &["assets/fonts"],
+             ..Package::DEFAULT
+         }),
+         ..App::DEFAULT
+     };
+     ```
+
+     `docs/app-releases.md`, "What an app gives", says what each field is.
+   - `shipped` holds **package** names, as `cargo build -p` takes them, the desktop program's
+     first. An entry that named a program whose package is called otherwise never worked:
+     `cargo xtask third-party-licenses` fails on it.
+   - The desktop program is named by the release id, and every other program `<id>-<name>`
+     (`<id>-cli`). Rename the `[[bin]]` of a program that is named otherwise, and every place
+     that names it: the guide, the README, tests that start it, agent configuration examples.
+   - The release id is the `id` of the app's `ReleaseSource`, and `app_id` is the id the
+     window is given (`with_app_id`). Keep a test in the app that the two places agree, since
+     the xtask cannot read the app's code.
+   - `CHANGELOG.md`: one `## ` section a release, newest first; `## Unreleased` until the
+     release, then `## X.Y.Z (YYYY-MM-DD)`. A heading in another form
+     (`## 1.0.0 (unreleased)`) fails `release-data`.
+   - Delete what the shared code replaces: the app's own packaging (a `packaging/` folder, a
+     packaging script, a `bundle` task and its module), and the desktop entry, MIME, property
+     list and registry files kept for it. `cargo xtask package` writes them from the data.
+     A check that a release step ran in the app's old workflow and that is not in its gate
+     (a test run in release mode) moves into the app's tests or is dropped.
+   - Run `cargo xtask release-data`, then `cargo xtask package` on Linux, and look inside the
+     file in `dist/`.
+5. **The update check** (`apps/<app>/src/main.rs`), where the app has one:
+   - first in `main`, before the app reads its own arguments:
+
+     ```rust
+     let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+     if let Some(done) = RELEASES.finish_update(&args) {
+         return if done.is_ok() { ExitCode::SUCCESS } else { ExitCode::FAILURE };
+     }
+     ```
+
+   - close the window when `shell.close_requested()` is true, and call `shell.finish()` last
+     in `on_exit`. An app that does neither installs an update and never starts it.
+   - `installs_in_place` stays `!cfg!(target_os = "macos")`.
+6. **Say it where users and contributors read**: the app's guide and README name the three
+   files and how each is opened (an unsigned build until certificates exist), and the app's
+   `AGENTS.md` or `CONTRIBUTING.md` points at the "Releasing an app" steps of the shared block
+   in place of its own. A decision record of the app that described its old release workflow
+   is marked superseded by core decision 0018.
+7. **The first release** of an app, once the steps above are on its `main`:
+   `gh workflow run release.yml --ref main -f dry-run=true` until it is green, then
+   `cargo xtask release <version>`, `cargo xtask ci`, commit, push, and
+   `gh workflow run release.yml --ref main`. Afterwards check the release: four files, and the
+   app's update check, started from the release before, finds it.
+
+**The release workflow** is new at `workflows-v1`: the tag is moved to a commit that has
+`shared-release.yml` before this release is cut, or an app's `release.yml` names a workflow
+that is not there yet. The app's `release.yml` starts a dry run every Tuesday; until step 4 is
+done in an app that run fails (the app has no package data) and opens an issue saying so.
 
 **The shared workflow** asks nothing of an app. It reaches an app when the core moves the tag
 `workflows-v1` to a commit that has it, not with this release, and no file in an app changes

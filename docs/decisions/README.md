@@ -26,3 +26,4 @@ records with the same numbers.
 | [0015](0015-apps-that-depend-on-apps.md) | Apps that depend on apps |
 | [0016](0016-entries-and-translations.md) | Entries and interface translations |
 | [0017](0017-command-lines-and-agent-tools.md) | One convention for command lines and agent tools |
+| [0018](0018-app-releases.md) | One release contract and one release pipeline for every app |

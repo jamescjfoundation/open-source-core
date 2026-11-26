@@ -16,6 +16,7 @@ cargo run -p core-testbed        # the test app that exercises every crate
 cargo xtask deny                 # licenses, advisories and sources (needs cargo-deny)
 cargo xtask template --write     # after changing a block or the code of conduct under template/
 cargo xtask template-check       # builds the app template against this checkout
+cargo xtask template-check --package   # its release package on this system, as an app's release makes it
 cargo xtask release <version>    # the changes of a release commit ("Releasing" below)
 ```
 
@@ -37,12 +38,13 @@ same tests and says which of the two ran them.
 | `crates/jcj-theme`, `jcj-board`, `jcj-shell` | Theming from tokens, cards and boards, the app shell |
 | `apps/core-testbed` | A small app that uses every crate |
 | `contract-tests` | Behavior apps rely on, run against every upstream candidate |
-| `template` | Starter files for a new app repository, and the source of what `cargo xtask sync` keeps identical in every app: the shared xtask modules (the gate every app runs is `template/xtask/src/gate.rs`), the two files that call the shared workflows, the Dependabot settings, hooks, code of conduct and the marked blocks of rules and settings |
+| `template` | Starter files for a new app repository, and the source of what `cargo xtask sync` keeps identical in every app: the shared xtask modules (the gate every app runs is `template/xtask/src/gate.rs`; an app's release package and release commit are `package` and `release` in `shared.rs`), the three files that call the shared workflows, the Dependabot settings, hooks, code of conduct and the marked blocks of rules and settings |
 | `xtask` | The core's own gate and maintenance tasks |
-| `.github/workflows` | The core's own workflows, and the two shared workflows every app's CI calls; its `README.md` says what each runs and when, how a change to a shared one reaches the apps, what CI keeps between runs, and how a release is gated |
+| `.github/workflows` | The core's own workflows, and the three shared workflows every app calls (its CI, its core pin, its release); its `README.md` says what each runs and when, how a change to a shared one reaches the apps, what CI keeps between runs, and how a release is gated |
 | `.github/apps.json` | The app repositories that are built against a core commit every night and before a release |
 | `docs/decisions` | Why things are the way they are |
 | `docs/command-lines-and-agent-tools.md` | The convention every app's command line and agent tools follow: exit codes, `mcp`, tool names |
+| `docs/app-releases.md` | The contract of an app's public release: tag, file names, the checksum file, what each package holds, signing, how a release is cut and tried; `docs/app-release-example/` is the example the tests hold it to |
 | `docs/UPSTREAM.md` | Pins, carried patches, follow / hold / own |
 | `docs/history/` | Finished plans and published reviews, kept as written and not maintained |
 | `CHANGELOG.md` | What each release changes for apps, with "What apps must do" |
@@ -131,20 +133,34 @@ an app must do.
 An app's gate is this repository's code: `template/xtask/src/gate.rs` and the modules beside it,
 listed in `template/xtask/src/shared.rs`. An app's `xtask/src/main.rs` is the app's own and holds
 only its data and its own tasks. Keep a release from asking for an edit there: a new check goes
-in `CHECKS`, a new module in `shared.rs` and in `MANAGED`, and a new field of `App` gets a value
-in `App::DEFAULT`. Until issue #42 is fixed, a release that adds a module cannot be taken by an
-app's own `cargo xtask sync`: put new code in a module apps already have, or give the step that
-works under "What apps must do". `cargo xtask template-check` builds the template against this checkout and
-runs its checks.
+in `CHECKS`, a new module in `shared.rs` and in `MANAGED`, and a new field of `App` or of
+`Package` gets a value in its `DEFAULT`. Until issue #42 is fixed, a release that adds a module
+cannot be taken by an app's own `cargo xtask sync`: put new code in a module apps already have,
+or give the step that works under "What apps must do". The `release` and `package` modules are
+written inside `shared.rs` for that reason, and move to files of their own once it is fixed.
+`cargo xtask template-check` builds the template against this checkout and runs its checks.
 
 ### The shared workflows
 
-`shared-ci.yml` and `shared-core-pin.yml` in `.github/workflows/` are the jobs of every app's CI.
-Apps call them at the tag `workflows-v1`, so a change to one reaches the apps when that tag is
-moved: not when the change lands, and not with a release. A person or an agent moves it, to a
-commit of `main` where `ci.yml` has passed. The steps, and the list of what these workflows may
-ask of an app, are in `.github/workflows/README.md`; a change that asks more gets a new tag
-(decision 0003).
+`shared-ci.yml`, `shared-core-pin.yml` and `shared-release.yml` in `.github/workflows/` are the
+jobs of every app's CI, of its weekly core-pin check and of its release. Apps call them at the
+tag `workflows-v1`, so a change to one reaches the apps when that tag is moved: not when the
+change lands, and not with a release. A person or an agent moves it, to a commit of `main` where
+`ci.yml` has passed. The steps, and the list of what these workflows may ask of an app, are in
+`.github/workflows/README.md`; a change that asks more gets a new tag (decision 0003).
+
+### App releases
+
+What an app's public release is made of is `docs/app-releases.md` (decision 0018), and the code
+that keeps it is here: `cargo xtask package` and `cargo xtask release` in the shared xtask,
+`shared-release.yml`, and the managed file `template/.github/workflows/release.yml`. An app
+gives data and nothing else. So a change to a file name, to the checksum file or to where a
+program sits in a package is a change to the contract: copies already installed read all three,
+and so do a launcher and a website. Change the document, the code and
+`docs/app-release-example/` together; the tests in `crates/jcj-shell/src/updates/desktop.rs`
+hold the example to the updater's own reader, and the core's xtask holds the packaging code to
+the example. `cargo xtask template-check --package` makes the template app's package on this
+system; the nightly run does that on Linux, macOS and Windows.
 
 ## Releasing
 
