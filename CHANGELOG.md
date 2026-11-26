@@ -3,6 +3,98 @@
 Each release says what changed for apps. While at 0.x, a patch release never breaks an app; a
 minor release may, and then **What apps must do** says exactly what (decision 0011).
 
+## Unreleased
+
+### Added
+
+- **`cargo xtask docs`, a task of the gate in the core and in every app** (decision 0003,
+  amended). The routes between repositories are prose, and nothing noticed when a file moved, a
+  record was renumbered or a marker never got its issue. The task reads the tracked Markdown
+  files, leaving out `docs/history/` and fenced code blocks, and fails on:
+  - a relative link (a Markdown link, an image, a reference definition, an `href` or `src`) whose
+    target is not a tracked file or folder, or whose `#fragment` is not a heading or `id` of the
+    Markdown file it points at;
+  - a decision reference that names no record: "core decision NNNN" in the core's
+    `docs/decisions/` (in an app, the pinned release's), a bare "decision NNNN" in the
+    repository's own. "project decision NNNN", "Script's decision NNNN" and the like are somebody
+    else's and are left alone, and so is a bare number inside a marked block;
+  - in an app, a `// core-candidate:` comment that names no core issue (`#12`,
+    `open-source-core#12` or the issue's address).
+  The shared module is `xtask/src/docs.rs` (`template/xtask/src/docs.rs` here).
+- In the core: `cargo xtask docs <folder>` runs the same checks on another checkout. It is the
+  only way a repository without Cargo is checked.
+- **One pull request template for every app**, `.github/pull_request_template.md`, a managed
+  file. It asks what another repository must take or make first, what a user will see, and
+  whether brand files were changed at their source. The core has its own.
+- **`cargo xtask ci` says when a clone's git hooks are off.** A fresh clone and a fresh worktree
+  start without them. It is a warning, not a failure, and silent in CI.
+- **`pre-commit` runs `cargo xtask unlinked`**, so a local core dev-link is refused at the
+  commit, not only at the push.
+
+### Changed
+
+- Wording inside the marked blocks; `cargo xtask sync` brings it. `app-and-core`: what belongs in
+  the core now lists entries kept beside documents and interface translations (decision 0016),
+  and the rule against product names says where it holds: the core's code, interface text and
+  `template/` (decision 0013). `app`: the brand may live in a project's brand kit with copies in
+  the app, the app's interface theme is its own `tokens.json`, and the pull request template is
+  among the files the core owns. Every block's first line says "its tooling rewrites the
+  copies", since the copies in the core and in a repository without Cargo are written by other
+  commands than `cargo xtask sync`.
+- `template/Cargo.toml` no longer lists `serde`, which nothing in the template used.
+
+### What apps must do
+
+1. Move every `jcj-` dependency to this release's tag, then run
+   `cargo metadata --format-version 1 >/dev/null` to bring `Cargo.lock` in line.
+2. Run `cargo xtask sync` twice. The first run brings the new `sync.rs`, the reworded blocks
+   and the pre-commit hook, and says to run it again; the second adds `xtask/src/docs.rs` and
+   `.github/pull_request_template.md`.
+3. Add four lines to the app's `xtask/src/main.rs`. `cargo xtask sync` names the ones still
+   missing each time it runs.
+
+   ```rust
+   mod docs;
+   ```
+
+   beside `mod corepin;`.
+
+   ```rust
+       ("docs", "links in Markdown lead somewhere, decision references name a record, core-candidate markers name an issue"),
+   ```
+
+   in `TASKS`, after the `("sync", ...)` row.
+
+   ```rust
+           "docs" => docs::app_task(root),
+   ```
+
+   in `run_task`, after the `"sync" => ...` arm.
+
+   ```rust
+       util::warn_if_hooks_off(root, "hooks");
+   ```
+
+   in `ci`, after the line `let skip = util::skipped(&skip_args, &names)?;`.
+4. Delete a pull request template the app keeps under another name
+   (`.github/PULL_REQUEST_TEMPLATE.md`, a file in `docs/` or at the root): GitHub would offer
+   only one of the two. Move a question that is only the app's into `CONTRIBUTING.md`.
+5. Run `cargo xtask docs` and fix what it reports:
+   - a link that leads nowhere: correct the path, or give the full address when the target is
+     in another repository;
+   - a decision reference that names no record: write "core decision NNNN" for a record of the
+     core, name the owner for another repository's ("project decision NNNN"), or correct the
+     number;
+   - a `core-candidate` marker without an issue: open the core issue (label `core-candidate`)
+     and put its number in the comment, `// core-candidate: open-source-core#N ...`.
+6. `cargo xtask sync --check`, then `cargo xtask ci`. Run `cargo xtask install-hooks` if the
+   gate says the hooks are off.
+
+No code changes. An app that follows another app's tag, and so cannot move its pin until that
+app has, can take the files first: in a core checkout at this release,
+`cargo xtask sync <the app's folder>` writes them and `cargo xtask docs <the app's folder>`
+checks the app. The app's own `cargo xtask sync --check` passes once its pin has moved.
+
 ## 0.1.17 (2026-11-26)
 
 ### Added

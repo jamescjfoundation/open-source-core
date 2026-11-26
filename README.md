@@ -66,7 +66,7 @@ plans and published reviews are kept under [docs/history/](docs/history/); they 
 ```sh
 cargo run -p core-testbed     # the test app
 cargo xtask ci                # the full gate; `cargo xtask ci --changed` for just your change
-cargo xtask install-hooks     # once: pre-commit (fmt, privacy) and pre-push (ci --changed) hooks
+cargo xtask install-hooks     # once: pre-commit (fmt, privacy, no dev-link) and pre-push (ci --changed) hooks
 ```
 
 Rust is pinned in `rust-toolchain.toml` (1.100.0; minimum 1.95). [CONTRIBUTING.md](CONTRIBUTING.md) says where things are and how a release is cut.

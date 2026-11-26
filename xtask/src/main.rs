@@ -19,6 +19,9 @@ mod changed;
 #[path = "../../template/xtask/src/corepin.rs"]
 #[allow(dead_code)]
 mod corepin;
+#[path = "../../template/xtask/src/docs.rs"]
+#[allow(dead_code)]
+mod docs;
 #[path = "../../template/xtask/src/json.rs"]
 #[allow(dead_code)]
 mod json;
@@ -61,6 +64,7 @@ const TASKS: &[(&str, &str)] = &[
     ("layers", "only jcj-upstream names upstream; dependencies point down"),
     ("pins", "upstream pins, Cargo.lock and docs/UPSTREAM.md agree"),
     ("template", "the app template carries the core's patch block and shared files, and the core its own shared blocks"),
+    ("docs", "links in Markdown lead somewhere, and decision references name a record"),
     ("privacy", "no personal details or secrets in files or commit identities"),
     ("licenses", "every dependency's license is on the allowlist; legal files exist"),
     ("clippy", "clippy on all targets and features, warnings are errors"),
@@ -99,6 +103,10 @@ fn main() -> ExitCode {
             Some(app) if !app.starts_with("--") => corepin::task(Path::new(app), rest.get(1..).unwrap_or_default()),
             _ => Err("usage: cargo xtask core-pin <app dir> [--behind] [--max-behind <n>]".to_owned()),
         },
+        // On a folder: an app, or a repository without Cargo, which has no other way to be checked.
+        "docs" if rest.first().is_some_and(|a| !a.starts_with("--")) => docs::core_task(&root, rest.first().map(String::as_str)),
+        // The hooks are shared with the apps, whose pre-commit rejects a dev-link; the core has none to leave.
+        "unlinked" => link::check_unlinked(&root),
         "vendor" => vendor(&root, rest.first().map(String::as_str)),
         "install-hooks" => install_hooks(&root),
         "template" if rest.iter().any(|a| a == "--write") => write_own_copies(&root),
@@ -140,13 +148,14 @@ fn print_help() {
     println!("  template --write          copy the shared blocks and files from template/ into the core's own AGENTS.md,");
     println!("                            SECURITY.md, CONTRIBUTING.md and CODE_OF_CONDUCT.md (after changing one in template/)");
     println!("  sync <app dir> [--check]  copy (or compare) shared files, marked blocks and the patch block into an app");
+    println!("  docs <dir>                the docs task on another folder: an app, or a repository without Cargo");
     println!("  core-pin <app dir> [--behind] [--max-behind <n>]");
     println!("                            an app names one core release, and Cargo.lock holds one core; --behind");
     println!("                            says how many releases behind the pin is (asks the network)");
     println!("  vendor [out file]         archive the vendored sources of every dependency (release asset)");
     println!("  upstream-status           the pinned WordCraft release and the newest upstream (the train's trigger)");
     println!("  template-check            build the app template against this checkout, and run its own checks");
-    println!("  install-hooks             use the repository's git hooks (pre-commit: fmt and privacy; pre-push: ci --changed)");
+    println!("  install-hooks             use the repository's git hooks (pre-commit: fmt, privacy, no dev-link; pre-push: ci --changed)");
     println!("  third-party-licenses [file]  write the dependency license texts");
 }
 
@@ -181,6 +190,7 @@ fn ci(root: &Path, args: &[String]) -> TaskResult {
         }
     }
     let skip = util::skipped(&skip_args, &names)?;
+    util::warn_if_hooks_off(root, "template/hooks");
     let scope = if args.iter().any(|a| a == "--changed") {
         let base = base_ref(root, args);
         let a = changed::affected(root, &base)?;
@@ -214,6 +224,7 @@ fn run_task(name: &str, root: &Path, scope: &Affected) -> TaskResult {
         "layers" => check_layers(root),
         "pins" => pins::task(root),
         "template" => check_template(root),
+        "docs" => docs::core_task(root, None),
         "privacy" => privacy::task(root, &[]),
         "licenses" => check_licenses(root),
         "clippy" => scoped(root, scope, &["clippy", "--locked", "--all-targets", "--all-features"], &["--", "-D", "warnings"]),
@@ -506,6 +517,7 @@ fn template_check(root: &Path) -> TaskResult {
     run(&["run", "--quiet", "-p", "xtask", "--", "core-pin"])?;
     run(&["run", "--quiet", "-p", "xtask", "--", "layers"])?;
     run(&["run", "--quiet", "-p", "xtask", "--", "sync", "--check"])?;
+    run(&["run", "--quiet", "-p", "xtask", "--", "docs"])?;
     run(&["test", "--workspace"])?;
     println!("ok: the app template builds against this checkout and passes its own checks");
     Ok(())
@@ -529,7 +541,7 @@ fn copy_dir(from: &Path, to: &Path, depth: usize) -> TaskResult {
 
 fn install_hooks(root: &Path) -> TaskResult {
     util::git_output(root, &["config", "core.hooksPath", "template/hooks"])?;
-    println!("git hooks on: pre-commit runs fmt and the privacy check on staged lines; pre-push runs `cargo xtask ci --changed`");
+    println!("git hooks on: pre-commit runs fmt, the privacy check on staged lines and the dev-link check; pre-push runs `cargo xtask ci --changed`");
     Ok(())
 }
 

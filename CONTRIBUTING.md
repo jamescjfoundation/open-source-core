@@ -9,6 +9,8 @@ issue, pull request or review can be read by anyone and stays in the history for
 cargo xtask install-hooks        # once: pre-commit and pre-push hooks
 cargo xtask ci                   # the full gate (CI runs the same)
 cargo xtask ci --changed         # only the packages your change affects, and their dependents
+cargo xtask docs                 # links, decision references (part of the gate; quick after a docs change)
+cargo xtask docs <folder>        # the same on another checkout: an app, or a repository without Cargo
 cargo run -p core-testbed        # the test app that exercises every crate
 cargo xtask deny                 # licenses, advisories and sources (needs cargo-deny)
 cargo xtask template --write     # after changing a block or the code of conduct under template/
@@ -41,7 +43,7 @@ when present.
 | `NOTICE`, `ATTRIBUTION.md` | The credit to upstream; the source and license of every asset and copied block of code we did not write |
 
 <!-- BEGIN open-source-core: contributing -->
-<!-- Owned by open-source-core (template/CONTRIBUTING.md). Change it there, never in a copy: `cargo xtask sync` rewrites the copies. -->
+<!-- Owned by open-source-core (template/CONTRIBUTING.md). Change it there, never in a copy: its tooling rewrites the copies. -->
 ## Rules for a public repository
 
 ### Personal information

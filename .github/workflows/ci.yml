@@ -145,7 +145,7 @@ jobs:
       - name: Install cargo-nextest
         run: command -v cargo-nextest || cargo install --locked cargo-nextest --version "$CARGO_NEXTEST_VERSION"
       - name: cargo xtask ci (clippy and tests)
-        run: cargo xtask ci ${{ steps.base.outputs.args }} --skip fmt,lint-roots,layers,pins,template,privacy,licenses
+        run: cargo xtask ci ${{ steps.base.outputs.args }} --skip fmt,lint-roots,layers,pins,template,docs,privacy,licenses
       - name: Trim the target folder before saving
         if: github.ref == 'refs/heads/main'
         run: rm -rf target/debug/incremental target/debug/examples target/nextest

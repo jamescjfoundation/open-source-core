@@ -13,7 +13,7 @@ from WordCraft keeps WordCraft's credit:
 
 | Path | What it is | Source | License |
 | --- | --- | --- | --- |
-| `crates/jcj-shell/src/ribbon_fit.rs` | Ribbon groups that shrink to fit | WordCraft `crates/ui-egui`, via Wordsmith Script (decision 0037 there) | MIT OR Apache-2.0 |
+| `crates/jcj-shell/src/ribbon_fit.rs` | Ribbon groups that shrink to fit | WordCraft `crates/ui-egui`, via Wordsmith Script (Script's decision 0037) | MIT OR Apache-2.0 |
 | `crates/jcj-shell/src/icons.rs` | The icon helper and general icons drawn in code | WordCraft `crates/ui-egui`, via Wordsmith Script | MIT OR Apache-2.0 |
 
 ## Assets

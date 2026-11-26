@@ -9,6 +9,7 @@
 
 mod changed;
 mod corepin;
+mod docs;
 mod json;
 mod licenses;
 mod link;
@@ -39,6 +40,7 @@ const TASKS: &[(&str, &str)] = &[
     ("core-pin", "every jcj- dependency names one core release tag, and Cargo.lock holds one core"),
     ("sync", "shared files, marked blocks and the patch block match the pinned core release"),
     ("layers", "only jcj- interfaces of the core are used, never upstream crates or jcj-upstream"),
+    ("docs", "links in Markdown lead somewhere, decision references name a record, core-candidate markers name an issue"),
     ("privacy", "no personal details or secrets in files or commit identities"),
     ("licenses", "every dependency's license is on the allowlist"),
     ("clippy", "clippy on all targets, warnings are errors"),
@@ -104,6 +106,7 @@ fn ci(root: &Path, args: &[String]) -> TaskResult {
         }
     }
     let skip = util::skipped(&skip_args, &names)?;
+    util::warn_if_hooks_off(root, "hooks");
     let scope = if args.iter().any(|a| a == "--changed") {
         let base = args.iter().position(|a| a == "--base").and_then(|i| args.get(i + 1)).cloned().unwrap_or_else(|| "origin/main".to_owned());
         changed::affected(root, &base)?
@@ -129,6 +132,7 @@ fn run_task(name: &str, root: &Path, scope: &Affected) -> TaskResult {
         "core-pin" => corepin::task(root, &[]),
         "sync" => sync::app_task(root, true),
         "layers" => check_layers(root),
+        "docs" => docs::app_task(root),
         "privacy" => privacy::task(root, &[]),
         "licenses" => check_licenses(root),
         "clippy" => scoped(root, scope, &["clippy", "--locked", "--all-targets"], &["--", "-D", "warnings"]),

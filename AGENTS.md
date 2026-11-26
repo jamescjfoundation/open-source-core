@@ -25,7 +25,7 @@ when a copy here differs.
 ## Before you commit
 
 ```sh
-cargo xtask install-hooks     # once: pre-commit (fmt, privacy) and pre-push (ci --changed)
+cargo xtask install-hooks     # once: pre-commit (fmt, privacy, no dev-link) and pre-push (ci --changed)
 cargo xtask ci --changed      # what CI will run for your change; `cargo xtask ci` for everything
 cargo xtask template --write  # after changing a block or the code of conduct under template/
 cargo xtask template-check    # after any change under template/: builds it against this checkout
@@ -35,7 +35,7 @@ cargo xtask template-check    # after any change under template/: builds it agai
 passes on the commit before it is tagged (`CONTRIBUTING.md`, "Releasing").
 
 <!-- BEGIN open-source-core: public -->
-<!-- Owned by open-source-core (template/AGENTS.md). Change it there, never in a copy: `cargo xtask sync` rewrites the copies. -->
+<!-- Owned by open-source-core (template/AGENTS.md). Change it there, never in a copy: its tooling rewrites the copies. -->
 ## What is public
 
 This repository is public, history included, forever
@@ -57,7 +57,7 @@ or `--mirror`.
 <!-- END open-source-core: public -->
 
 <!-- BEGIN open-source-core: app-and-core -->
-<!-- Owned by open-source-core (template/AGENTS.md). Change it there, never in a copy: `cargo xtask sync` rewrites the copies. -->
+<!-- Owned by open-source-core (template/AGENTS.md). Change it there, never in a copy: its tooling rewrites the copies. -->
 ## Building between an app and the core
 
 "The core" is [open-source-core](https://github.com/jamescjfoundation/open-source-core); "an app"
@@ -75,8 +75,8 @@ Ask in order; the first "yes" decides.
    [core decision 0004](https://github.com/jamescjfoundation/open-source-core/blob/main/docs/decisions/0004-follow-hold-own.md)).
 2. **Would it look or work the same in any foundation app?** The window, ribbon, panels, dialogs,
    File page, preferences, auto-save, updates, saving and backups, spelling, find and replace,
-   undo, format import and export, PDF and printing, cards and boards, theming, agent control: the
-   core.
+   undo, format import and export, PDF and printing, cards and boards, theming, entries kept
+   beside documents, interface translations, agent control: the core.
 3. **Does a second app already need it, or have a written plan to use it?** The core.
 4. **Otherwise** the app. Screenplay elements, Fountain, scene numbers, (MORE)/(CONT'D), a
    manuscript binder's compile rules and a book's themes are app code.
@@ -138,7 +138,8 @@ interface back out is not.
 
 - Name WordCraft or craft-libs types in an app repository. Use the `jcj-` interfaces; if one is
   missing, add it to the core.
-- Put a product name, color, logo, or screenplay, manuscript or book concept into the core.
+- Put a product name, color, logo, or screenplay, manuscript or book concept into the core's
+  code, interface text or `template/`.
 - Change a core interface from a change made in an app repository.
 - Copy code from one app repository into another.
 - Release the core, or move an upstream pin, on a commit whose full gate has not passed. A

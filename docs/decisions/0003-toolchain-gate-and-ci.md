@@ -1,6 +1,6 @@
 # 0003: Toolchain, the gate, and CI that rarely makes anyone wait
 
-Date: 2026-11-24 · Status: accepted · Amended 2026-11-26 (what `sync` carries) · Ported from
+Date: 2026-11-24 · Status: accepted · Amended 2026-11-26 (what `sync` carries; the `docs` task and the hooks) · Ported from
 Wordsmith Script decisions 0003 and 0040
 
 ## Decision
@@ -11,7 +11,7 @@ Wordsmith Script decisions 0003 and 0040
 - **Lints.** `unsafe_code` is forbidden and the six panicking lints are denied at every crate root
   (`cargo xtask lint-roots` checks the attributes); clippy warnings are errors. Tests may unwrap.
 - **One gate.** `cargo xtask ci` runs, cheapest first: fmt, lint-roots, layers, pins, template,
-  privacy, licenses, clippy, tests. The same command runs locally, in the pre-push hook and in CI,
+  docs, privacy, licenses, clippy, tests. The same command runs locally, in the pre-push hook and in CI,
   so CI confirms what the developer already saw instead of being the first to find a mistake.
 - **xtask has no dependencies**, so the gate never depends on a crate the gate must vet. The
   modules apps share (`template/xtask/src/`) are compiled into the core's xtask, so the core tests
@@ -34,6 +34,17 @@ Wordsmith Script decisions 0003 and 0040
   nothing. Tests run under cargo-nextest when installed.
 - **Hooks.** `cargo xtask install-hooks` turns on `pre-commit` (fmt and the privacy scan of the
   staged lines, a few seconds) and `pre-push` (`ci --changed` against what the remote has).
+- **What points across repositories is checked** (amended 2026-11-26). The routes between the
+  core and the apps are prose, and nothing noticed when the prose stopped being true. The `docs`
+  task (`template/xtask/src/docs.rs`, in the core's gate and every app's) fails on a relative
+  Markdown link that leads nowhere, on a decision reference that names no record ("core decision
+  NNNN" in the core's `docs/decisions/`, a bare "decision NNNN" in the repository's own), and, in
+  an app, on a `core-candidate` marker that names no core issue. `cargo xtask docs <folder>` in
+  the core runs it on any checkout, which is the only way a repository without Cargo is checked.
+  `pre-commit` also refuses a commit while a core dev-link is in place, and `cargo xtask ci`
+  says so when a clone's hooks are off, since a fresh clone or worktree starts without them.
+  Every app carries one pull request template (`template/.github/pull_request_template.md`)
+  that asks what another repository must take or make first.
 - **CI** (GitHub-hosted runners only) is described in `.github/workflows/README.md`; its shape
   follows from the points above: quick checks in parallel with the build, changed-only clippy and
   tests on pushes, a full cross-platform run on a schedule and before a release, warm caches saved

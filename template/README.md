@@ -9,11 +9,12 @@ Started from open-source-core's `template/`. To make it yours:
 3. Pin the core: every `jcj-` dependency in `Cargo.toml` at the same release tag. Add a line for
    each other `jcj-` crate the app uses.
 4. Run `cargo xtask sync`. This folder already holds the shared xtask modules, the CI and
-   core-pin workflows, the hooks, the code of conduct and the three files with the core's marked
-   blocks. The first run adds the four settings files kept at the core's root
+   core-pin workflows, the pull request template, the hooks, the code of conduct and the three
+   files with the core's marked blocks. The first run adds the four settings files kept at the core's root
    (`rust-toolchain.toml`, `rustfmt.toml`, `clippy.toml`, `deny.toml`) and rewrites the rest and
    the patch block in `Cargo.toml` from the pinned release. Cargo writes `Cargo.lock` on that run;
-   commit it. Then `cargo xtask install-hooks` and `cargo xtask ci`.
+   commit it. Then `cargo xtask install-hooks` and `cargo xtask ci`. The gate says so each time
+   it runs in a clone whose hooks are off.
 5. Write the app's own parts of `AGENTS.md`, `CONTRIBUTING.md` and `SECURITY.md`: the opening
    lines and every section outside the blocks marked `open-source-core`, where the template has
    placeholder text. The blocks themselves are the core's: `cargo xtask sync` rewrites them and
@@ -27,7 +28,11 @@ Started from open-source-core's `template/`. To make it yours:
    (keep the credit "based on WordCraft by the ArtCraft team"), `CHANGELOG.md`, a
    `docs/decisions/` folder, and the product's `tokens.json` (the core's
    `crates/jcj-theme/TOKENS.md` describes it).
-8. In the repository's settings on GitHub, turn on private vulnerability reporting (the
+8. Code that should one day move to the core is marked `// core-candidate: open-source-core#N`
+   with the core issue that tracks it; `cargo xtask docs`, a task of the gate, fails on a marker
+   without an issue, on a relative Markdown link that leads nowhere and on a decision reference
+   that names no record.
+9. In the repository's settings on GitHub, turn on private vulnerability reporting (the
    `security` block and the code of conduct send reports there) and keep issues on (the
    core-pin workflow opens one when the pin falls behind).
 

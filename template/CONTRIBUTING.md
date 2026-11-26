@@ -9,6 +9,7 @@ issue, pull request or review can be read by anyone and stays in the history for
 cargo xtask install-hooks        # once: pre-commit and pre-push hooks
 cargo xtask ci                   # the full gate (CI runs the same)
 cargo xtask ci --changed         # only the packages your change affects, and their dependents
+cargo xtask docs                 # links, decision references, core-candidate markers (part of the gate)
 cargo run -p app                 # the app
 ```
 
@@ -23,7 +24,7 @@ cargo run -p app                 # the app
 | `docs/decisions` | Why things are the way they are |
 
 <!-- BEGIN open-source-core: contributing -->
-<!-- Owned by open-source-core (template/CONTRIBUTING.md). Change it there, never in a copy: `cargo xtask sync` rewrites the copies. -->
+<!-- Owned by open-source-core (template/CONTRIBUTING.md). Change it there, never in a copy: its tooling rewrites the copies. -->
 ## Rules for a public repository
 
 ### Personal information
