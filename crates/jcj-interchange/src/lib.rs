@@ -33,6 +33,9 @@
 //! ([`jcj_doc::ExtKey`]) survives only in the native JSON a project stores, never in these
 //! formats. [`emphasis`] adds a small inline markup (`**bold**`, `*italic*`, `_underline_`) for
 //! places that hold one line of formatted text as plain text.
+//!
+//! [`export_epub`] is the EPUB writer with choices ([`EpubOptions`]): how notes are numbered,
+//! what the link back from a note says, a heading above them; it also tells the words it added.
 
 #![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
@@ -43,6 +46,7 @@ pub mod epub_read;
 mod format;
 mod rtf_direct;
 
+pub use epub::{EpubExport, EpubOptions, NoteBacklink, NoteNumbering};
 pub use format::Format;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -109,7 +113,7 @@ pub fn export(format: Format, doc: &Document) -> Result<Vec<u8>, Error> {
     let failed = |reason: String| Error::Failed { format, reason };
     guarded(
         || match format {
-            Format::Epub => epub::write(doc).map_err(failed),
+            Format::Epub => epub::write(doc, &EpubOptions::default()).map(|e| e.bytes).map_err(failed),
             Format::Docx => docx::write(doc).map_err(|e| failed(e.to_string())),
             other => match formats::export(other.extension(), doc) {
                 Some(r) => r.map_err(failed),
@@ -118,6 +122,29 @@ pub fn export(format: Format, doc: &Document) -> Result<Vec<u8>, Error> {
         },
         failed("the writer stopped unexpectedly".into()),
     )
+}
+
+/// Write `doc` as an EPUB with choices about its notes, and learn the words the writer added.
+///
+/// [`export`] with [`Format::Epub`] numbers notes from 1 in each chapter file and puts the
+/// English word "Back" under each as the link to its reference. Here the caller chooses the
+/// numbering ([`NoteNumbering`]), the link ([`NoteBacklink`]: its text in the book's language, a
+/// symbol with a name, or none) and a heading above each chapter's notes, and gets back
+/// [`EpubExport::added_words`], so a word-for-word check of the file can leave out exactly the
+/// words that are the writer's. With `EpubOptions::default()` the bytes are [`export`]'s.
+///
+/// ```
+/// use jcj_interchange::{EpubOptions, Format, NoteBacklink, export, export_epub};
+///
+/// let doc = jcj_interchange::import(Format::Markdown, b"# One\n\nWords.").unwrap();
+/// let same = export_epub(&doc, &EpubOptions::default()).unwrap();
+/// assert_eq!(same.bytes, export(Format::Epub, &doc).unwrap());
+/// let quiet = export_epub(&doc, &EpubOptions::default().note_backlink(NoteBacklink::None)).unwrap();
+/// assert!(quiet.added_words.is_empty(), "a book with no notes gets no added words");
+/// ```
+pub fn export_epub(doc: &Document, options: &EpubOptions) -> Result<EpubExport, Error> {
+    let failed = |reason: String| Error::Failed { format: Format::Epub, reason };
+    guarded(|| epub::write(doc, options).map_err(failed), failed("the writer stopped unexpectedly".into()))
 }
 
 /// Write `doc` as RTF with each paragraph's formatting written out in full, for apps that lay out

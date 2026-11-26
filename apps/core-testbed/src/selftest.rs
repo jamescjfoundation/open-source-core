@@ -140,6 +140,27 @@ pub fn run() -> Result<Vec<Step>, String> {
     let back = jcj_interchange::import(Format::Epub, &epub).map_err(|e| format!("import EPUB: {e}"))?;
     let text: String = jcj_doc::walk::body_paragraphs(&back).iter().map(|(_, p)| jcj_doc::plain_text(p)).collect();
     check(text.contains("A footnote."), "the EPUB keeps the footnote")?;
+    // The same book with the notes the way a caller chooses: numbered through the book, a
+    // heading in the book's language, a link back that adds no word. The writer says which words
+    // it added, so a check of the file leaves out exactly those.
+    let chosen = jcj_interchange::EpubOptions::default()
+        .note_numbering(jcj_interchange::NoteNumbering::ThroughBook)
+        .note_backlink(jcj_interchange::NoteBacklink::Symbol { label: "Volver al texto".into() })
+        .note_heading("Notas");
+    let noted = jcj_interchange::export_epub(&sectioned, &chosen).map_err(|e| format!("export EPUB: {e}"))?;
+    check(noted.added_words == ["1", "Notas", "1"], "the EPUB writer says which words it added")?;
+    let back = jcj_interchange::import(Format::Epub, &noted.bytes).map_err(|e| format!("import EPUB: {e}"))?;
+    let letters = |words: &[String]| {
+        let mut all: Vec<char> = words.iter().flat_map(|w| w.chars()).filter(|c| c.is_alphanumeric()).collect();
+        all.sort_unstable();
+        all
+    };
+    let mut source = jcj_doc::verify::document_words(&sectioned);
+    source.extend(jcj_doc::words("A footnote."));
+    source.extend(noted.added_words.iter().cloned());
+    check(letters(&jcj_doc::verify::document_words(&back)) == letters(&source), "the EPUB holds the book's words and the added ones, no other")?;
+    let plain = jcj_interchange::export_epub(&sectioned, &jcj_interchange::EpubOptions::default()).map_err(|e| format!("export EPUB: {e}"))?;
+    check(plain.bytes == epub, "the EPUB writer's default choices are the plain export")?;
 
     // jcj-layout: pages.
     let mut cache = jcj_layout::LayoutCache::new();
