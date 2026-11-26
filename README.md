@@ -32,7 +32,7 @@ crosses them.
 | `jcj-theme` | A product's design tokens turned into the shell's theme |
 | `jcj-board` | Cards, corkboard and canvas |
 | `jcj-shell` | Window, ribbon, panels, File page, dialogs, the system's file dialogs, preferences, keys, auto-save, updates, and the door to interface translations |
-| `jcj-agents` | An app's commands as MCP tools for agents |
+| `jcj-agents` | An app's commands as MCP tools for agents, on a document or on the app's own state, and the parts of a command line every app shares (exit codes, `mcp` arguments) |
 | `jcj-upstream` | Internal: the one crate that names upstream code. Apps never use it |
 
 `apps/core-testbed` uses every crate; `contract-tests` checks the behavior apps rely on against

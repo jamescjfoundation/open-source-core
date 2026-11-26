@@ -315,15 +315,18 @@ pub fn run() -> Result<Vec<Step>, String> {
     check(jcj_theme::Tokens::from_json(&json).map_err(|e| e.to_string())? == tokens, "tokens round trip as JSON")?;
     step("theme", format!("neutral tokens, {} bytes of JSON", json.len()));
 
-    // jcj-agents: an MCP server over a session.
-    let info = jcj_agents::AgentInfo::new("core-testbed", "Core testbed", env!("CARGO_PKG_VERSION"), "The core's test app.");
-    let mut server = jcj_agents::AgentServer::headless(self::session(doc), jcj_agents::AgentConfig::new(info));
+    // jcj-agents: an MCP server over a session and the testbed's own commands, every tool of
+    // the testbed's own named after it.
+    let mut server = crate::agents::server(doc, None);
     let init = server.handle(json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})).ok_or("initialize answers")?;
     check(init.pointer("/result/serverInfo/name").and_then(|v| v.as_str()) == Some("core-testbed"), "the server names the app")?;
     let tools = server.handle(json!({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})).ok_or("tools/list answers")?;
     let count = tools.pointer("/result/tools").and_then(|t| t.as_array()).map_or(0, Vec::len);
     check(count > 0, "the server lists tools")?;
-    step("agents", format!("{count} tools"));
+    let own = server.tool_names();
+    check(!own.is_empty() && own.iter().all(|n| n.starts_with("testbed_")), "the testbed's own tools carry its name")?;
+    check(jcj_agents::app_tool_name(crate::agents::PREFIX, "board.list") == "testbed_board_list", "an app's tool is named after the app")?;
+    step("agents", format!("{count} tools, {} of them the testbed's own", own.len()));
 
     Ok(steps)
 }

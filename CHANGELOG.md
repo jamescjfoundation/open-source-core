@@ -77,6 +77,39 @@ minor release may, and then **What apps must do** says exactly what (decision 00
     window's handles; it was in every app's lock file already. A dialog that cannot be shown
     is said in the status bar (one new text, in the shell's Spanish catalog too).
   `core-testbed` has Open, Save As and Export To through it, and a test answers them.
+- **One convention for command lines and agent tools** (decision 0017, new;
+  `docs/command-lines-and-agent-tools.md`, new). The three apps' command lines each chose their
+  own exit codes, `mcp` arguments and tool names. The page decides them:
+  - exit codes 0 done, 1 failed, 2 usage, **3 a check of the content did not pass** (two texts
+    differ, a check blocks an export), so a script can tell "they differ" from "the check did
+    not run";
+  - no argument is a usage error (the usage on standard error, code 2); `--help`, `-h` and
+    `help` give the usage with code 0; `--version` and `-V` print `<program> <version>`;
+  - `<program> mcp [<file>] [--read-root <folder>] [--write-root <folder>]`, the two flags being
+    the folders an agent's commands may read and write;
+  - every tool that is an app's own is named `<app>_<command>`.
+- `jcj-agents`: the code for that convention, and the adapter two apps each wrote.
+  - `jcj_agents::cli`: `Exit` (`Done`, `Failed`, `Usage`, `Differs`, with `code()` and
+    `Into<ExitCode>`), `standard(&args) -> Option<Standard>` (`Help`, `Version`, `NoCommand`),
+    `version_line(program, version)`, and `McpArgs` (`parse`, `USAGE`, `roots()`, and
+    `confine(program)`, which puts the roots in force for the process or says on standard error
+    that nothing is confined).
+  - `AppCommands` (a trait: `commands() -> Vec<AppCommand>`, `run(id, params)`) and `AppCommand`
+    (`new(id, label)`, `.params(..)`, `.read_only()`, `.reads(&[..])`, `.writes(&[..])`): an
+    app's own commands, for an app whose commands run on its own state (a project) and not on a
+    document session. `AgentServer::for_app(Box<dyn AppCommands>, prefix, config)` serves them
+    and nothing else: each is a tool named `<prefix>_<command>`; the files its declared
+    parameters name are checked against the agent's folders before it runs; the general
+    document tools are left out, because there is no document behind them.
+  - `AgentServer::with_app_commands(..)` adds such commands to a server over a document;
+    `.tool_prefix("app")` names every tool of the app's own (exported commands too)
+    `app_<command>`; `.without_general_tools()` leaves the general document tools out;
+    `tool_names()` lists the app's own tools; `app_tool_name(prefix, id)` is the naming rule.
+  - `AgentServer::headless`, `AgentConfig` and every existing tool name are unchanged: all of
+    this is asked for by the app.
+  `core-testbed` follows the page (`--version`, `verify` with code 3, `mcp` with a file and the
+  two flags, its tools named `testbed_…`, the board's commands through the adapter), and
+  `apps/core-testbed/tests/command_line.rs` runs the built program to hold it there.
 
 ## 0.1.19 (2026-11-26)
 

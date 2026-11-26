@@ -77,6 +77,10 @@ engine's own commands already do.
   each app command under a chosen id prefix as a tool of its own (`notes.add` → `notes_add`).
   Files the commands read and write can be confined to chosen folders
   (`AgentConfig::confined`, the engine's `file_access`).
+- Added 2026-11-26 (decision 0017): an app whose commands run on its own state, not on a
+  document session, serves them through `AppCommands` and `AgentServer::for_app`; every tool of
+  an app's own is named `<app>_<command>`; and the exit codes and `mcp` arguments of an app's
+  command line are one convention (`docs/command-lines-and-agent-tools.md`, `jcj_agents::cli`).
 - craft-libs' `craft-mcp-server` is not at our pins; when it is, it replaces the server inside
   `jcj-agents` and apps do not change. Script's branding (server name, environment variables,
   profile folder) is each app's `AgentInfo`.

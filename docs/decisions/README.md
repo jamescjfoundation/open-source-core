@@ -25,3 +25,4 @@ records with the same numbers.
 | [0014](0014-shell-theme-board.md) | The shell, theming and boards |
 | [0015](0015-apps-that-depend-on-apps.md) | Apps that depend on apps |
 | [0016](0016-entries-and-translations.md) | Entries and interface translations |
+| [0017](0017-command-lines-and-agent-tools.md) | One convention for command lines and agent tools |
