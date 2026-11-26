@@ -11,6 +11,7 @@ use jcj_engine::Session;
 use jcj_interchange::Format;
 use jcj_shell::commands::{ids, shell_ids};
 use jcj_shell::egui;
+use jcj_shell::i18n::{tl, trn};
 use jcj_shell::widgets::{self, Control};
 use jcj_shell::{About, App, Cmd, CommandInfo, Commands, PanelSpec, Shell, Side, TabSpec};
 use serde_json::json;
@@ -181,6 +182,8 @@ impl App for Testbed {
     fn status_ui(&mut self, ui: &mut egui::Ui, _shell: &mut Shell) {
         let words = self.writing.session_words();
         jcj_shell::writing::progress_bar(ui, &format!("{words} of 500 words this session"), self.writing.progress().unwrap_or(0.0), 80.0);
+        // A count in the interface language, through the shell's door to the catalogs.
+        ui.label(trn("{n} card", "{n} cards", self.board.cards.len() as u64, &[]));
     }
 
     fn has_document(&self) -> bool {
@@ -294,24 +297,24 @@ impl App for Testbed {
         match tab {
             "home" => {
                 widgets::group(ui, shell, "Document", |ui, shell| {
-                    widgets::big(ui, shell, me, &Control::new(cmd::SAMPLE).label("Sample"));
-                    widgets::big(ui, shell, me, &Control::new(cmd::INSERT).label("Insert"));
+                    widgets::big(ui, shell, me, &Control::new(cmd::SAMPLE).label(tl("Sample")));
+                    widgets::big(ui, shell, me, &Control::new(cmd::INSERT).label(tl("Insert")));
                 });
                 widgets::group(ui, shell, "History", |ui, shell| {
                     widgets::small(ui, shell, me, &Control::new(ids::UNDO).icon("undo").label("Undo"));
                     widgets::small(ui, shell, me, &Control::new(ids::REDO).icon("redo").label("Redo"));
                 });
                 widgets::group(ui, shell, "Board", |ui, shell| {
-                    widgets::big(ui, shell, me, &Control::new(cmd::ADD_CARD).label("Add Card"));
+                    widgets::big(ui, shell, me, &Control::new(cmd::ADD_CARD).label(tl("Add Card")));
                 });
             }
             "tools" => {
                 widgets::group(ui, shell, "Export", |ui, shell| {
                     widgets::big(ui, shell, me, &Control::new(cmd::EXPORT_PDF).label("PDF"));
-                    widgets::big(ui, shell, me, &Control::new(cmd::EXPORT_ALL).label("Every Format"));
+                    widgets::big(ui, shell, me, &Control::new(cmd::EXPORT_ALL).label(tl("Every Format")));
                 });
                 widgets::group(ui, shell, "Checks", |ui, shell| {
-                    widgets::big(ui, shell, me, &Control::new(cmd::SELFTEST).label("Self-Test"));
+                    widgets::big(ui, shell, me, &Control::new(cmd::SELFTEST).label(tl("Self-Test")));
                     widgets::big(ui, shell, me, &Control::new(shell_ids::PALETTE).label("Commands"));
                 });
             }

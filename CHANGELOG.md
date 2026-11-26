@@ -19,6 +19,17 @@ minor release may, and then **What apps must do** says exactly what (decision 00
     the same types, fields and results, so nothing that uses them changes.
   `core-testbed` lists words and compares two lists of paragraphs through `jcj-doc` alone, and
   still checks its exports and compares documents through `jcj-features`.
+- `jcj-shell`: `jcj_shell::i18n` gives the translation lookups beside `set_language` (core issue
+  #32): `tr`, `tr_with`, `trn`, `tl`, `language`, and for a test of an app's catalog `Catalog`,
+  `Entry`, `texts_in`, `singulars_in` and `compare`. They are `jcj-i18n`'s own items, so an
+  interface crate that already depends on `jcj-shell` needs no second dependency to translate
+  its texts. No behaviour changes. `core-testbed` no longer names `jcj-i18n`: it marks its
+  labels with `tl`, shows a count with `trn`, and a test holds its catalog to its window's code.
+  - Not added: a way to translate an app's texts while the shell's stay in English. One language
+    holds for the whole window, because the shell shows the labels an app gives it through the
+    same lookup as its own texts; installing only an app's catalog would turn the shell texts
+    that share a key with it and leave the rest. An app that moves its texts onto the core's
+    catalogs gets the shell's in that language too, and says so in its own changelog.
 
 ## 0.1.19 (2026-11-26)
 
