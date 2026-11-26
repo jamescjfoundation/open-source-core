@@ -1,7 +1,8 @@
 # 0014: The shell, theming and boards
 
-Date: 2026-11-24 · Status: accepted · General parts of Wordsmith Script decisions 0011, 0016, 0020
-(preferences), 0022 (index cards), 0028 (boards), 0036, 0037, 0038 and 0043
+Date: 2026-11-24 · Status: accepted · Amended 2026-11-26 (file dialogs, keys, start-up, brand
+loading) · General parts of Wordsmith Script decisions 0011, 0016, 0020 (preferences), 0022 (index
+cards), 0028 (boards), 0036, 0037, 0038 and 0043
 
 ## Decision
 
@@ -13,7 +14,8 @@ Date: 2026-11-24 · Status: accepted · General parts of Wordsmith Script decisi
   "save changes first?"; crash recovery; preferences; the user's own keys; auto-save's schedule;
   updates; generic icons drawn in code; an offscreen renderer for pictures and checks.
 - **The app implements `App`** (its document view, commands, ribbon tabs, panels, File pages,
-  About) and calls `Shell::ui` each frame from its own `eframe::App`. `jcj-shell` re-exports
+  About) and calls `Shell::ui` each frame from its own `eframe::App`, or lets the core's
+  start-up do it (below, "Start-up"). `jcj-shell` re-exports
   `egui`, so apps draw with the version the core pins.
 - **Every control runs a command by id** (Script 0043). The shell's own commands start with
   `shell.`; standard ids (`file.save`, `edit.undo`, ...) are the app's to provide, and a control
@@ -35,6 +37,30 @@ Date: 2026-11-24 · Status: accepted · General parts of Wordsmith Script decisi
   map what a key runs (`KeyMap::command_for`), which holds the one rule for a shifted key with
   no command of its own: with a caret movement's key it extends the selection, and
   Shift+Backspace deletes back.
+- **Start-up** (added 2026-11-26, core issue #46): three apps each wrote the code that opens the
+  window, and each copy left out a step another had (the close that starts an installed update
+  and its helper; a file whose name is not Unicode; the file dialogs; coming back to write a
+  preference that waited). `jcj_shell::desktop` is that code once. The app gives its data
+  (`Desktop`: name, id, app id, version, brand, where its releases are, a variable naming
+  another settings folder) and what only it can do (`DesktopApp`: build itself, apply and
+  report its preferences, open its files, say whether it may close, its last work), and
+  `Desktop::main` is the whole of its `main`. The steps of a frame and of the end are in
+  `desktop::Window`, which needs no window toolkit, so tests drive it. Opening the window needs
+  eframe, which the shell does not otherwise use: it is behind the `window` feature, off unless
+  an app asks, so an app that keeps its own start-up builds as before. The command line stays
+  the app's (decision 0017): the start-up takes the files to open and reads no option, but for
+  the one start that is not the user's, the updater's helper on Windows
+  (`Desktop::finish_update`, core issue #36).
+- **Brand loading** (added 2026-11-26, core issue #46): the brand is the app's, the loading is
+  the core's. `jcj_theme::Brand` reads the tokens file (the neutral set when it does not read,
+  so a window always opens), the app's own section of it and the window's icon;
+  `jcj_theme::Mask` paints a mark from a white mask in the theme's ink; the WCAG contrast
+  figures a brand's tests hold its colors to are beside them.
+- **The Windows icon** is embedded by the app's build script. It stays a file of the app, the
+  same in every app: the library it calls reads the program's name, company and copyright from
+  `[package.metadata.winresource]` in the app's manifest, so the script holds no data but the
+  icon's path, and the template carries it. A crate of the core for six lines around one call
+  would cost every app a dependency and the core a crate.
 - **Preferences** are JSON in the app's settings folder (WordCraft's settings location with the
   app's own name), written atomically; a damaged file is set aside and defaults used. The shell's
   preferences and the app's own type live side by side (`Prefs<A>`).

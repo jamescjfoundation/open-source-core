@@ -29,9 +29,9 @@ when present.
 | `crates/jcj-doc` | Document model interface, typed extension data, the word list and the word-level comparison |
 | `crates/jcj-entries`, `jcj-i18n` | Entries kept beside documents; interface translation catalogs |
 | `crates/jcj-layout`, `jcj-engine`, `jcj-output`, `jcj-proof`, `jcj-agents` | Adapters: pages, editing sessions, PDF and printing, spelling, agent tools (with the adapter for an app's own commands and the shared parts of a command line) |
-| `crates/jcj-project`, `jcj-interchange` | Project files, saving and backups; format import and export |
+| `crates/jcj-project`, `jcj-interchange` | Projects on disk (the folder of plain files and the single-file container), saving, recovery and backups; format import and export |
 | `crates/jcj-features` | Document features every app shares: bookmarks, notes, revisions, page locks |
-| `crates/jcj-theme`, `jcj-board`, `jcj-shell` | Theming from tokens, cards and boards, the app shell |
+| `crates/jcj-theme`, `jcj-board`, `jcj-shell` | Theming from tokens and brand loading, cards and boards, the app shell and an app's start-up |
 | `apps/core-testbed` | A small app that uses every crate |
 | `contract-tests` | Behavior apps rely on, run against every upstream candidate |
 | `template` | Starter files for a new app repository, and the source of what `cargo xtask sync` keeps identical in every app: the shared xtask modules (the gate every app runs is `template/xtask/src/gate.rs`), the two files that call the shared workflows, the Dependabot settings, hooks, code of conduct and the marked blocks of rules and settings |
