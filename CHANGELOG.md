@@ -235,6 +235,10 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 ### Fixed
 
+- In the core: the core's own files carry the `attributes` block too. With the block only
+  under `template/`, a Windows checkout had LF there and CRLF in the core's copies of the
+  marked blocks, and the `template` check failed.
+
 - **A dev-link to a core checkout of another version than the pinned one linked nothing.**
   Cargo keeps what a lock file holds, so the pinned packages stayed and the `[patch]` entries
   were reported unused. The lock file of the linked build now starts as the app's own without

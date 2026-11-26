@@ -48,7 +48,7 @@ const SHIPPED: &[&str] = &["core-testbed"];
 
 /// The marked blocks of `sync::BLOCKS` the core's own files do not carry: it has its own "Before
 /// you commit" and house rules for code, and its own Cargo settings and ignore rules.
-const NOT_IN_THE_CORE: &[&str] = &["app", "cargo", "ignore", "attributes"];
+const NOT_IN_THE_CORE: &[&str] = &["app", "cargo", "ignore"];
 
 /// (file under `template/`, the core's own file): whole managed files the core itself uses too.
 const SAME_IN_THE_CORE: &[(&str, &str)] = &[("template/CODE_OF_CONDUCT.md", "CODE_OF_CONDUCT.md")];
