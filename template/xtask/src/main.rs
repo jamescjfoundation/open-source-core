@@ -8,6 +8,7 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
 mod changed;
+mod corepin;
 mod json;
 mod licenses;
 mod link;
@@ -35,6 +36,7 @@ const TASKS: &[(&str, &str)] = &[
     ("fmt", "rustfmt in check mode"),
     ("lint-roots", "every crate root forbids unsafe and denies the panicking lints"),
     ("unlinked", "no local core dev-link is left in .cargo/config.toml"),
+    ("core-pin", "every jcj- dependency names one core release tag, and Cargo.lock holds one core"),
     ("sync", "shared settings and the patch block match the pinned core release"),
     ("layers", "only jcj- interfaces of the core are used, never upstream crates or jcj-upstream"),
     ("privacy", "no personal details or secrets in files or commit identities"),
@@ -57,6 +59,7 @@ fn main() -> ExitCode {
         },
         "dev-unlink" => link::dev_unlink(&root),
         "sync" => sync::app_task(&root, rest.iter().any(|a| a == "--check")),
+        "core-pin" => corepin::task(&root, rest),
         "deny" => cargo(&root, &["deny", "--locked", "check"]),
         "install-hooks" => util::git_output(&root, &["config", "core.hooksPath", "hooks"]).map(|_| println!("git hooks on")),
         "third-party-licenses" => licenses::task(&root, SHIPPED, PRODUCT, rest.first().map(String::as_str)),
@@ -65,6 +68,7 @@ fn main() -> ExitCode {
             Some((n, _)) => run_task(n, &root, &Affected::All),
             None => {
                 println!("usage: cargo xtask <ci [--changed] [--base <ref>] | dev-link <core> | dev-unlink | sync [--check] | deny | install-hooks>");
+                println!("       cargo xtask core-pin [--behind] [--max-behind <n>]   --behind asks the core for its releases (network)");
                 for (name, about) in TASKS {
                     println!("  {name:<12} {about}");
                 }
@@ -122,6 +126,7 @@ fn run_task(name: &str, root: &Path, scope: &Affected) -> TaskResult {
         "fmt" => cargo(root, &["fmt", "--all", "--", "--check"]),
         "lint-roots" => lintroots::check_lint_roots(root, &[], &[]),
         "unlinked" => link::check_unlinked(root),
+        "core-pin" => corepin::task(root, &[]),
         "sync" => sync::app_task(root, true),
         "layers" => check_layers(root),
         "privacy" => privacy::task(root, &[]),

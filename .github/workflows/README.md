@@ -9,6 +9,14 @@ Decision 0003. GitHub-hosted runners only; built so nobody waits on CI.
 | `upstream-train.yml` | Every other Monday | Opens an issue with the train checklist when WordCraft has a newer release than the pin (`cargo xtask upstream-status`). |
 | `release.yml` | Pushing a `v*` tag (a person's decision) | The nightly run, then a GitHub release with the changelog section, vendored sources, third-party licenses and checksums. |
 
+The core also owns the workflows every app runs. They live in `template/.github/workflows/` and
+`cargo xtask sync` keeps them identical in each app; none of them runs here.
+
+| Workflow | When | What |
+| --- | --- | --- |
+| `ci.yml` | Every push to `main` and pull request in an app | The app's gate, built the same way as the core's: cheap checks, cargo-deny, and clippy and tests for what changed. |
+| `core-pin.yml` | Mondays, and on demand | `cargo xtask core-pin --max-behind 3`: when the app's core pin is more than three releases behind the newest, opens an issue in the app ("Move to open-source-core vX.Y.Z"), or brings the open one up to date (decision 0011). |
+
 Why it rarely makes anyone wait:
 
 1. **The same gate runs locally first.** `cargo xtask install-hooks` makes `git push` run

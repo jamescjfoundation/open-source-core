@@ -5,7 +5,68 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 ## Unreleased
 
-Nothing yet.
+### Added
+
+- Shared xtask (`template/xtask/src/corepin.rs`, new, managed): `cargo xtask core-pin` checks
+  that an app builds on one core release (decision 0011). Until now nothing did: an app could
+  name two tags, hold two cores in its graph, or sit many releases behind unnoticed.
+  - **One tag.** Every line of the root `Cargo.toml` that names the core's git address carries a
+    release tag (`tag = "vX.Y.Z"`), all of them the same; the lines that differ are listed.
+  - **One core in the graph.** `Cargo.lock` holds packages from one ref of the core's address.
+    A second one is named with the packages built from it and the packages that bring them in
+    (another app's crates that pin a different core, for example; decision 0015).
+  - **Distance.** `cargo xtask core-pin --behind` lists the core's release tags
+    (`git ls-remote`, so it needs the network), orders them as versions and prints, for example,
+    `core pin v0.1.4 is 11 releases behind v0.1.15`, then `pinned=`, `newest=` and `behind=`
+    lines for a workflow to read. `--max-behind <n>` fails when the pin is more than `n` behind.
+  - The first two read two files and are a task of the template's `ci` (`core-pin`, after
+    `unlinked`); the distance is never part of `ci`. A workspace with no core pin passes.
+  - In the core, which has no pin of its own, `cargo xtask core-pin <app dir> [--behind]
+    [--max-behind <n>]` looks at an app checkout, as `cargo xtask sync <app dir>` does.
+- `template/.github/workflows/core-pin.yml` (new, managed): every Monday, and on demand, an app
+  runs `cargo xtask core-pin --max-behind 3`. When the pin is more than three releases behind,
+  the workflow opens an issue in the app, "Move to open-source-core vX.Y.Z", with the distance, a
+  link to this changelog and the steps. While such an issue is open no second one is opened: it
+  is renamed and rewritten when the core has released again. It uses only the run's own token
+  (`issues: write`). CI stays green for a release an app does not need yet.
+- Shared xtask (`template/xtask/src/sync.rs`): `cargo xtask sync` says when `sync.rs` itself
+  changed, because the run that brings a longer list of managed files cannot yet copy the files
+  the list adds; and `sync` and `sync --check` print a note while the app's own
+  `xtask/src/main.rs` does not run the core-pin check.
+- `cargo xtask template-check` runs the template's `core-pin` task.
+
+### Changed
+
+- The rules every app carries (`template/AGENTS.md`, from "Before you commit" to the end) follow
+  the decisions recorded with this release: how a change lands and what "no product name" covers
+  (0013), who cuts a release and how far behind an app may be (0011), upstream pins (0004,
+  accepted), reviews and working notes (0012), apps that depend on apps (0015, new), and the
+  entries and translation crates (0016, new). The port plan and the first review moved to
+  `docs/history/`.
+
+### What apps must do
+
+- Move every `jcj-` dependency to this release's tag, then run `cargo xtask sync` **twice**: the
+  first run brings the new list of managed files, the second the two files it adds
+  (`xtask/src/corepin.rs` and `.github/workflows/core-pin.yml`). `cargo xtask sync --check` passes
+  after the second. The patch block is unchanged.
+- Add the check to the app's own `xtask/src/main.rs` (four lines; `template/xtask/src/main.rs`
+  shows them in place). Nothing fails without them, but then nothing is checked, and the new
+  workflow's run fails because the task is unknown:
+  1. With the other `mod` lines: `mod corepin;`
+  2. In `TASKS`, after the `unlinked` entry:
+     `("core-pin", "every jcj- dependency names one core release tag, and Cargo.lock holds one core"),`
+  3. In `main`, among the arms of `match task`, before the `name =>` arm:
+     `"core-pin" => corepin::task(&root, rest),`
+  4. In `run_task`, among the arms of `match name`: `"core-pin" => corepin::task(root, &[]),`
+- The workflow arrives with the sync and needs no setting. It opens issues, so issues must be
+  turned on in the repository.
+- Replace the shared rules in the app's `AGENTS.md` (from "Before you commit" to the end of
+  "House rules for code") with the same part of `template/AGENTS.md`. This is still a copy by
+  hand; nothing checks it yet.
+- An app whose lock file holds two cores fails `cargo xtask ci` once it has the task. That is the
+  point of the check: move the dependency that brings the second core to a release built on the
+  app's own core release (decision 0015) in the same change, or first.
 
 ## 0.1.15 (2026-11-25)
 
@@ -259,7 +320,7 @@ Nothing yet.
 ## 0.1.0 (2026-11-24)
 
 The first release of open-source-core, built from the review of Wordsmith Script at `29ed4bf`
-(`docs/review/script-29ed4bf.md`) on WordCraft v0.18.1.
+(`docs/history/script-29ed4bf.md`) on WordCraft v0.18.1.
 
 ### Upstream
 
@@ -307,4 +368,4 @@ tables whole; spelling and hyphenation tests run without the optional craft-i18n
 
 ### What apps must do
 
-Start from `template/` and follow `docs/porting-script.md` (for Wordsmith Script).
+Start from `template/` and follow `docs/history/porting-script.md` (for Wordsmith Script).

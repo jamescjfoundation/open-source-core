@@ -16,6 +16,9 @@
 #[path = "../../template/xtask/src/changed.rs"]
 #[allow(dead_code)]
 mod changed;
+#[path = "../../template/xtask/src/corepin.rs"]
+#[allow(dead_code)]
+mod corepin;
 #[path = "../../template/xtask/src/json.rs"]
 #[allow(dead_code)]
 mod json;
@@ -84,6 +87,11 @@ fn main() -> ExitCode {
             Some(app) => sync::core_task(&root, app, rest.iter().any(|a| a == "--check")),
             None => Err("usage: cargo xtask sync <app dir> [--check]".to_owned()),
         },
+        // The core has no core pin of its own; like `sync`, the task here looks at an app.
+        "core-pin" => match rest.first() {
+            Some(app) if !app.starts_with("--") => corepin::task(Path::new(app), rest.get(1..).unwrap_or_default()),
+            _ => Err("usage: cargo xtask core-pin <app dir> [--behind] [--max-behind <n>]".to_owned()),
+        },
         "vendor" => vendor(&root, rest.first().map(String::as_str)),
         "install-hooks" => install_hooks(&root),
         "template-check" => template_check(&root),
@@ -122,6 +130,9 @@ fn print_help() {
     println!("\n  affected [--base <ref>]   print the packages a change affects");
     println!("  deny                      cargo-deny: licenses, advisories, sources");
     println!("  sync <app dir> [--check]  copy (or compare) shared settings and the patch block into an app");
+    println!("  core-pin <app dir> [--behind] [--max-behind <n>]");
+    println!("                            an app names one core release, and Cargo.lock holds one core; --behind");
+    println!("                            says how many releases behind the pin is (asks the network)");
     println!("  vendor [out file]         archive the vendored sources of every dependency (release asset)");
     println!("  upstream-status           the pinned WordCraft release and the newest upstream (the train's trigger)");
     println!("  template-check            build the app template against this checkout, and run its own checks");
@@ -394,8 +405,8 @@ fn vendor(root: &Path, out: Option<&str>) -> TaskResult {
 
 /// `cargo xtask template-check`: a copy of `template/` in `target/template-check`, synced from this
 /// checkout and depending on it by path instead of by release tag, must build and pass its own
-/// lint-roots, layers and sync checks. The scheduled CI run does this, so the template never rots
-/// between releases.
+/// lint-roots, core-pin, layers and sync checks. The scheduled CI run does this, so the template
+/// never rots between releases.
 fn template_check(root: &Path) -> TaskResult {
     let dir = root.join("target").join("template-check");
     let _ = std::fs::remove_dir_all(&dir);
@@ -431,6 +442,7 @@ fn template_check(root: &Path) -> TaskResult {
     run(&["fmt", "--all", "--", "--check"])?;
     run(&["clippy", "--workspace", "--all-targets", "--", "-D", "warnings"])?;
     run(&["run", "--quiet", "-p", "xtask", "--", "lint-roots"])?;
+    run(&["run", "--quiet", "-p", "xtask", "--", "core-pin"])?;
     run(&["run", "--quiet", "-p", "xtask", "--", "layers"])?;
     run(&["run", "--quiet", "-p", "xtask", "--", "sync", "--check"])?;
     run(&["test", "--workspace"])?;
