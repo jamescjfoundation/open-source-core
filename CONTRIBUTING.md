@@ -38,9 +38,9 @@ same tests and says which of the two ran them.
 | `crates/jcj-theme`, `jcj-board`, `jcj-shell` | Theming from tokens and brand loading, cards and boards, the app shell and an app's start-up |
 | `apps/core-testbed` | A small app that uses every crate |
 | `contract-tests` | Behavior apps rely on, run against every upstream candidate |
-| `template` | Starter files for a new app repository, and the source of what `cargo xtask sync` keeps identical in every app: the shared xtask modules (the gate every app runs is `template/xtask/src/gate.rs`; an app's release package and release commit are `package` and `release` in `shared.rs`), the three files that call the shared workflows, the Dependabot settings, hooks, code of conduct and the marked blocks of rules and settings |
+| `template` | Starter files for a new app repository, and the source of what `cargo xtask sync` keeps identical in every app: the shared xtask modules (the gate every app runs is `template/xtask/src/gate.rs`; an app's release package and release commit are `package` and `release` in `shared.rs`), the four files that call the shared workflows, the Dependabot settings, hooks, code of conduct and the marked blocks of rules and settings |
 | `xtask` | The core's own gate and maintenance tasks |
-| `.github/workflows` | The core's own workflows, and the three shared workflows every app calls (its CI, its core pin, its release); its `README.md` says what each runs and when, how a change to a shared one reaches the apps, what CI keeps between runs, and how a release is gated |
+| `.github/workflows` | The core's own workflows, and the four shared workflows every app calls (its CI, its core pin, its gate on macOS and Windows, its release); its `README.md` says what each runs and when, how a change to a shared one reaches the apps, what CI keeps between runs, and how a release is gated |
 | `.github/apps.json` | The app repositories that are built against a core commit every night and before a release |
 | `docs/decisions` | Why things are the way they are |
 | `docs/command-lines-and-agent-tools.md` | The convention every app's command line and agent tools follow: exit codes, `mcp`, tool names |
@@ -143,8 +143,9 @@ written inside `shared.rs` for that reason, and move to files of their own once 
 
 ### The shared workflows
 
-`shared-ci.yml`, `shared-core-pin.yml` and `shared-release.yml` in `.github/workflows/` are the
-jobs of every app's CI, of its weekly core-pin check and of its release. Apps call them at the
+`shared-ci.yml`, `shared-core-pin.yml`, `shared-platforms.yml` and `shared-release.yml` in
+`.github/workflows/` are the jobs of every app's CI, of its weekly core-pin check, of its
+nightly gate on macOS and Windows and of its release. Apps call them at the
 tag `workflows-v1`, so a change to one reaches the apps when that tag is moved: not when the
 change lands, and not with a release. A person or an agent moves it, to a commit of `main` where
 `ci.yml` has passed. The steps, and the list of what these workflows may ask of an app, are in

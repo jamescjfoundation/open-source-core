@@ -14,8 +14,8 @@ Decision 0003. GitHub-hosted runners only; built so nobody waits on CI.
 
 ## The shared workflows, which every app calls
 
-The jobs of an app's CI and of its release are not copied into the app. They are three
-workflows here, and each app carries three short files that call them
+The jobs of an app's CI, of its gate on macOS and Windows and of its release are not copied
+into the app. They are four workflows here, and each app carries four short files that call them
 (`template/.github/workflows/`, kept identical in every app by `cargo xtask sync`). Those files
 say only when a workflow runs, which token its jobs get and which secrets they are handed.
 
@@ -24,6 +24,7 @@ say only when a workflow runs, which token its jobs get and which secrets they a
 | `shared-ci.yml` | `ci.yml` here (from the same commit) and `ci.yml` in every app (at `workflows-v1`) | The three jobs above. In an app the checks include `sync --check` (the shared files, the patch block and the marked blocks match the pinned core release), `core-pin`, `unlinked`, `app-layers`, `docs`, `assets`, and every task the app added to its own gate. The list is the app's pinned core release's (`gate.rs`), not this file's. On a pull request whose branch pins the core at a commit instead of a release, the jobs build against that commit and `core-pin` passes with a warning shown on the checks page; the same pin fails on `main` (decision 0013). |
 | `shared-core-pin.yml` | `core-pin.yml` in every app (at `workflows-v1`), Mondays and on demand | `cargo xtask core-pin --max-behind 3`: when the app's core pin is more than three releases behind the newest, opens an issue in the app ("Move to open-source-core vX.Y.Z"), or brings the open one up to date (decision 0011). |
 | `shared-release.yml` | `release.yml` in every app (at `workflows-v1`): started by hand for a release or a dry run, and by itself on Tuesdays as a dry run | The app's release (decision 0019, `docs/app-releases.md`): the release commit checked, the whole gate on Linux, macOS and Windows with cargo-deny, the package of each system, `SHA256SUMS.txt`, an attestation, and only then the tag and the published release. A dry run builds and checks the files and stops ("An app's release" below). |
+| `shared-platforms.yml` | `platforms.yml` in every app (at `workflows-v1`), every night and on demand (`-f system=macos` or `windows` for one) | The app's whole gate, `cargo xtask ci`, on `macos-latest` and `windows-latest`, with the archives, tools and cargo-nextest of the release's gate. A scheduled run that fails opens the issue "The macOS and Windows gate failed" in the app, or adds to the open one. Never a required check ("An app on macOS and Windows" below). |
 
 ### The checks a pull request needs
 
@@ -96,6 +97,10 @@ core keeps that output, a few hundred megabytes at most, until it moves.
 The tests run under cargo-nextest where the app's gate uses it, which is from 0.1.21 on. The
 workflow puts the program there for every app; an older gate does not look for it.
 
+`shared-platforms.yml` asks for `cargo xtask ci` and tries `prune-target`, as above; its
+calling file reaches an app with core 0.1.23, and it works for an app on any release from
+0.1.22 on, which it was tried with.
+
 `shared-release.yml` asks for more, of the apps that can call it: the tasks `release`,
 `release-data` and `package` of the shared xtask and the app's package data. The file that
 calls it reaches an app with the same core release as those tasks, through `cargo xtask sync`,
@@ -113,7 +118,7 @@ unasked.
 
 GitHub switches a scheduled workflow off when its repository has had no activity for 60 days,
 and tells nobody. Here that is `nightly.yml` and `upstream-train.yml`; in an app it is
-`core-pin.yml` and the weekly dry run of `release.yml`, in a repository that may well be quiet
+`core-pin.yml`, `platforms.yml` and the weekly dry run of `release.yml`, in a repository that may well be quiet
 for that long. To look and to switch one back on:
 
 ```sh
@@ -145,7 +150,8 @@ What it cannot show, and says in the run's summary:
   the whole build, whatever core that tag was cut on. The other app's `main`, from which its
   next tag will be cut, is not tried with this one: that is between the two apps, and the
   provider's own row tries the provider.
-- macOS and Windows: an app's gate runs on Linux here, as in the app's own CI.
+- macOS and Windows: an app's gate runs on Linux here, as in the app's own CI. The app's own
+  `platforms.yml` runs it on the other two every night, at the pin the app has.
 - An app on a core older than 0.1.20 has no link that leaves its files alone and no
   `ci --linked`. Its job fails and says so; the app moves first.
 - The app after a step that "What apps must do" asks beyond the pin move and `sync`. A release
@@ -238,6 +244,31 @@ and in a branch of one app change the `uses:` line of `release.yml` to that bran
 (`...shared-release.yml@<branch>`), then
 `gh workflow run release.yml --repo jamescjfoundation/<app> --ref <app branch> -f dry-run=true`.
 The app's gate fails on that branch (`sync --check`), which is right: it is never merged.
+
+## An app on macOS and Windows
+
+An app's CI and the apps job above run on Linux. `shared-platforms.yml` runs the app's whole
+gate on the other two systems, called by the app's managed `platforms.yml`:
+
+- **Every night and on demand, never on a push or a pull request.** The full gate on two
+  systems takes long; a pull request would wait on it, so it is not a required check. A
+  failure is found the next morning and long before a release, whose gate runs on all three.
+- **The commit is the one the run is on**: the newest of `main` for a scheduled run, the branch
+  it was started on otherwise (`gh workflow run platforms.yml --ref <branch>`).
+- **A scheduled run that fails opens an issue** in the app, "The macOS and Windows gate
+  failed", or adds a comment to the open one. A run started by hand is not reported.
+- **Every failure is named.** cargo-nextest stops at the first failing test unless told
+  otherwise; an app whose tests rarely run on a system sets `fail-fast = false` in its own
+  `.config/nextest.toml`, so that one run names them all.
+- **Nothing is kept between runs**, as for a release build: an archive for macOS or Windows
+  would push out the ones the app's CI reads every day. The run builds from nothing, on
+  GitHub's machines, in about the time of a release's gate.
+
+To try a change to `shared-platforms.yml` before `workflows-v1` moves: push it to a branch
+here, and in a branch of one app add `platforms.yml` with its `uses:` line naming that branch
+(`...shared-platforms.yml@<branch>`) and `push: branches: [<app branch>]` among its triggers,
+since GitHub starts a workflow by hand only when its file is on the default branch. Pushing the
+app's branch starts it. The branch is never merged; delete it afterwards.
 
 ## What CI keeps between runs
 
