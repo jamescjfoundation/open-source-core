@@ -3,6 +3,20 @@
 Each release says what changed for apps. While at 0.x, a patch release never breaks an app; a
 minor release may, and then **What apps must do** says exactly what (decision 0011).
 
+## Unreleased
+
+### Changed
+
+- **The comment at the top of the managed `.github/workflows/release.yml` says the release
+  commit lands on `main` through a pull request whose checks pass.** It said to push the commit
+  to `main`, which GitHub has refused since 0.1.23 (decision 0013, amended). The workflow itself
+  is unchanged.
+
+### What apps must do
+
+Nothing. The comment reaches each app with the next core release: move the pin and run
+`cargo xtask sync`, as that release says.
+
 ## 0.1.23 (2026-11-27)
 
 ### Added
