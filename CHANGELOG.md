@@ -3,6 +3,39 @@
 Each release says what changed for apps. While at 0.x, a patch release never breaks an app; a
 minor release may, and then **What apps must do** says exactly what (decision 0011).
 
+## Unreleased
+
+### Changed
+
+- **Every change lands through a pull request whose checks pass, and its author merges it**
+  (decision 0013, amended; 0011 and 0003 too). Apps built on the core have public releases now,
+  so a broken `main` can reach users with an app's next release. The `main` rule of the core and
+  of every app requires a pull request and the three checks of the shared CI
+  (`gate / checks (every task but clippy and test)`, `gate / cargo-deny (licenses, advisories,
+  sources)`, `gate / clippy and tests (affected packages)`); GitHub refuses a direct push. No
+  approval is required: one account does the work, so an approval would not be a second pair
+  of eyes. The carried text says so: the `app-and-core` block of `AGENTS.md` ("How a change
+  lands", and step 2 of "Releasing an app"), the `contributing` block of `CONTRIBUTING.md`, and
+  the managed pull request template. `cargo xtask release` now ends by saying to land the
+  release commit through a pull request. The pre-push hook stays: it runs the gate before a
+  branch is pushed.
+
+### Fixed
+
+- **The package data of 0.1.22's "What apps must do" ends with `..Package::DEFAULT`.** An app
+  that writes every field of `Package` must leave that line out: clippy refuses a `..` that
+  fills nothing (`needless_update`), and the gate's clippy fails. `docs/app-releases.md`, the
+  documentation of `Package::DEFAULT` and the template's `xtask/src/main.rs` say so now.
+
+### What apps must do
+
+1. Move every `jcj-` dependency to this release's tag, then run
+   `cargo metadata --format-version 1 >/dev/null` to bring `Cargo.lock` in line.
+2. Run `cargo xtask sync`, then `cargo xtask sync --check`. It rewrites the `app-and-core`
+   block of `AGENTS.md`, the `contributing` block of `CONTRIBUTING.md`,
+   `.github/pull_request_template.md` and `xtask/src/shared.rs`. Nothing in the app's own code
+   changes.
+
 ## 0.1.22 (2026-11-27)
 
 ### Added

@@ -1,8 +1,9 @@
 # 0013: Building between an app and the core
 
 Date: 2026-11-24 · Status: accepted · Amended 2026-11-26 (how changes land; what "no product
-name" covers; when a promotion is finished; the dev-link and the temporary pin) · From the plan's
-"Building between an app and the core"
+name" covers; when a promotion is finished; the dev-link and the temporary pin) · Amended
+2026-11-27 (every change lands through a pull request) · From the plan's "Building between an
+app and the core"
 
 ## Decision
 
@@ -47,11 +48,16 @@ When a promotion is finished (amended 2026-11-26): when the app the code came fr
 core's copy and its own copy is deleted. The core issue stays open until then, and the marker on
 the app's copy names it. A core release that carries the code does not close the issue.
 
-How a change lands, while no app built on the core has a public release:
+How a change lands (amended 2026-11-27), in the core and in every app:
 
-- A direct push to `main` is allowed, for people and agents. The gate (`cargo xtask ci`) is run
-  before the push.
-- A pull request is optional. Its author may merge it once its checks pass.
+- Every change lands on `main` through a pull request. GitHub refuses a direct push: the `main`
+  rule of each repository requires a pull request and the three checks of its CI
+  (`gate / cargo-deny (licenses, advisories, sources)`,
+  `gate / checks (every task but clippy and test)`,
+  `gate / clippy and tests (affected packages)`).
+- Its author, a person or an agent, merges it once those checks pass. No approval is required.
+  The gate (`cargo xtask ci`) is run before the branch is pushed, as it was before a push to
+  `main`; the pre-push hook still runs it.
 - A change that spans two repositories lands provider first: the core, its release, then the
   app's pin and the app's change. One app that another depends on is a provider in the same way
   (decision 0015).
@@ -77,6 +83,22 @@ of `template/AGENTS.md`, copied and checked by `cargo xtask sync` (decision 0003
   decision that says where code was promoted from is a true record, and removing it would lose
   the reason the interface has its shape.
 
+## Why the 2026-11-27 amendment
+
+- The first apps built on the core published releases that installed copies update from, so a
+  broken `main` can now reach users with an app's next release. A direct push could land a
+  commit whose CI had not run, or had failed: the checks ran after the push, and nothing but
+  the pre-push hook, which a clone may not have, stood before it. A required check on a pull
+  request is the one place where "the checks passed" is held by GitHub and not by habit.
+- No approval is required, because one account does the work in every repository: an approval
+  it gave itself would be a second pair of eyes in name only. The author merges, as before.
+- The three checks are the jobs of `shared-ci.yml`, the same in the core and in every app, so
+  one rule fits every repository. The full gate on macOS and Windows is not required: it takes
+  long, and it runs every night and before every release (decision 0003).
+- Considered and not chosen: keeping direct pushes for small changes (the rule would again be
+  kept by habit, and "small" is where a broken carried block or link slips through); requiring
+  an approval (above).
+
 ## Why the promotion rule, the dev-link in an ignored folder and the temporary pin
 
 - The first promotions were released and their issues closed while the app each came from still
@@ -98,9 +120,9 @@ of `template/AGENTS.md`, copied and checked by `cargo xtask sync` (decision 0003
 
 ## Revisit when
 
-The first app built on the core has a public release: from then a broken `main` can reach users
-through an update, and required checks or pull requests on `main` should be decided again.
+A second person or account works in the repositories, so that an approval would be a second
+pair of eyes (then decide whether to require one); or the required checks are often the wait
+that keeps a change from landing.
 
-2026-11-27: this is due. Apps built on the core published their first releases, previews, on
-that day. How a change lands has not been decided again yet, and changes still land as above;
-issue #52 holds the question.
+The earlier condition, the first app built on the core with a public release, was met on
+2026-11-27 and answered by that day's amendment (issue #52).

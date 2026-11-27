@@ -4,7 +4,7 @@ Date: 2026-11-24 · Status: accepted · Amended 2026-11-26 (what `sync` carries;
 and the hooks; the shared workflows, what a change affects, and checks on every push; the gate an
 app shares, its layer table, and one run of `sync`; what CI keeps between runs, cargo-nextest in
 every gate, and the apps built against the core; a third shared workflow, an app's release,
-decision 0019) · Ported
+decision 0019) · Amended 2026-11-27 (the CI checks are required on `main`) · Ported
 from Wordsmith Script decisions 0003 and 0040
 
 ## Decision
@@ -152,6 +152,12 @@ from Wordsmith Script decisions 0003 and 0040
   workflow. Compiling them took two to four minutes whenever their cache was gone, and an
   action of someone else's is not allowed here. The `workflows` task of the core's gate holds
   the workflow files to that, and to GitHub's own actions at a full commit.
+- **The CI checks are required** (amended 2026-11-27). The `main` rule of the core and of each
+  app requires a pull request and the three jobs of `shared-ci.yml` (decision 0013), so a
+  change lands only where CI has passed. Their names are what the rule holds:
+  `gate / checks (every task but clippy and test)`, `gate / cargo-deny (licenses, advisories,
+  sources)`, `gate / clippy and tests (affected packages)`. A change to a job's name, or to the
+  caller's job `gate`, is a change to every repository's rule and is made with it.
 - **The apps are built against the core** (amended 2026-11-26) every night and before a
   release, each with its own gate; decision 0011 says what a red app means for a release.
   Which repositories those are is a list in `.github/apps.json`, so the core's code still

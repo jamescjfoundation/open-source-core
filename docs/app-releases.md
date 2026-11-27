@@ -198,6 +198,9 @@ const APP: App = App {
 };
 ```
 
+- **`..Package::DEFAULT`** gives every field the app does not write. An app that writes every
+  field leaves the line out: clippy refuses a `..` that fills nothing (`needless_update`), and
+  the gate's clippy fails on it. The same holds for `..FileType::DEFAULT` and `..App::DEFAULT`.
 - **`product`** is the name people see: the release's title, the macOS app, the menu entry.
 - **`shipped`** names workspace packages. Each builds one program. The first builds the desktop
   program, which is named by the release id; every other program is named `<id>-<name>`, so
@@ -229,7 +232,8 @@ the workflow makes the tag, as for the core (decision 0011).
 2. Write what the release changes under `## Unreleased` of `CHANGELOG.md`.
 3. `cargo xtask release X.Y.Z` makes the changes of the release commit: the version in
    `Cargo.toml` and `Cargo.lock`, and the changelog heading with today's date in UTC.
-4. `cargo xtask ci`, commit as "<the product's name> X.Y.Z", push to `main`.
+4. `cargo xtask ci`, commit as "<the product's name> X.Y.Z", and land the commit on `main`
+   through a pull request.
 5. Start the release:
 
    ```sh
@@ -241,7 +245,7 @@ the workflow makes the tag, as for the core (decision 0011).
    on the newest core; runs the whole gate on Linux, macOS and Windows, and cargo-deny; builds
    the package of each system; checks the three files and writes `SHA256SUMS.txt`; attests
    them. Only when all of that has passed does it make the tag and publish the release.
-6. A red job stops the release and no tag exists. Fix the cause on `main` and start the workflow
+6. A red job stops the release and no tag exists. Land the fix on `main` and start the workflow
    again: the version was never tagged, so the commit with the fix is the release commit now.
    When only a runner or the network was at fault: `gh run rerun <run> --failed`.
 7. Do not make or push a `v*` tag by hand, and do not create or edit a release by hand: nothing

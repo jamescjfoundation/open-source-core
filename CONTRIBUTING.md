@@ -79,9 +79,10 @@ than "as discussed".
 
 ## Commits, pushes and pull requests
 
-- While no app built on the core has a public release, a push to `main` is allowed once the
-  repository's gate passes (`cargo xtask ci` where it has `cargo xtask`). A pull request is
-  optional; its author may merge it once its checks pass
+- Every change lands on `main` through a pull request whose required checks pass; GitHub
+  refuses a direct push. Its author, a person or an agent, merges it once they pass, and no
+  approval is required. Run the repository's gate (`cargo xtask ci` where it has
+  `cargo xtask`) before you push the branch
   ([core decision 0013](https://github.com/jamescjfoundation/open-source-core/blob/main/docs/decisions/0013-app-and-core.md)).
 - A release is cut, and in the core an upstream pin is moved, only on a commit whose full gate
   has passed; a person or an agent may do either (core decisions
@@ -183,7 +184,8 @@ gate runs first and the tag is made by a workflow, so a tag cannot land on a com
    It refuses a version that is not newer than the present one, a changelog whose newest
    section is not `## Unreleased`, and a section with no **What apps must do** or nothing
    under it. A refusal changes no file.
-3. Run `cargo xtask ci`, commit the four files as "open-source-core X.Y.Z" and push to `main`.
+3. Run `cargo xtask ci`, commit the four files as "open-source-core X.Y.Z" on a branch, open a
+   pull request, and merge it once its checks pass.
 4. Start the release for that commit:
 
    ```sh
@@ -199,7 +201,7 @@ gate runs first and the tag is made by a workflow, so a tag cannot land on a com
    checksums. When a run of the gate (`nightly.yml`) has already passed on that very commit, it
    uses that run and does not run the gate again. `-f commit=<commit>` releases an older commit
    of `main` than its newest.
-5. A red job stops the release, and no tag exists. Fix the cause on `main`, with a line in the
+5. A red job stops the release, and no tag exists. Land the fix on `main`, with a line in the
    release's changelog section when apps should know, and start the workflow again: the
    version was never tagged, so the commit with the fix is the release commit now. When only a
    runner or the network was at fault, run the failed jobs again:

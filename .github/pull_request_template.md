@@ -1,4 +1,4 @@
-<!-- A pull request is optional while no app has a public release (decision 0013); a push to main follows the same list. -->
+<!-- Every change lands through a pull request whose checks pass; its author merges it (decision 0013). -->
 
 ## What changed, and why
 
