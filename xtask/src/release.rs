@@ -168,7 +168,7 @@ fn cut(root: &Path, new: &str, date: &str) -> TaskResult {
     println!("open-source-core {new} ({date}): Cargo.toml, Cargo.lock, template/Cargo.toml ({lines} lines at v{new}) and CHANGELOG.md are changed.");
     println!("Next:");
     println!("  1. cargo xtask ci");
-    println!("  2. commit the four files as \"open-source-core {new}\" and push to main");
+    println!("  2. commit the four files as \"open-source-core {new}\" and land it on main through a pull request");
     println!("  3. gh workflow run release.yml --ref main");
     println!("     It runs the gate on Linux, macOS and Windows and builds the apps; when all of it has passed it");
     println!("     makes the tag v{new} and publishes the release. Do not make the tag by hand.");

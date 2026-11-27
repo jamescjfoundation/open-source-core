@@ -39,7 +39,8 @@ const APP: App = App {
 
 /// What a release of the app carries besides its programs (`cargo xtask package`; the core's
 /// `docs/app-releases.md`). Set the fields the app has; the rest come from `Package::DEFAULT`
-/// (`shared::package::Package` describes each):
+/// (`shared::package::Package` describes each). An app that sets every field drops the line
+/// `..Package::DEFAULT`, which clippy then refuses (`needless_update`):
 ///
 /// - `file_types`: the kinds of file the app opens, as
 ///   `&[FileType { name: "Example document", extensions: &["exd"], mime: "application/x-example", ..FileType::DEFAULT }]`

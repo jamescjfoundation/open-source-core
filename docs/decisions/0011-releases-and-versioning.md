@@ -2,7 +2,8 @@
 
 Date: 2026-11-24 · Status: accepted · Amended 2026-11-26 (who cuts a release; how far behind an
 app may be; the gate before the tag, and the apps in the gate; the same order for an app's own
-release, decision 0019)
+release, decision 0019) · Amended 2026-11-27 (looked at again once apps had public releases;
+the release commit lands through a pull request)
 
 ## Decision
 
@@ -40,6 +41,8 @@ release, decision 0019)
   systems and builds every release file; only then does it make the tag and publish. The
   workflow is the core's (`shared-release.yml`), and it refuses an app that is not on the
   newest core unless it is told to go ahead.
+- **A release commit lands like any change** (amended 2026-11-27): through a pull request whose
+  checks pass (decision 0013), and the release workflow is then started for it on `main`.
 - **Changes that alter what users see in other apps** sit behind an option (a shell setting or a
   Cargo feature) that defaults to the old behavior until every app has turned it on (plan, "Step
   3").
@@ -83,10 +86,19 @@ copy reads the app's releases and installs what it finds, so a tag or a release 
 before the gate has passed reaches users, not only other repositories. Decision 0019 has the
 contract and the reasons.
 
+## Why no slower path once apps have public releases (2026-11-27)
+
+Apps built on the core published releases that installed copies update from. A core release
+does not reach a user by itself: it reaches an app when the app moves its pin, and a user when
+that app makes its own release, which runs the app's whole gate on Linux, macOS and Windows
+before its tag exists (decision 0019). Before the core's tag exists, the core's gate already
+builds each app against the commit with the app's own gate. From this day each app's full gate
+also runs on macOS and Windows every night (decision 0003), and every change, a release commit
+included, lands through a pull request whose checks pass (decision 0013). A slower path for the
+core (a waiting time, a person's approval) would add a wait to every fix an app needs and no
+check that the gates above do not already make. The rules of this record stand as written.
+
 ## Revisit when
 
-An app has a public release that users update from (a core release then reaches users, and may
-need a slower path), or the core reaches 1.0.
-
-2026-11-27: this is due. Apps built on the core published their first releases, previews, on
-that day. The record has not been looked at again yet; issue #52 holds the question.
+The core reaches 1.0, or a fault reaches users through an app's release that these gates
+passed (issue #52 was the last review).

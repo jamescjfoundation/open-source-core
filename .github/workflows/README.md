@@ -25,6 +25,22 @@ say only when a workflow runs, which token its jobs get and which secrets they a
 | `shared-core-pin.yml` | `core-pin.yml` in every app (at `workflows-v1`), Mondays and on demand | `cargo xtask core-pin --max-behind 3`: when the app's core pin is more than three releases behind the newest, opens an issue in the app ("Move to open-source-core vX.Y.Z"), or brings the open one up to date (decision 0011). |
 | `shared-release.yml` | `release.yml` in every app (at `workflows-v1`): started by hand for a release or a dry run, and by itself on Tuesdays as a dry run | The app's release (decision 0019, `docs/app-releases.md`): the release commit checked, the whole gate on Linux, macOS and Windows with cargo-deny, the package of each system, `SHA256SUMS.txt`, an attestation, and only then the tag and the published release. A dry run builds and checks the files and stops ("An app's release" below). |
 
+### The checks a pull request needs
+
+Every change lands on `main` through a pull request (decision 0013), and the `main` rule of the
+core and of every app requires the three jobs of `shared-ci.yml` to have passed on it. GitHub
+names a check after the calling job and the called one, so the rule holds these three names:
+
+- `gate / checks (every task but clippy and test)`
+- `gate / cargo-deny (licenses, advisories, sources)`
+- `gate / clippy and tests (affected packages)`
+
+A job's `name:` in `shared-ci.yml`, and the job `gate` in the calling `ci.yml`, are therefore
+part of every repository's rule. Renaming one leaves every pull request waiting for a check
+that never comes: change the rule of each repository in the same step, before the tag moves.
+`build` passes at once for a change that affects no package, so a change to Markdown alone
+waits only for the two quick jobs. No other workflow is a required check.
+
 A called workflow runs in the repository that calls it: that repository's code, commit and
 token. The caller grants the token (`contents: read` and `actions: read` for CI; `contents: read`
 and `issues: write` for the core pin; for the release also `contents: write`, `id-token: write`
