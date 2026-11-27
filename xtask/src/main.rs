@@ -30,7 +30,7 @@ use std::process::{Command, ExitCode};
 use shared::changed::{self, Affected};
 use shared::gate::scoped;
 use shared::util::{self, TaskResult, cargo, cargo_output, report, workspace_members};
-use shared::{corepin, docs, gate, licenses, link, lintroots, privacy, spdx, sync};
+use shared::{corepin, docs, gate, licenses, link, lintroots, package, privacy, spdx, sync};
 
 /// The gate, in order. Cheap checks first so a mistake fails fast.
 const TASKS: &[(&str, &str)] = &[
@@ -86,7 +86,7 @@ fn main() -> ExitCode {
         "vendor" => vendor(&root, rest.first().map(String::as_str)),
         "install-hooks" => install_hooks(&root),
         "template" if rest.iter().any(|a| a == "--write") => write_own_copies(&root),
-        "template-check" => template_check(&root),
+        "template-check" => template_check(&root, rest),
         "upstream-status" => pins::status(&root),
         "third-party-licenses" => licenses::task(&root, SHIPPED, "open-source-core's test app", rest.first().map(String::as_str)),
         "privacy" => privacy::task(&root, rest),
@@ -133,7 +133,9 @@ fn print_help() {
     println!("                            says how many releases behind the pin is (asks the network)");
     println!("  vendor [out file]         archive the vendored sources of every dependency (release asset)");
     println!("  upstream-status           the pinned WordCraft release and the newest upstream (the train's trigger)");
-    println!("  template-check            build the app template against this checkout, and run its own checks");
+    println!("  template-check [--package]");
+    println!("                            build the app template against this checkout, and run its own checks; --package makes");
+    println!("                            its release package on this system instead, as an app's release workflow does");
     println!(
         "  install-hooks             use the repository's git hooks (pre-commit: fmt, privacy, no dev-link in a tracked file; pre-push: ci --changed)"
     );
@@ -429,12 +431,11 @@ fn vendor(root: &Path, out: Option<&str>) -> TaskResult {
     Ok(())
 }
 
-/// `cargo xtask template-check`: a copy of `template/` in `target/template-check`, synced from this
-/// checkout and depending on it by path instead of by release tag, must build and pass its own
-/// lint-roots, core-pin, unlinked, layers, app-layers, sync and docs checks. The scheduled CI run does this, so the template
-/// never rots between releases.
-fn template_check(root: &Path) -> TaskResult {
-    let dir = root.join("target").join("template-check");
+/// A copy of `template/` in `target/<name>`, synced from this checkout and depending on it by
+/// path instead of by release tag: the app a new repository starts as, built against the core as
+/// it is here. Returns the folder and the target folder its builds share with the core's.
+fn template_copy(root: &Path, name: &str) -> Result<(PathBuf, String), String> {
+    let dir = root.join("target").join(name);
     let _ = std::fs::remove_dir_all(&dir);
     copy_dir(&root.join("template"), &dir, 0)?;
     sync::write(root, &dir, Some(&[]))?;
@@ -455,16 +456,32 @@ fn template_check(root: &Path) -> TaskResult {
     }
     std::fs::write(&manifest_path, out).map_err(|e| format!("template Cargo.toml: {e}"))?;
     std::fs::copy(root.join("Cargo.lock"), dir.join("Cargo.lock")).map_err(|e| format!("Cargo.lock: {e}"))?;
-    let target = root.join("target").to_string_lossy().into_owned();
-    let run = |args: &[&str]| -> TaskResult {
-        let status = Command::new(util::cargo_bin())
-            .args(args)
-            .current_dir(&dir)
-            .env("CARGO_TARGET_DIR", &target)
-            .status()
-            .map_err(|e| format!("could not run cargo: {e}"))?;
-        if status.success() { Ok(()) } else { Err(format!("template: `cargo {}` exited with {status}", args.join(" "))) }
-    };
+    Ok((dir, root.join("target").to_string_lossy().into_owned()))
+}
+
+/// Run cargo in a copy of the template, building into the core's own target folder.
+fn template_cargo(dir: &Path, target: &str, args: &[&str]) -> TaskResult {
+    let status = Command::new(util::cargo_bin())
+        .args(args)
+        .current_dir(dir)
+        .env("CARGO_TARGET_DIR", target)
+        .status()
+        .map_err(|e| format!("could not run cargo: {e}"))?;
+    if status.success() { Ok(()) } else { Err(format!("template: `cargo {}` exited with {status}", args.join(" "))) }
+}
+
+/// `cargo xtask template-check`: the copy of the template must build and pass its own
+/// lint-roots, core-pin, unlinked, layers, app-layers, sync and docs checks. The scheduled CI
+/// run does this, so the template never rots between releases. `--package`: see
+/// [`template_package`].
+fn template_check(root: &Path, args: &[String]) -> TaskResult {
+    match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
+        [] => {}
+        ["--package"] => return template_package(root),
+        _ => return Err("usage: cargo xtask template-check [--package]".to_owned()),
+    }
+    let (dir, target) = template_copy(root, "template-check")?;
+    let run = |args: &[&str]| template_cargo(&dir, &target, args);
     run(&["fmt", "--all", "--", "--check"])?;
     run(&["clippy", "--workspace", "--all-targets", "--", "-D", "warnings"])?;
     run(&["run", "--quiet", "-p", "xtask", "--", "lint-roots"])?;
@@ -476,6 +493,34 @@ fn template_check(root: &Path) -> TaskResult {
     run(&["run", "--quiet", "-p", "xtask", "--", "docs"])?;
     run(&["test", "--workspace"])?;
     println!("ok: the app template builds against this checkout and passes its own checks");
+    Ok(())
+}
+
+/// `cargo xtask template-check --package`: the release package of the template app, made on
+/// this system by the app's own `cargo xtask package`, as an app's release workflow makes it
+/// (`docs/app-releases.md`). The copy is given what a new repository adds before its first
+/// release: the legal files and a changelog. The scheduled run does this on Linux, macOS and
+/// Windows, so the packaging of every system is tried before an app's release needs it.
+fn template_package(root: &Path) -> TaskResult {
+    let (dir, target) = template_copy(root, "template-package")?;
+    for file in package::LEGAL {
+        std::fs::copy(root.join(file), dir.join(file)).map_err(|e| format!("{file}: {e}"))?;
+    }
+    std::fs::write(dir.join("CHANGELOG.md"), "# Changelog\n\n## Unreleased\n\n- The first release.\n").map_err(|e| format!("CHANGELOG.md: {e}"))?;
+    let run = |args: &[&str]| template_cargo(&dir, &target, args);
+    run(&["run", "--quiet", "-p", "xtask", "--", "release-data"])?;
+    run(&["run", "--quiet", "-p", "xtask", "--", "release", "0.9.0", "--date", "2026-01-01"])?;
+    run(&["run", "--quiet", "-p", "xtask", "--", "release", "--check"])?;
+    run(&["run", "--quiet", "-p", "xtask", "--", "package"])?;
+    run(&["run", "--quiet", "-p", "xtask", "--", "package", "--sums", "dist"])?;
+    let platform = package::Platform::host().ok_or("a release has no file for this system")?;
+    let file = dir.join("dist").join(package::file_name("app", "0.9.0", platform));
+    let sums = std::fs::read_to_string(dir.join("dist").join(package::SUMS)).map_err(|e| format!("{}: {e}", package::SUMS))?;
+    let expected = format!("{}  {}\n", package::sha256_of(&file)?, package::file_name("app", "0.9.0", platform));
+    if sums != expected {
+        return Err(format!("{} is not the one line it should be:\n{sums}expected:\n{expected}", package::SUMS));
+    }
+    println!("ok: the app template packages on this system: {} ({} bytes)", file.display(), std::fs::metadata(&file).map(|m| m.len()).unwrap_or(0));
     Ok(())
 }
 
@@ -504,6 +549,19 @@ fn install_hooks(root: &Path) -> TaskResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_release_example_is_what_the_shared_task_writes() {
+        // docs/app-release-example/SHA256SUMS.txt is the contract's example (docs/app-releases.md).
+        // jcj-shell tests that the updater reads it; this holds the packaging code to it.
+        let example = std::fs::read_to_string(workspace_root().join("docs/app-release-example").join(package::SUMS)).unwrap();
+        let sums: Vec<(String, String)> =
+            example.lines().map(|l| l.split_once("  ").unwrap()).map(|(sum, name)| (name.to_owned(), sum.to_owned())).collect();
+        let names: Vec<String> = package::Platform::ALL.iter().map(|p| package::file_name("sample-app", "1.2.3", *p)).collect();
+        assert_eq!(sums.iter().map(|(name, _)| name.clone()).collect::<Vec<_>>(), names);
+        assert_eq!(package::sums_text(&sums), example);
+        assert!(package::set_problems(&names, "sample-app", "1.2.3", true).is_empty());
+    }
 
     #[test]
     fn reads_the_calls_to_shared_workflows() {

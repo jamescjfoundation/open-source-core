@@ -7,26 +7,29 @@ Decision 0003. GitHub-hosted runners only; built so nobody waits on CI.
 | Workflow | When | What |
 | --- | --- | --- |
 | `ci.yml` | Every push to `main` and every pull request, a change to Markdown alone included | Calls `shared-ci.yml` from the same commit. Three jobs in parallel: **checks** (every task of the gate but clippy and test: fmt, crate roots, layers, pins, template, workflows, docs, privacy of every file and commit identity, licenses; no product build), **deny** (cargo-deny), **build** (clippy and tests for the packages changed since the last green commit on `main`, and their dependents; it ends at once when the change affects no package). A newer push cancels an older run; nothing is skipped, because the base is the last *green* commit. |
-| `nightly.yml` | Daily, on demand, and as the gate of a release | The full gate on Linux, macOS and Windows; the minimum Rust version; cargo-deny with today's advisories; the app template built against this checkout; and each app in `.github/apps.json` built against this checkout with its own gate ("The apps, built against a core commit" below). |
+| `nightly.yml` | Daily, on demand, and as the gate of a release | The full gate on Linux, macOS and Windows; the minimum Rust version; cargo-deny with today's advisories; the app template built against this checkout; the template app's release package made on Linux, macOS and Windows (`cargo xtask template-check --package`; "An app's release" below); and each app in `.github/apps.json` built against this checkout with its own gate ("The apps, built against a core commit" below). |
 | `nightly-failed.yml` | When a scheduled `nightly.yml` run has failed | Opens the issue "Nightly run failed", or adds a comment to the open one. A run started by hand or by a release is not reported: someone is watching it. |
 | `upstream-train.yml` | Every other Monday | Opens an issue with the train checklist when WordCraft has a newer release than the pin (`cargo xtask upstream-status`). |
 | `release.yml` | Started by a person or an agent for a release commit on `main` (decision 0011): `gh workflow run release.yml --ref main` | Checks that the commit is a release commit and not released yet; runs `nightly.yml` on it, unless a run of it has already passed on that commit; and only then makes the annotated tag and the GitHub release, with the changelog section, vendored sources, third-party licenses and checksums ("A release" below). |
 
 ## The shared workflows, which every app calls
 
-The jobs of an app's CI are not copied into the app. They are two workflows here, and each app
-carries two short files that call them (`template/.github/workflows/`, kept identical in every
-app by `cargo xtask sync`). Those files say only when a workflow runs and which token its jobs
-get.
+The jobs of an app's CI and of its release are not copied into the app. They are three
+workflows here, and each app carries three short files that call them
+(`template/.github/workflows/`, kept identical in every app by `cargo xtask sync`). Those files
+say only when a workflow runs, which token its jobs get and which secrets they are handed.
 
 | Shared workflow | Called by | What |
 | --- | --- | --- |
 | `shared-ci.yml` | `ci.yml` here (from the same commit) and `ci.yml` in every app (at `workflows-v1`) | The three jobs above. In an app the checks include `sync --check` (the shared files, the patch block and the marked blocks match the pinned core release), `core-pin`, `unlinked`, `app-layers`, `docs`, `assets`, and every task the app added to its own gate. The list is the app's pinned core release's (`gate.rs`), not this file's. On a pull request whose branch pins the core at a commit instead of a release, the jobs build against that commit and `core-pin` passes with a warning shown on the checks page; the same pin fails on `main` (decision 0013). |
 | `shared-core-pin.yml` | `core-pin.yml` in every app (at `workflows-v1`), Mondays and on demand | `cargo xtask core-pin --max-behind 3`: when the app's core pin is more than three releases behind the newest, opens an issue in the app ("Move to open-source-core vX.Y.Z"), or brings the open one up to date (decision 0011). |
+| `shared-release.yml` | `release.yml` in every app (at `workflows-v1`): started by hand for a release or a dry run, and by itself on Tuesdays as a dry run | The app's release (decision 0019, `docs/app-releases.md`): the release commit checked, the whole gate on Linux, macOS and Windows with cargo-deny, the package of each system, `SHA256SUMS.txt`, an attestation, and only then the tag and the published release. A dry run builds and checks the files and stops ("An app's release" below). |
 
 A called workflow runs in the repository that calls it: that repository's code, commit and
 token. The caller grants the token (`contents: read` and `actions: read` for CI; `contents: read`
-and `issues: write` for the core pin) and the shared workflow cannot ask for more.
+and `issues: write` for the core pin; for the release also `contents: write`, `id-token: write`
+and `attestations: write`, of which each job takes only its part) and the shared workflow
+cannot ask for more. A secret reaches a shared workflow only when the caller names it.
 
 ### The tag `workflows-v1`
 
@@ -77,9 +80,15 @@ core keeps that output, a few hundred megabytes at most, until it moves.
 The tests run under cargo-nextest where the app's gate uses it, which is from 0.1.21 on. The
 workflow puts the program there for every app; an older gate does not look for it.
 
+`shared-release.yml` asks for more, of the apps that can call it: the tasks `release`,
+`release-data` and `package` of the shared xtask and the app's package data. The file that
+calls it reaches an app with the same core release as those tasks, through `cargo xtask sync`,
+so no app calls it without having them. A later change to it may use only
+what that release gives.
+
 A change that needs more than this (a new task, a new flag, a new file in the app) does not go
 to `workflows-v1`. It gets a new tag, `workflows-v2`: the release that brings what the workflow
-needs also changes the two files under `template/.github/workflows/` to name the new tag, and
+needs also changes the files under `template/.github/workflows/` to name the new tag, and
 the tag is created before that release is cut. `workflows-v1` then stays where it is, for apps
 that have not moved yet. This is what keeps a change in the core from breaking an app's CI
 unasked.
@@ -88,8 +97,8 @@ unasked.
 
 GitHub switches a scheduled workflow off when its repository has had no activity for 60 days,
 and tells nobody. Here that is `nightly.yml` and `upstream-train.yml`; in an app it is
-`core-pin.yml`, in a repository that may well be quiet for that long. To look and to switch one
-back on:
+`core-pin.yml` and the weekly dry run of `release.yml`, in a repository that may well be quiet
+for that long. To look and to switch one back on:
 
 ```sh
 gh workflow list --all --repo jamescjfoundation/<repository>    # shows it as disabled_inactivity
@@ -175,6 +184,44 @@ workflows hold:
   and it cannot be taken back. The rule is not to push one; what would make it impossible is a
   repository rule that lets only this workflow create `v*` tags, which is a setting, not a
   file.
+
+## An app's release
+
+`docs/app-releases.md` is the contract and has the steps a person or an agent follows. What
+`shared-release.yml` holds:
+
+- **The gate runs before the tag exists**, as for the core. `check` refuses a commit that is
+  not on `main`, is not a release commit (`cargo xtask release --check` in the app: the version
+  in `Cargo.toml`, a dated changelog section for it, package data that is sound), is released
+  already, or pins a core that is not the newest (`older-core: true` goes ahead with a
+  warning). `gate` is `cargo xtask ci`, whole, on Linux, macOS and Windows, and `deny` is
+  cargo-deny. `publish` needs all of it and is the only job that can write to the repository.
+- **Every file is built and checked before the tag.** `package` runs the app's own
+  `cargo xtask package` on each system; `assemble` puts the three files in one folder, refuses
+  a missing or a foreign one, writes `SHA256SUMS.txt` and reads it back with `sha256sum`.
+  `attest` signs a statement of where the files were built. A failure anywhere leaves no tag.
+- **Signing waits for its secrets.** The macOS certificate goes into a keychain of the run's
+  own; the Windows certificate into a file of the run's own; the notary key likewise. A step
+  whose secret is missing does not run, and the run's summary says how each package was
+  signed. The secrets are named in `docs/app-releases.md`. No secret is read in a dry run.
+- **A dry run** (`dry-run: true`; always, when the run was started by the schedule) does
+  `check` without the release-commit rules, `package` and `assemble`, and stops. Its files are
+  kept with the run for a week. A scheduled dry run that fails opens the issue "The release
+  dry run failed" in the app, or adds to the open one.
+- **The Linux package is built on a named image** (`ubuntu-24.04`), not the newest, because it
+  needs that image's C library or a newer one and that must not move by itself. Moving it is a
+  change to the contract's "Inside the Linux package".
+- **Nothing is kept between runs** for a release build. A release is rare, and its build
+  output would push out the archives CI reads every day.
+- **The core tries the packaging first.** `nightly.yml` makes the template app's package on
+  the three systems with the same task, every night and before a core release, so a change to
+  the packaging code is red here before an app's weekly dry run or its release finds it.
+
+To try a change to `shared-release.yml` before `workflows-v1` moves: push it to a branch here,
+and in a branch of one app change the `uses:` line of `release.yml` to that branch
+(`...shared-release.yml@<branch>`), then
+`gh workflow run release.yml --repo jamescjfoundation/<app> --ref <app branch> -f dry-run=true`.
+The app's gate fails on that branch (`sync --check`), which is right: it is never merged.
 
 ## What CI keeps between runs
 
@@ -265,7 +312,7 @@ A change to `shared-ci.yml` reaches the apps when `workflows-v1` is moved.
 5. **The slow, wide checks run on a schedule**, not on every push.
 
 Run any job's work locally: `cargo xtask ci`, `cargo xtask ci --changed --base <ref>`,
-`cargo xtask deny`, `cargo xtask template-check`. For the apps job, in a checkout of the app:
+`cargo xtask deny`, `cargo xtask template-check`, `cargo xtask template-check --package`. For the apps job, in a checkout of the app:
 `cargo xtask dev-link <this checkout>`, `cargo xtask sync`, `cargo xtask ci --linked`. Afterwards
 `cargo xtask dev-unlink`, and put back the shared files `sync` wrote from this checkout
 (`git status` in the app lists them).

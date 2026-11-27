@@ -27,3 +27,4 @@ records with the same numbers.
 | [0016](0016-entries-and-translations.md) | Entries and interface translations |
 | [0017](0017-command-lines-and-agent-tools.md) | One convention for command lines and agent tools |
 | [0018](0018-folder-projects.md) | A project is a folder of plain files |
+| [0019](0019-app-releases.md) | One release contract and one release pipeline for every app |

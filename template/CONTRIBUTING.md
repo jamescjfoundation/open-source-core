@@ -12,6 +12,7 @@ cargo xtask ci --changed         # only the packages your change affects, and th
 cargo xtask affected             # which packages those are, and why
 cargo xtask docs                 # links, decision references, core-candidate markers (part of the gate)
 cargo run -p app                 # the app
+cargo xtask package              # this computer's release package, in dist/ (nothing is published)
 ```
 
 `cargo xtask help` lists every task.

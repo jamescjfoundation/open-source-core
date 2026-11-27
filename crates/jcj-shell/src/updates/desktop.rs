@@ -314,6 +314,110 @@ mod tests {
         }
     }
 
+    /// The files of a release as `docs/app-releases.md` names them, in the checksum file it
+    /// describes: the example every app's `cargo xtask package` is held to (the core's xtask
+    /// tests it writes exactly this file).
+    const EXAMPLE_SUMS: &str = include_str!("../../../../docs/app-release-example/SHA256SUMS.txt");
+
+    #[test]
+    fn the_updater_reads_a_release_as_the_contract_writes_it() {
+        use jcj_upstream::update::platform::parse_asset_name;
+        use jcj_upstream::update::release::{parse_sha256sums, release_from_sums, valid_tag};
+        use jcj_upstream::update::{Arch, Os, PackageKind, Platform, pick_asset};
+
+        // Every line of the checksum file is one the updater's reader takes: none is dropped.
+        let sums = parse_sha256sums(EXAMPLE_SUMS);
+        assert_eq!(sums.len(), EXAMPLE_SUMS.lines().count());
+        assert_eq!(sums.len(), 3);
+        // `./name`, the form one app's workflow wrote, is not read at all.
+        assert!(parse_sha256sums(&EXAMPLE_SUMS.replace("  sample-app", "  ./sample-app")).is_empty());
+
+        // A release known only from its tag and that file gives each system its own package.
+        assert!(valid_tag("v1.2.3"));
+        let release = release_from_sums(SOURCE.repo, "v1.2.3", &sums);
+        assert_eq!(release.version, jcj_upstream::update::parse_version("1.2.3"));
+        let pick = |os, arch| {
+            let platform = Platform { os, arch };
+            pick_asset(&release, &[SOURCE.id], platform, platform.default_kinds())
+                .map(|(asset, kind)| (asset.name.as_str(), kind, asset.sha256.is_some()))
+        };
+        assert_eq!(pick(Os::Linux, Arch::X64), Some(("sample-app-1.2.3-linux-x86_64.tar.gz", PackageKind::TarGz, true)));
+        assert_eq!(pick(Os::MacOs, Arch::Arm64), Some(("sample-app-1.2.3-macos-aarch64.dmg", PackageKind::Dmg, true)));
+        assert_eq!(pick(Os::Windows, Arch::X64), Some(("sample-app-1.2.3-windows-x64-portable.zip", PackageKind::PortableZip, true)));
+        // No file for a system the releases do not cover, and none that would be taken for one.
+        assert_eq!(pick(Os::Linux, Arch::Arm64), None);
+        assert_eq!(pick(Os::MacOs, Arch::X64), None);
+        for (_, name) in &sums {
+            let read = parse_asset_name(name, &[SOURCE.id]).unwrap_or_else(|| panic!("{name} is not a release file to the updater"));
+            assert_eq!((read.stem.as_str(), read.version.as_str()), ("sample-app", "1.2.3"), "{name}");
+        }
+        // The names two apps used before the contract are not found, which is why it exists.
+        for old in ["sample-app-1.2.3-windows-x86_64.zip", "sample-app-1.2.3-macos-aarch64.zip"] {
+            assert!(parse_asset_name(old, &[SOURCE.id]).is_none(), "{old}");
+        }
+        // Each download link is the one the updater builds itself and accepts before a download.
+        let linux = release.assets.iter().find(|a| a.name.ends_with(".tar.gz")).map(|a| a.url.as_str());
+        assert_eq!(linux, Some("https://github.com/example-org/sample-app/releases/download/v1.2.3/sample-app-1.2.3-linux-x86_64.tar.gz"));
+    }
+
+    /// The files of a real release or dry run, read as an installed copy would read them.
+    /// `JCJ_RELEASE_FOLDERS` names the folders (as `PATH` names folders), each holding the
+    /// files of one release with its `SHA256SUMS.txt`; without it the test has nothing to read.
+    ///
+    /// ```sh
+    /// gh run download <run> --repo <owner>/<app> --name release --dir /tmp/release
+    /// JCJ_RELEASE_FOLDERS=/tmp/release cargo test -p jcj-shell a_real_release
+    /// ```
+    #[test]
+    fn a_real_release_is_read_as_the_contract_says() {
+        use jcj_upstream::update::platform::parse_asset_name;
+        use jcj_upstream::update::release::{parse_sha256sums, release_from_sums};
+        use jcj_upstream::update::{Arch, Os, Platform, pick_asset};
+
+        let Some(folders) = std::env::var_os("JCJ_RELEASE_FOLDERS") else { return };
+        for folder in std::env::split_paths(&folders) {
+            let text = std::fs::read_to_string(folder.join("SHA256SUMS.txt")).unwrap_or_else(|e| panic!("{}: SHA256SUMS.txt: {e}", folder.display()));
+            let sums = parse_sha256sums(&text);
+            assert_eq!(sums.len(), text.lines().count(), "{}: the updater drops a line of SHA256SUMS.txt", folder.display());
+            // The release id and the version, as the updater reads them from the first name.
+            let first = sums.first().map(|(_, name)| name.as_str()).unwrap_or_else(|| panic!("{}: an empty SHA256SUMS.txt", folder.display()));
+            let system = ["-linux-", "-macos-", "-windows-"].into_iter().find_map(|system| first.split_once(system));
+            let id = system.and_then(|(stem, _)| stem.rsplit_once('-')).map(|(id, _)| id.to_owned()).unwrap_or_default();
+            let read = parse_asset_name(first, &[&id]).unwrap_or_else(|| panic!("{first} is not a release file to the updater"));
+            let release = release_from_sums("example-org/sample-app", &format!("v{}", read.version), &sums);
+            for (os, arch, end) in [(Os::Linux, Arch::X64, ".tar.gz"), (Os::MacOs, Arch::Arm64, ".dmg"), (Os::Windows, Arch::X64, "-portable.zip")] {
+                let platform = Platform { os, arch };
+                // A folder may hold fewer than three files (one system's package, tried alone).
+                let Some((_, name)) = sums.iter().find(|(_, name)| name.ends_with(end)) else { continue };
+                let picked = pick_asset(&release, &[&id], platform, platform.default_kinds()).map(|(asset, _)| asset.name.as_str());
+                assert_eq!(picked, Some(name.as_str()), "{}: the file an installed copy on {} takes", folder.display(), platform.label());
+                assert!(folder.join(name).is_file(), "{}: {name} is listed and not there", folder.display());
+            }
+            println!("{}: {} {} is read by the updater ({} files)", folder.display(), id, read.version, sums.len());
+        }
+    }
+
+    #[test]
+    fn a_website_tells_the_systems_apart_by_the_same_names() {
+        // The patterns a site reads a release with (a project's own data; these are the ones the
+        // foundation's site holds): a system's words, then a processor's, anywhere in the name.
+        let systems: [(&str, &[&str], &[&str]); 3] = [
+            ("macos-arm64", &["macos", "darwin", "osx"], &["aarch64", "arm64"]),
+            ("windows-x64", &["win"], &["x64", "x86_64", "amd64"]),
+            ("linux-x64", &["linux"], &["x86_64", "x64", "amd64"]),
+        ];
+        let matches = |name: &str, first: &[&str], then: &[&str]| {
+            first.iter().any(|a| name.find(a).is_some_and(|at| then.iter().any(|b| name[at + a.len()..].contains(b))))
+        };
+        let names: Vec<&str> = EXAMPLE_SUMS.lines().filter_map(|l| l.split_whitespace().nth(1)).collect();
+        for (system, first, then) in systems {
+            let found: Vec<&&str> = names.iter().filter(|n| matches(n, first, then)).collect();
+            assert_eq!(found.len(), 1, "{system}: {found:?}");
+        }
+        // The checksum file is told from a download by its name.
+        assert!("SHA256SUMS.txt".to_lowercase().contains("sha256") && !systems.iter().any(|(_, a, b)| matches("SHA256SUMS.txt", a, b)));
+    }
+
     #[test]
     fn a_copy_that_cannot_install_is_sent_to_the_release_page() {
         let mut u = Updater::new(SOURCE);

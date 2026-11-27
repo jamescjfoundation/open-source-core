@@ -24,4 +24,6 @@ License 1.1) are WordCraft's bundled fonts, compiled in from the WordCraft
 dependency (`jcj_layout::fonts::bundled_faces`); their license texts are in
 WordCraft's `assets/fonts/`, and an app shipping them carries those texts with
 its third-party licenses. egui's own default fonts are not built in (decision
-0001). Icons are drawn in code.
+0001). Icons are drawn in code. `template/assets/icon-256.png` is a placeholder
+drawn for this repository, a plain grey square under the repository's own
+license, which a new app replaces with its icon.
