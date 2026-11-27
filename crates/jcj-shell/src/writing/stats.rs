@@ -268,8 +268,10 @@ impl Statistics {
                 hours[h] = hours[h].saturating_add(*s);
             }
         }
-        let best_weekday = weekdays.iter().enumerate().filter(|(_, v)| **v > 0.0).max_by(|a, b| a.1.total_cmp(b.1)).map(|(i, _)| i as u8);
-        let best_hour = hours.iter().enumerate().filter(|(_, s)| **s > 0).max_by_key(|(_, s)| **s).map(|(h, _)| h as u8);
+        // On a tie, the earlier weekday or hour (`max_by` keeps the last of equals).
+        let best_weekday =
+            weekdays.iter().enumerate().filter(|(_, v)| **v > 0.0).max_by(|a, b| a.1.total_cmp(b.1).then(b.0.cmp(&a.0))).map(|(i, _)| i as u8);
+        let best_hour = hours.iter().enumerate().filter(|(_, s)| **s > 0).max_by(|a, b| a.1.cmp(b.1).then(b.0.cmp(&a.0))).map(|(h, _)| h as u8);
         Summary { current_streak: current, longest_streak: longest, best_weekday, best_hour }
     }
 
@@ -750,7 +752,7 @@ mod tests {
         // The 21st has words (but less than a minute); the 22nd has nothing yet.
         assert_eq!((sum.current_streak, sum.longest_streak), (2, 2));
         assert_eq!(sum.best_weekday, Some(4), "2026-11-20 is a Friday");
-        assert_eq!(sum.best_hour, Some(9));
+        assert_eq!(sum.best_hour, Some(9), "09:00 and 10:00 tie: the earlier");
         assert_eq!(s.summary(day("2026-11-24"), Metric::Words).current_streak, 0);
         let bars = s.bars(today, Metric::Words, Range::Days);
         assert_eq!(bars.len(), 14);
@@ -809,7 +811,7 @@ mod tests {
             (s, view, false),
         );
         h.run();
-        assert!(h.query_by_label("Writing Statistics").is_some());
+        assert!(h.query_by_label("Current streak").is_some(), "the window is open");
         assert!(h.query_by_label("09:00 to 10:00 UTC").is_some());
         assert!(h.query_by_label("Friday").is_some());
         h.get_by_label("Minutes").click();

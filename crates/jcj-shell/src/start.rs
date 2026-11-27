@@ -72,7 +72,12 @@ impl TemplatePreview {
     pub fn lines<S: AsRef<str>>(lines: impl IntoIterator<Item = S>) -> Self {
         let lines = lines
             .into_iter()
-            .flat_map(|l| l.as_ref().lines().map(|l| l.chars().take(PREVIEW_LINE_CHARS).collect::<String>()).collect::<Vec<_>>())
+            .flat_map(|l| {
+                // An empty line is a line too (`"".lines()` gives none).
+                let text = l.as_ref();
+                let parts: Vec<&str> = if text.is_empty() { vec![""] } else { text.lines().collect() };
+                parts.into_iter().map(|l| l.chars().take(PREVIEW_LINE_CHARS).collect::<String>()).collect::<Vec<_>>()
+            })
             .take(PREVIEW_LINES)
             .collect();
         TemplatePreview { lines, monospace: false }
@@ -285,9 +290,9 @@ mod tests {
     #[test]
     fn a_preview_keeps_a_few_short_lines() {
         let long = "x".repeat(PREVIEW_LINE_CHARS + 10);
-        let p = TemplatePreview::lines(["FADE IN:", "", "A ROOM - DAY\nA second line", long.as_str(), "5", "6", "7"]);
+        let p = TemplatePreview::lines(["Title", "", "First line\nA second line", long.as_str(), "5", "6", "7"]);
         assert_eq!(p.text_lines().len(), PREVIEW_LINES);
-        assert_eq!(&p.text_lines()[..4], ["FADE IN:", "", "A ROOM - DAY", "A second line"]);
+        assert_eq!(&p.text_lines()[..4], ["Title", "", "First line", "A second line"]);
         assert_eq!(p.text_lines()[4].chars().count(), PREVIEW_LINE_CHARS);
         assert!(!p.is_monospace() && p.clone().monospace().is_monospace());
         let tpl = TemplateSpec::new("a", "A", "About.").with_preview(p.clone());
@@ -312,6 +317,9 @@ mod tests {
             }
             fn document_ui(&mut self, ui: &mut Ui, shell: &mut Shell) {
                 self.0.document_ui(ui, shell);
+            }
+            fn has_document(&self) -> bool {
+                self.0.has_document()
             }
             fn templates(&self) -> Vec<TemplateSpec> {
                 vec![
