@@ -115,7 +115,9 @@ later.
 Beside each other: `LICENSE-MIT`, `LICENSE-APACHE`, `NOTICE`, `ATTRIBUTION.md`, the legal files
 the app adds, and `THIRD-PARTY-LICENSES.txt`, the license text of every package the programs are
 built from. Under `licenses/`, by their path in the repository, the license texts of what the
-programs embed (fonts, data). They sit in `share/<id>/` of the Linux package, at the top of the
+programs embed (fonts, data), and under `licenses/assets/fonts/` those of the fonts a
+dependency builds in: the core's interface fonts come from WordCraft, and their license texts
+are taken from its source, so an app need not copy them. They sit in `share/<id>/` of the Linux package, at the top of the
 Windows folder, and in `Contents/Resources/` of the macOS app. A package without its programs or
 without `THIRD-PARTY-LICENSES.txt` is not made: the task stops.
 

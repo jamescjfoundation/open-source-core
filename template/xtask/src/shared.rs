@@ -782,6 +782,34 @@ pub mod package {
         Ok(out)
     }
 
+    /// Where the license texts of fonts are kept, in an app and in a dependency: this folder at
+    /// the top of the repository.
+    const FONTS: &str = "assets/fonts";
+    /// How far above a crate the top of its checkout may be.
+    const MAX_WALK_UP: usize = 6;
+
+    /// The license texts of the fonts that dependencies build into the programs. A dependency
+    /// taken from a git repository that keeps fonts under `assets/fonts` at its top keeps
+    /// their license texts there (the core's interface fonts come to an app this way); those
+    /// are the files returned, one for each name, sorted. Every package carries them, so the
+    /// fonts' licenses go with the programs without an app having to copy them.
+    pub fn dependency_font_licenses(packages: &[licenses::Package]) -> Vec<PathBuf> {
+        let mut found: Vec<PathBuf> = Vec::new();
+        for package in packages.iter().filter(|p| p.git) {
+            // `.cargo-ok` marks the top of Cargo's checkout, `.git` the top of any other.
+            let top = package.dir.ancestors().take(MAX_WALK_UP + 1).find(|dir| dir.join(".cargo-ok").exists() || dir.join(".git").exists());
+            let Some(entries) = top.and_then(|top| std::fs::read_dir(top.join(FONTS)).ok()) else { continue };
+            for file in entries.flatten().map(|e| e.path()) {
+                let name = file.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                if file.is_file() && is_license_name(&name) && !found.iter().any(|f| f.file_name() == file.file_name()) {
+                    found.push(file);
+                }
+            }
+        }
+        found.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+        found
+    }
+
     /// What is wrong with the files the package data names.
     pub fn file_problems(root: &Path, app: &App, package: &Package) -> Vec<String> {
         let mut out = Vec::new();
@@ -1379,6 +1407,8 @@ pub mod package {
         pub programs: &'a [(String, PathBuf)],
         /// The text of `THIRD-PARTY-LICENSES.txt`.
         pub third_party: &'a str,
+        /// The license texts of fonts that dependencies build in ([`dependency_font_licenses`]).
+        pub font_licenses: &'a [PathBuf],
     }
 
     impl Build<'_> {
@@ -1389,6 +1419,12 @@ pub mod package {
                 copy(&self.root.join(file), &dir.join(file))?;
             }
             write(&dir.join(licenses::FILE_NAME), self.third_party.as_bytes())?;
+            // A dependency's fonts first, where an app keeps its own: the app's file of the
+            // same name, written after it, is the one that stays.
+            for text in self.font_licenses {
+                let name = text.file_name().ok_or_else(|| format!("{}: no file name", text.display()))?;
+                copy(text, &dir.join(LICENSES_DIR).join(FONTS).join(name))?;
+            }
             for text in license_texts(self.root, self.package.license_files)? {
                 copy(&self.root.join(&text), &dir.join(LICENSES_DIR).join(&text))?;
             }
@@ -1623,7 +1659,9 @@ pub mod package {
         let mut made = Err(String::new());
         for _ in 0..3 {
             let mut hdiutil = Command::new("hdiutil");
-            hdiutil.args(["create", "-volname", build.app.product, "-fs", "HFS+", "-format", "UDZO", "-ov", "-srcfolder"]).arg(&stage).arg(out);
+            // The file system is left to the tool: the one it picks is one this system's own
+            // version of it can still make.
+            hdiutil.args(["create", "-volname", build.app.product, "-format", "UDZO", "-ov", "-srcfolder"]).arg(&stage).arg(out);
             made = run(&mut hdiutil, "hdiutil create");
             if made.is_ok() {
                 break;
@@ -1706,13 +1744,14 @@ pub mod package {
             return Err(format!("the program {name} is not built ({} is not there)", file.display()));
         }
         let third_party = licenses::third_party_licenses(root, app.shipped, app.product)?;
+        let font_licenses = dependency_font_licenses(&licenses::shipped_packages(root, app.shipped)?);
         let out_dir = root.join(out.as_deref().unwrap_or(DIST));
         std::fs::create_dir_all(&out_dir).map_err(|e| format!("{}: {e}", out_dir.display()))?;
         let name = stem(package.id, &version, platform);
         let out = out_dir.join(file_name(package.id, &version, platform));
         let _ = std::fs::remove_file(&out);
         let _ = std::fs::remove_dir_all(out_dir.join(&name));
-        let build = Build { root, app, package, version: &version, programs: &files, third_party: &third_party };
+        let build = Build { root, app, package, version: &version, programs: &files, third_party: &third_party, font_licenses: &font_licenses };
         match platform {
             Platform::LinuxX64 => pack_linux(&build, &out_dir, &name, &out),
             Platform::WindowsX64 => pack_windows(&build, &out_dir, &name, &out),
@@ -1957,7 +1996,34 @@ pub mod package {
         #[test]
         fn the_linux_package_is_laid_out_for_the_updater_and_carries_the_licenses() {
             let (root, programs) = scratch("linux");
-            let build = Build { root: &root, app: &APP, package: &PACKAGE, version: "1.2.3", programs: &programs, third_party: THIRD_PARTY };
+            // A dependency's checkout with fonts and their licenses at its top, three folders up.
+            let checkout = root.join("checkout");
+            for file in [".cargo-ok", "assets/fonts/OFL-Sans.txt", "assets/fonts/Sans.ttf", "assets/fonts/readme.md", "crates/fonts/src/lib.rs"] {
+                write(&checkout.join(file), b"SIL Open Font License").unwrap();
+            }
+            let dependency = |dir: &str, git: bool| licenses::Package {
+                name: "fonts".to_owned(),
+                version: "1.0.0".to_owned(),
+                license: None,
+                license_file: None,
+                repository: None,
+                authors: Vec::new(),
+                dir: checkout.join(dir),
+                git,
+            };
+            let font_licenses = dependency_font_licenses(&[dependency("crates/fonts", true), dependency("crates/other", true)]);
+            assert_eq!(font_licenses, [checkout.join("assets/fonts/OFL-Sans.txt")]);
+            // A package from a registry or the workspace has no checkout to look in.
+            assert!(dependency_font_licenses(&[dependency("crates/fonts", false)]).is_empty());
+            let build = Build {
+                root: &root,
+                app: &APP,
+                package: &PACKAGE,
+                version: "1.2.3",
+                programs: &programs,
+                third_party: THIRD_PARTY,
+                font_licenses: &font_licenses,
+            };
             let stage = root.join("dist/sample-app-1.2.3-linux-x86_64");
             build.stage_linux(&stage).unwrap();
             assert_eq!(
@@ -1977,6 +2043,8 @@ pub mod package {
                     "share/sample-app/LICENSE-MIT",
                     "share/sample-app/NOTICE",
                     "share/sample-app/THIRD-PARTY-LICENSES.txt",
+                    // The license of a font a dependency builds in, beside the app's own fonts'.
+                    "share/sample-app/licenses/assets/fonts/OFL-Sans.txt",
                     "share/sample-app/licenses/assets/fonts/serif/OFL.txt",
                     "uninstall.sh",
                 ]
@@ -2002,7 +2070,15 @@ pub mod package {
         #[test]
         fn the_windows_and_macos_packages_carry_the_programs_and_the_licenses() {
             let (root, programs) = scratch("others");
-            let build = Build { root: &root, app: &APP, package: &PACKAGE, version: "1.2.3", programs: &programs, third_party: THIRD_PARTY };
+            let build = Build {
+                root: &root,
+                app: &APP,
+                package: &PACKAGE,
+                version: "1.2.3",
+                programs: &programs,
+                third_party: THIRD_PARTY,
+                font_licenses: &[],
+            };
             let names: Vec<String> = programs.iter().map(|(n, _)| n.clone()).collect();
 
             let windows = root.join("dist/sample-app-1.2.3-windows-x64");
