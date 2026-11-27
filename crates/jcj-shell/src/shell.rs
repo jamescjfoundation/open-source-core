@@ -408,7 +408,9 @@ impl Shell {
     }
 
     /// [`Shell::ask_file`], with a command to run when the dialog is closed without choosing
-    /// (a step that waited on the answer can then be given up).
+    /// (a step that waited on the answer can then be given up). It also runs when no dialog
+    /// could be shown, with the reason in its parameters (`"unavailable"`; read it with
+    /// [`crate::files::unavailable`]), after the status bar has said so.
     pub fn ask_file_or(&mut self, ask: crate::files::FileAsk, then: Cmd, cancelled: Cmd) -> bool {
         self.push_file_ask(ask, then, Some(cancelled))
     }

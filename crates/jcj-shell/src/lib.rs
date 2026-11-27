@@ -62,7 +62,7 @@ pub use ribbon::TabSpec;
 pub use ribbon::widgets::{self, Control};
 pub use shell::{Shell, ShellOptions};
 pub use sidebar::RAIL_W;
-pub use start::TemplateSpec;
+pub use start::{TemplatePreview, TemplateSpec};
 pub use workspace::{Layout, PanelSpec, Side};
 
 /// egui, at the version the core pins, so apps draw with the same one the shell uses.

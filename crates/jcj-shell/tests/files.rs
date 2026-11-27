@@ -120,6 +120,14 @@ fn a_dialog_that_cannot_be_shown_is_said_in_the_status_bar() {
     let (shell, _, app) = h.state();
     assert!(app.ran.is_empty());
     assert_eq!(shell.message, "The file dialog could not be shown: no dialog service");
+    // A step waiting on the answer is given up, and told why.
+    h.state_mut().0.ask_file_or(FileAsk::save(), Cmd::new(ids::SAVE_AS), Cmd::with("file.closeCancelled", json!({"window": 1})));
+    h.run();
+    h.run();
+    let (shell, _, app) = h.state();
+    assert_eq!(app.ran, [Cmd::with("file.closeCancelled", json!({"window": 1, "unavailable": "no dialog service"}))]);
+    assert_eq!(jcj_shell::files::unavailable(&app.ran[0]), Some("no dialog service"));
+    assert_eq!(shell.message, "The file dialog could not be shown: no dialog service");
 }
 
 #[test]
