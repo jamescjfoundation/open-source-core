@@ -57,6 +57,11 @@ minor release may, and then **What apps must do** says exactly what (decision 00
     desktop program is named by the release id and every other program `<id>-<name>`. The
     release's text is the changelog section. The document says what each package holds, file
     by file, and what a launcher or a website may rely on.
+  - **The fonts' license texts go with the programs.** The core's interface fonts are built
+    in from WordCraft, and `THIRD-PARTY-LICENSES.txt` said their license texts sat beside it;
+    in two apps' packages none did. `cargo xtask package` now takes them from the
+    dependency's source into `licenses/assets/fonts/` of every package, beside the license
+    texts of the app's own fonts (`license_files`).
   - **`cargo xtask package`** in every app builds the package of the system it runs on into
     `dist/`. `cargo xtask package --sums <folder>` checks a folder of release files and writes
     the checksum file; `--describe` prints the release's id, version and file names.
@@ -127,8 +132,9 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 1. Move every `jcj-` dependency to this release's tag, then run
    `cargo metadata --format-version 1 >/dev/null` to bring `Cargo.lock` in line.
 2. Run `cargo xtask sync`, once. It brings five changed modules (`xtask/src/gate.rs`,
-   `shared.rs`, `sync.rs`, `changed.rs`, `corepin.rs`) and one new managed file,
-   `.github/workflows/release.yml`, which replaces an app's own file of that name (step 4).
+   `shared.rs`, `sync.rs`, `changed.rs`, `corepin.rs`), a changed comment in
+   `.github/workflows/ci.yml`, and one new managed file, `.github/workflows/release.yml`,
+   which replaces an app's own file of that name (step 4).
    Then `cargo xtask sync --check`. The gate passes as before with no other change: its new
    `release-data` task asks nothing of an app that has no package data yet.
 3. Install cargo-nextest where the gate is run by hand, if it is wanted there (the gate works

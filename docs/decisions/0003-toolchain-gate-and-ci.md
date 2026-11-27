@@ -3,7 +3,8 @@
 Date: 2026-11-24 · Status: accepted · Amended 2026-11-26 (what `sync` carries; the `docs` task
 and the hooks; the shared workflows, what a change affects, and checks on every push; the gate an
 app shares, its layer table, and one run of `sync`; what CI keeps between runs, cargo-nextest in
-every gate, and the apps built against the core) · Ported
+every gate, and the apps built against the core; a third shared workflow, an app's release,
+decision 0018) · Ported
 from Wordsmith Script decisions 0003 and 0040
 
 ## Decision
@@ -20,8 +21,8 @@ from Wordsmith Script decisions 0003 and 0040
   modules apps share (`template/xtask/src/`) are compiled into the core's xtask, so the core tests
   them, and `cargo xtask sync` copies them into each app.
 - **What `sync` carries** (amended 2026-11-26). Whole files the core owns: the toolchain, lint,
-  format and cargo-deny settings, the shared xtask modules, the two files that call the shared
-  workflows, the Dependabot settings, the hooks and the code of conduct (`MANAGED` in
+  format and cargo-deny settings, the shared xtask modules, the files that call the shared
+  workflows (two, and from decision 0018 a third, `release.yml`), the Dependabot settings, the hooks and the code of conduct (`MANAGED` in
   `template/xtask/src/sync.rs`). Blocks inside files
   an app otherwise owns: the patch block in `Cargo.toml`, and the core's rules as marked blocks
   in `AGENTS.md`, `SECURITY.md` and `CONTRIBUTING.md` (`BLOCKS`), each between a
@@ -108,7 +109,9 @@ from Wordsmith Script decisions 0003 and 0040
   by `sync`, so a fix to it reached an app only with a core release and a pin move, and apps on
   different pins ran different generations of CI. The jobs are now two reusable workflows in
   the core, `shared-ci.yml` and `shared-core-pin.yml`; what `sync` copies into an app is two
-  short files that say when to run and call them at the tag `workflows-v1`.
+  short files that say when to run and call them at the tag `workflows-v1`. An app's release
+  is a third, `shared-release.yml`, called the same way (decision 0018): it asks of an app the
+  tasks that the core release bringing its calling file also brings.
   - The tag is moved by a person or an agent to a commit of `main` on which the core's own
     `ci.yml` has passed. That workflow calls `shared-ci.yml` from its own commit, so a change is
     tried in the core first, and one tag move then carries it to every app.
