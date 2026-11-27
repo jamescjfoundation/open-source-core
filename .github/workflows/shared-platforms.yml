@@ -1,0 +1,183 @@
+# An app's whole gate on macOS and Windows, written once (decision 0003). Every app's
+# `platforms.yml` calls this file at the tag `workflows-v1`, every night and on demand
+# (README.md in this folder says how the tag is moved).
+#
+# An app's CI runs on Linux, and the core's nightly run builds each app on Linux. Without this,
+# the first run of an app's tests on macOS and Windows would be its release run, which is the
+# worst moment to learn that a test holds the keys of one system. So:
+#
+# - `gate`: `cargo xtask ci`, whole (checks, clippy, every test, golden files included), on
+#   `macos-latest` and `windows-latest`, on the commit the run is on: the newest of `main` for
+#   a scheduled run, the branch it was started on otherwise. The same command, archives, tools
+#   and cargo-nextest as the gate of an app's release (`shared-release.yml`).
+# - `failed`: when a scheduled run failed, opens the issue "The macOS and Windows gate failed"
+#   in the app, or adds a comment to the open one. A run started by hand is not reported:
+#   someone is watching it.
+#
+# It is never a required check of a pull request: it takes long, and nothing waits on it.
+#
+# What it asks of the calling repository: `cargo xtask ci`, a `rust-toolchain.toml` and a
+# `Cargo.lock` at the root, which every core release gives an app; and `cargo xtask
+# prune-target <lock file>` (from core 0.1.21), which it tries and does without.
+#
+# Nothing is saved between runs: an archive for macOS or Windows would push out the ones an
+# app's CI reads every day (README.md in this folder, "What CI keeps between runs"). What the
+# app's CI saved on Linux is not restored on another system, so each run builds from nothing.
+#
+# The `github` context here is the calling repository's: its code, its commit, its token. The
+# caller grants `contents: read` and `issues: write`; only `failed` takes the second.
+# Only GitHub's own actions, pinned to full commit SHAs (`cargo xtask workflows` checks it).
+name: Shared platforms
+
+on:
+  workflow_call:
+    inputs:
+      systems:
+        description: "Which systems: both, macos or windows"
+        type: string
+        default: both
+
+permissions:
+  contents: read
+
+# A tool's version and the checksum of each file downloaded for it. Every workflow that
+# downloads the same tool names the same values (`cargo xtask workflows` checks it).
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  CARGO_NET_RETRY: "10"
+  RUST_BACKTRACE: "short"
+  CARGO_NEXTEST_VERSION: "0.9.152"
+  CARGO_NEXTEST_LINUX_SHA256: "d039b43c3e0958441b6ad0a39c8884d018b3d2e8fb9928f209074b1100b5e17a"
+  CARGO_NEXTEST_MACOS_SHA256: "2fadf57df4243e691f088ee3bff4f4ab9af16da0c95a1db84b5cb1685e098a76"
+  CARGO_NEXTEST_WINDOWS_SHA256: "0384fc89a5a547d4fd5e183fcc101d31dba2837feafd8e64d5ea003a0ddb1941"
+
+jobs:
+  gate:
+    name: full gate (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(inputs.systems == 'macos' && '["macos-latest"]' || inputs.systems == 'windows' && '["windows-latest"]' || '["macos-latest", "windows-latest"]') }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # privacy checks every commit identity
+      - name: Toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Restore cargo home
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: cargo-home-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-home-
+      - name: Name the dependencies' build output
+        id: name
+        env:
+          KIND: deps-${{ runner.os }}
+        run: |
+          # BEGIN same: name the build output
+          # What decides the build output of the dependencies, and nothing else: the toolchain,
+          # Cargo's settings, the locked packages that come from elsewhere (a package of the
+          # workspace has no `source` line), and the manifests without the workspace's own
+          # version. A change to the workspace's code, or a release that moves only its
+          # version, keeps the archive it has.
+          hash() { if command -v sha256sum >/dev/null; then sha256sum; else shasum -a 256; fi | cut -c1-32; }
+          settings=$(cat rust-toolchain.toml .cargo/config.toml | hash)
+          dependencies=$({
+            awk -v RS= '/\nsource = /' Cargo.lock
+            git ls-files -z -- '*Cargo.toml' ':(exclude)template/*' | xargs -0 grep -hv '^version = '
+          } | hash)
+          {
+            echo "key=$KIND-$settings-$dependencies"
+            echo "older=$KIND-$settings-"
+          } >> "$GITHUB_OUTPUT"
+          # END same: name the build output
+      # An archive for this system, when one exists in the app (none is saved from here).
+      - name: Restore the dependencies' build output
+        id: deps
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: target
+          key: ${{ steps.name.outputs.key }}
+          restore-keys: ${{ steps.name.outputs.older }}
+      - name: Drop the output of dependencies that moved
+        if: steps.deps.outputs.cache-hit != 'true' && steps.deps.outputs.cache-matched-key != ''
+        run: |
+          if [ ! -f target/deps.lock ] || ! cargo xtask prune-target target/deps.lock; then
+            echo "::notice::Could not tell which restored build output is stale: starting from nothing"
+            rm -rf target
+          fi
+      - name: Install cargo-nextest (the project's release file, checksum checked)
+        run: |
+          # BEGIN same: install cargo-nextest on any system
+          case "$RUNNER_OS" in
+            Linux) platform="x86_64-unknown-linux-gnu"; sum="$CARGO_NEXTEST_LINUX_SHA256" ;;
+            macOS) platform="universal-apple-darwin"; sum="$CARGO_NEXTEST_MACOS_SHA256" ;;
+            Windows) platform="x86_64-pc-windows-msvc"; sum="$CARGO_NEXTEST_WINDOWS_SHA256" ;;
+            *) echo "::error::no cargo-nextest file is named here for $RUNNER_OS"; exit 1 ;;
+          esac
+          file="cargo-nextest-$CARGO_NEXTEST_VERSION-$platform.tar.gz"
+          bin="$(dirname "$(command -v cargo)")"
+          cd "$RUNNER_TEMP"
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location --retry 5 --output "$file" \
+            "https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-$CARGO_NEXTEST_VERSION/$file"
+          # The three systems name the checksum program differently, so the sums are compared here.
+          have=$( (sha256sum "$file" 2>/dev/null || shasum -a 256 "$file") | cut -d ' ' -f 1)
+          if [ "$have" != "$sum" ]; then
+            echo "::error::$file has the checksum $have, not $sum: it is not the file this workflow names"
+            exit 1
+          fi
+          # Unpacked here and moved, so that no system's tar is given a path of another's kind.
+          mkdir nextest
+          tar -xzf "$file" -C nextest
+          mv nextest/* "$bin/"
+          cargo nextest --version
+          # END same: install cargo-nextest on any system
+      - name: cargo xtask ci
+        run: cargo xtask ci
+
+  failed:
+    name: report a failed scheduled run
+    needs: gate
+    if: ${{ failure() && github.event_name == 'schedule' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: write
+    steps:
+      - name: Open the issue, or add to the open one
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TITLE: "The macOS and Windows gate failed"
+        run: |
+          {
+            echo "The scheduled run of the whole gate on macOS and Windows failed on \`${GITHUB_SHA::9}\`: $RUN"
+            echo
+            echo "It is \`cargo xtask ci\` (the checks, clippy and every test) on the two systems the app's CI does not run on. A release runs the same gate on them first, so until this passes again a release would fail the same way."
+            echo
+            echo "- Read the failed job in the run above: its name says which system."
+            echo "- Try a fix on a branch: \`gh workflow run platforms.yml --ref <branch>\` (\`-f system=macos\` or \`-f system=windows\` for one of them)."
+            echo "- A test that needs the machine to itself, or that should name every failure on a system it rarely runs on, is configured in the app's \`.config/nextest.toml\`."
+            echo "- Close this issue when a run is green again."
+          } > "$RUNNER_TEMP/body.md"
+          # Every open issue (the list also holds pull requests), not a search: a search can lag.
+          number=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues?state=open&per_page=100" \
+                   --jq ".[] | select(.pull_request == null and .title == \"$TITLE\") | .number" | head -n 1)
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body "Failed again on \`${GITHUB_SHA::9}\`: $RUN"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file "$RUNNER_TEMP/body.md"
+          fi

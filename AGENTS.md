@@ -180,6 +180,8 @@ The gate runs first and the workflow makes the tag, as for the core.
    tag: land the fix on `main` and start it again.
 4. To try it without releasing: `gh workflow run release.yml -f dry-run=true`. The same dry run
    starts by itself every week. `cargo xtask package` makes this computer's package in `dist/`.
+   The app's whole gate also runs on macOS and Windows every night (`platforms.yml`; a failure
+   opens an issue): an issue it opened is fixed before a release.
 
 What a release carries is data in `xtask/src/main.rs` (`package`). The packaging and the
 workflow are the core's: an app has no release workflow and no packaging script of its own.

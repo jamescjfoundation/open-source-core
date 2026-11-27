@@ -19,7 +19,7 @@ Started from open-source-core's `template/`. To make it yours:
 3. Pin the core: every `jcj-` dependency in `Cargo.toml` at the same release tag. Add a line for
    each other `jcj-` crate the app uses.
 4. Run `cargo xtask sync`. This folder already holds the shared xtask modules, the CI,
-   core-pin and release workflows, the Dependabot settings, the pull request template, the hooks, the code
+   core-pin, macOS and Windows, and release workflows, the Dependabot settings, the pull request template, the hooks, the code
    of conduct and the files with the core's marked blocks (`AGENTS.md`, `SECURITY.md`,
    `CONTRIBUTING.md`, `Cargo.toml`, `.cargo/config.toml`, `.gitignore`, `.gitattributes`). The
    first run adds the four settings files kept at the core's root (`rust-toolchain.toml`,
@@ -50,8 +50,9 @@ Started from open-source-core's `template/`. To make it yours:
    that names no record.
 9. In the repository's settings on GitHub, turn on private vulnerability reporting (the
    `security` block and the code of conduct send reports there) and keep issues on (the
-   core-pin workflow opens one when the pin falls behind, and the release workflow when its
-   weekly dry run fails). `ci.yml`, `core-pin.yml` and `release.yml` call workflows kept in
+   core-pin workflow opens one when the pin falls behind, the macOS and Windows workflow when
+   its nightly run fails, and the release workflow when its weekly dry run fails). `ci.yml`,
+   `core-pin.yml`, `platforms.yml` and `release.yml` call workflows kept in
    `jamescjfoundation/open-source-core`: an organisation that limits which actions and
    workflows may run must allow that repository's (its own are always allowed).
 10. Releases: the core's `docs/app-releases.md` says what a release is made of and how one is

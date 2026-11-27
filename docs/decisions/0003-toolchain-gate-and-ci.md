@@ -4,7 +4,8 @@ Date: 2026-11-24 · Status: accepted · Amended 2026-11-26 (what `sync` carries;
 and the hooks; the shared workflows, what a change affects, and checks on every push; the gate an
 app shares, its layer table, and one run of `sync`; what CI keeps between runs, cargo-nextest in
 every gate, and the apps built against the core; a third shared workflow, an app's release,
-decision 0019) · Amended 2026-11-27 (the CI checks are required on `main`) · Ported
+decision 0019) · Amended 2026-11-27 (the CI checks are required on `main`; each app's full gate
+on macOS and Windows every night) · Ported
 from Wordsmith Script decisions 0003 and 0040
 
 ## Decision
@@ -158,6 +159,17 @@ from Wordsmith Script decisions 0003 and 0040
   `gate / checks (every task but clippy and test)`, `gate / cargo-deny (licenses, advisories,
   sources)`, `gate / clippy and tests (affected packages)`. A change to a job's name, or to the
   caller's job `gate`, is a change to every repository's rule and is made with it.
+- **An app's full gate on macOS and Windows, every night** (amended 2026-11-27). An app's CI
+  runs on Linux, and the core's nightly run builds each app on Linux; the first run of an app's
+  tests on macOS and Windows used to be its release run, and the first releases each needed
+  several runs to find tests that had never run there (issue #49). The fourth shared workflow,
+  `shared-platforms.yml`, runs the app's whole gate on `macos-latest` and `windows-latest`,
+  called by the managed `platforms.yml` every night and on demand, and a scheduled run that
+  fails opens an issue in the app. It is never a required check: it takes long, and a pull
+  request would wait on it. GitHub's machines run it; nothing is kept between its runs, as for
+  a release build. Considered and not chosen: the gate in the weekly dry run of the release (a
+  week between a change and its failure, and a dry run that fails for two reasons at once);
+  macOS and Windows on every pull request (the wait, and three times the cost).
 - **The apps are built against the core** (amended 2026-11-26) every night and before a
   release, each with its own gate; decision 0011 says what a red app means for a release.
   Which repositories those are is a list in `.github/apps.json`, so the core's code still

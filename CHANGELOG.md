@@ -5,6 +5,23 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 ## Unreleased
 
+### Added
+
+- **Each app's whole gate on macOS and Windows, every night and on demand** (decision 0003,
+  amended; issue #49). An app's CI runs on Linux, and so does the core's build of each app;
+  the first run of an app's tests on macOS and Windows used to be its release run, and the
+  first releases needed several runs to find tests that had never run there. A fourth shared
+  workflow, `shared-platforms.yml`, runs `cargo xtask ci`, whole, on `macos-latest` and
+  `windows-latest`, with the archives, tools and cargo-nextest of a release's gate. A new
+  managed file, `.github/workflows/platforms.yml`, calls it at `workflows-v1` every night and
+  when started by hand (`gh workflow run platforms.yml --ref <branch>`, with
+  `-f system=macos` or `-f system=windows` for one system). It runs on no push or pull request
+  and is not a required check. A scheduled run that fails opens the issue "The macOS and
+  Windows gate failed" in the app, or adds a comment to the open one. Nothing is kept between
+  its runs.
+  - An app whose tests rarely run on a system may set `fail-fast = false` in its own
+    `.config/nextest.toml`, so that one run names every failing test, not the first.
+
 ### Changed
 
 - **Every change lands through a pull request whose checks pass, and its author merges it**
@@ -31,10 +48,18 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 1. Move every `jcj-` dependency to this release's tag, then run
    `cargo metadata --format-version 1 >/dev/null` to bring `Cargo.lock` in line.
-2. Run `cargo xtask sync`, then `cargo xtask sync --check`. It rewrites the `app-and-core`
-   block of `AGENTS.md`, the `contributing` block of `CONTRIBUTING.md`,
-   `.github/pull_request_template.md` and `xtask/src/shared.rs`. Nothing in the app's own code
-   changes.
+2. Run `cargo xtask sync`, once, then `cargo xtask sync --check`. It rewrites the
+   `app-and-core` block of `AGENTS.md`, the `contributing` block of `CONTRIBUTING.md`,
+   `.github/pull_request_template.md`, `xtask/src/shared.rs` and `xtask/src/sync.rs`, and adds
+   one new managed file, `.github/workflows/platforms.yml`: the app's whole gate on macOS and
+   Windows, every night at 02:23 UTC and when started by hand, through the core's
+   `shared-platforms.yml` at `workflows-v1`. It is not a required check and needs no setting:
+   the repository keeps issues on, as it already does for `core-pin.yml`. Nothing in the app's
+   own code changes, and the gate passes as before.
+3. Commit, land it through a pull request, and start the new workflow once on `main` to see
+   where the app stands: `gh workflow run platforms.yml --ref main`. A test that fails there
+   is the app's to fix (or to mark for its system) before its next release, whose gate runs
+   the same tests on the same systems.
 
 ## 0.1.22 (2026-11-27)
 
