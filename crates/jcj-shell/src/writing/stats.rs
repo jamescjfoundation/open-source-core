@@ -806,6 +806,8 @@ mod tests {
         type State = (Statistics, StatsView, bool);
         let mut h = Harness::builder().with_size(vec2(700.0, 600.0)).build_ui_state(
             |ui, st: &mut State| {
+                let (names, faces) = jcj_theme::with_defaults(&jcj_theme::FontNames::default(), &[]);
+                jcj_theme::install_fonts(ui.ctx(), &names, &faces);
                 st.2 |= statistics_window(ui.ctx(), &mut st.0, &mut st.1, Day { year: 2026, month: 11, day: 22 });
             },
             (s, view, false),
