@@ -7,6 +7,16 @@ projects the apps build on: [WordCraft](https://github.com/storytold/wordcraft) 
 [craft-libs](https://github.com/storytold/craft-libs) by the ArtCraft team, used at pinned
 releases through the foundation's forks.
 
+> **A note from the founder**
+>
+> A lot of work has already gone into laying a solid foundation. The apps aren't ready for everyday use yet, but the idea is sound and the pieces are in place. From here, the plan is slow, steady development and testing.
+>
+> I've been a wannabe developer for years. AI has finally given me the tools to bring an idea like this together, but my time and resources are limited. Ideas, feedback, bug reports, fixes and feature improvements are all welcome. If you care about this as much as we do, we're also open to deeper partnerships.
+>
+> I'll keep improving the ecosystem where I can while building out the rest of the foundation.
+>
+> — Dylan J.
+
 It carries no product name in its code, its interface text or the files apps copy from it.
 Wordsmith Script, Wordsmith Manuscript and Wordsmith Book are its first apps; any later
 foundation app, or anyone else's, builds on it the same way. A project built on the core keeps its
