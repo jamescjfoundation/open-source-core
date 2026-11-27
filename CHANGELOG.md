@@ -3,7 +3,7 @@
 Each release says what changed for apps. While at 0.x, a patch release never breaks an app; a
 minor release may, and then **What apps must do** says exactly what (decision 0011).
 
-## Unreleased
+## 0.1.23 (2026-11-27)
 
 ### Added
 
@@ -60,6 +60,10 @@ minor release may, and then **What apps must do** says exactly what (decision 00
    where the app stands: `gh workflow run platforms.yml --ref main`. A test that fails there
    is the app's to fix (or to mark for its system) before its next release, whose gate runs
    the same tests on the same systems.
+
+**The new workflow is at `workflows-v1`** once that tag is moved to a commit that has
+`shared-platforms.yml`, which is done when this release is published; until then an app's
+`platforms.yml` names a file the tag does not have yet, and its run fails at once.
 
 ## 0.1.22 (2026-11-27)
 
