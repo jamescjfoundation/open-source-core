@@ -8,6 +8,7 @@ use std::time::{Duration, SystemTime};
 
 use jcj_doc::{CharProps, Document, ExtKey, Paragraph, para_block};
 use jcj_interchange::Format;
+use jcj_shell::egui::{Key, Modifiers};
 use serde_json::json;
 
 /// A value the test app keeps on paragraphs, as an app would (its own namespace).
@@ -262,7 +263,19 @@ pub fn run() -> Result<Vec<Step>, String> {
     keyed.run(&extend.id, &extend.params).map_err(|e| format!("{}: {e:?}", extend.id))?;
     check(keyed.sel.anchor != keyed.sel.focus, "a shifted caret key extends the selection")?;
     check(keys.command_for("Shift+Backspace").map(|c| c.id).as_deref() == Some(jcj_shell::keys::BACKSPACE), "Shift+Backspace deletes back")?;
-    step("keys", format!("Shift+Right runs {} extending the selection; Shift+Backspace deletes back", extend.id));
+    // macOS's own text keys reach the engine's caret commands, as this system's engine declares
+    // them: Option+Arrow by word, Command+Left the line's start, Command+Up the document's.
+    let opt = Modifiers { alt: true, ..Modifiers::NONE };
+    let command = Modifiers { command: true, mac_cmd: true, ..Modifiers::NONE };
+    let mac_press = |key: Key, m: Modifiers| jcj_shell::keys::shortcut(key, m, true).and_then(|s| keys.command_for(&s)).map(|c| c.id);
+    check(mac_press(Key::ArrowLeft, opt).as_deref() == Some("caret.wordLeft"), "Option+Left moves by word on macOS")?;
+    check(
+        mac_press(Key::ArrowRight, Modifiers { shift: true, ..opt }).as_deref() == Some("caret.wordRight"),
+        "Option+Shift+Right selects by word on macOS",
+    )?;
+    check(mac_press(Key::ArrowLeft, command).as_deref() == Some("caret.home"), "Command+Left goes to the line's start on macOS")?;
+    check(mac_press(Key::ArrowUp, command).as_deref() == Some("caret.docStart"), "Command+Up goes to the document's start on macOS")?;
+    step("keys", format!("Shift+Right runs {} extending the selection; Shift+Backspace deletes back; macOS's text keys reach the caret", extend.id));
 
     // jcj-doc's section settings: a second section starting on an odd page, numbered in roman.
     let mut sectioned = doc.clone();

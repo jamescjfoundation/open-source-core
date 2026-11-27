@@ -240,6 +240,14 @@ fn check_template(root: &Path) -> TaskResult {
         Some(t) if t == core => {}
         _ => failures.push("template/Cargo.toml: patch block differs from Cargo.toml's (copy it over)".to_owned()),
     }
+    // The template's build.rs names the program from `[package.metadata.winresource]`, which
+    // winresource reads only with its `toml` feature.
+    // The core's own workspace and the testbed are held to the same, should either name it.
+    for file in ["template/Cargo.toml", "Cargo.toml", "apps/core-testbed/Cargo.toml"] {
+        if !winresource_reads_its_table(&read(file)?) {
+            failures.push(format!("{file}: winresource needs `features = [\"toml\"]`, or a build.rs ignores [package.metadata.winresource]"));
+        }
+    }
     // The rules every app carries are marked blocks in the template's files. The core carries
     // the ones that are about more than an app, word for word.
     for (from, own, name) in sync::BLOCKS {
@@ -299,6 +307,17 @@ fn check_template(root: &Path) -> TaskResult {
         failures.push(format!("the template's workflow files name different tags: {}", tags.into_iter().collect::<Vec<_>>().join(", ")));
     }
     report(failures, "the app template is in step with the core")
+}
+
+/// Whether the `winresource` dependency of a `Cargo.toml` turns on the `toml` feature, by which
+/// it reads `[package.metadata.winresource]`; `true` when there is no such dependency, or when
+/// it is the workspace's (which is checked where it is declared).
+fn winresource_reads_its_table(cargo_toml: &str) -> bool {
+    cargo_toml
+        .lines()
+        .filter(|l| l.trim_start().starts_with("winresource ") || l.trim_start().starts_with("winresource="))
+        .filter(|l| !l.replace(' ', "").contains("workspace=true"))
+        .all(|l| l.split_once("features").is_some_and(|(_, f)| f.contains("\"toml\"")))
 }
 
 /// The calls to the core's shared workflows in a workflow file: (file under
@@ -577,6 +596,15 @@ mod tests {
         for other in ["main", "v0.1.19", "workflows-v", "workflows-v1.2", "workflows-vx", ""] {
             assert!(!is_workflows_tag(other), "{other}");
         }
+    }
+
+    #[test]
+    fn the_template_s_winresource_reads_its_table() {
+        assert!(winresource_reads_its_table(&std::fs::read_to_string(workspace_root().join("template/Cargo.toml")).unwrap()));
+        assert!(!winresource_reads_its_table("[workspace.dependencies]\nwinresource = { version = \"0.1.34\", default-features = false }\n"));
+        assert!(winresource_reads_its_table("[workspace.dependencies]\nwinresource = { version = \"0.1\", features = [\"toml\"] }\n"));
+        assert!(winresource_reads_its_table("[workspace.dependencies]\nserde = \"1\"\n"), "no winresource, nothing to check");
+        assert!(winresource_reads_its_table("[build-dependencies]\nwinresource = { workspace = true }\n"), "checked in the workspace");
     }
 
     #[test]

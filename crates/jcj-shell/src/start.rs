@@ -28,12 +28,15 @@ pub struct TemplateSpec {
     pub about: String,
     /// A heading templates are grouped under (empty: no heading).
     pub group: String,
+    /// What the template holds, drawn on its tile; `None` for a tile with its name and
+    /// description only.
+    pub preview: Option<TemplatePreview>,
 }
 
 impl TemplateSpec {
     /// A template with an id, a name and a description.
     pub fn new(id: impl Into<String>, name: impl Into<String>, about: impl Into<String>) -> Self {
-        TemplateSpec { id: id.into(), name: name.into(), about: about.into(), group: String::new() }
+        TemplateSpec { id: id.into(), name: name.into(), about: about.into(), group: String::new(), preview: None }
     }
 
     /// The same template under a group heading.
@@ -41,10 +44,63 @@ impl TemplateSpec {
         self.group = group.into();
         self
     }
+
+    /// The same template with a preview of what it holds: its tile is taller
+    /// ([`TILE_WITH_PREVIEW`]) and shows it above the name.
+    pub fn with_preview(mut self, preview: TemplatePreview) -> Self {
+        self.preview = Some(preview);
+        self
+    }
+}
+
+/// Most lines a template's preview keeps.
+pub const PREVIEW_LINES: usize = 6;
+/// Most characters a line of a preview keeps.
+pub const PREVIEW_LINE_CHARS: usize = 120;
+
+/// A preview of what a template holds: its first lines, drawn as text on a small page.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TemplatePreview {
+    lines: Vec<String>,
+    monospace: bool,
+}
+
+impl TemplatePreview {
+    /// The template's first lines. Empty lines are kept, and at most [`PREVIEW_LINES`] of
+    /// [`PREVIEW_LINE_CHARS`] characters each; a line holding line breaks counts as several.
+    /// Text is shown as it is given, not translated.
+    pub fn lines<S: AsRef<str>>(lines: impl IntoIterator<Item = S>) -> Self {
+        let lines = lines
+            .into_iter()
+            .flat_map(|l| l.as_ref().lines().map(|l| l.chars().take(PREVIEW_LINE_CHARS).collect::<String>()).collect::<Vec<_>>())
+            .take(PREVIEW_LINES)
+            .collect();
+        TemplatePreview { lines, monospace: false }
+    }
+
+    /// The same lines in a fixed-width font, for a template whose text is laid out by columns.
+    pub fn monospace(mut self) -> Self {
+        self.monospace = true;
+        self
+    }
+
+    /// The lines the tile shows.
+    pub fn text_lines(&self) -> &[String] {
+        &self.lines
+    }
+
+    /// Whether they are shown in a fixed-width font.
+    pub fn is_monospace(&self) -> bool {
+        self.monospace
+    }
 }
 
 /// The size of a template tile.
 pub const TILE: egui::Vec2 = vec2(200.0, 92.0);
+/// The size of a template tile with a preview ([`TemplateSpec::with_preview`]).
+pub const TILE_WITH_PREVIEW: egui::Vec2 = vec2(210.0, 150.0);
+/// The height of the small page a preview is drawn on.
+const PREVIEW_PAGE: f32 = 80.0;
 
 /// Draw the templates as tiles, grouped under their headings. Returns the id of the one clicked
 /// (and queues [`ids::NEW_FROM_TEMPLATE`] for it).
@@ -64,18 +120,17 @@ pub fn chooser(ui: &mut Ui, shell: &mut Shell, templates: &[TemplateSpec]) -> Op
         }
         ui.horizontal_wrapped(|ui| {
             for tpl in templates.iter().filter(|x| x.group == group) {
-                let (rect, resp) = ui.allocate_exact_size(TILE, Sense::click());
+                let (rect, resp) = ui.allocate_exact_size(if tpl.preview.is_some() { TILE_WITH_PREVIEW } else { TILE }, Sense::click());
                 let fill = if resp.hovered() { t.hover } else { t.surface_high };
                 ui.painter().rect(rect, t.radius.card, fill, Stroke::new(1.0, t.border), StrokeKind::Inside);
-                ui.painter().text(
-                    pos2(rect.min.x + 12.0, rect.min.y + 18.0),
-                    Align2::LEFT_CENTER,
-                    tr(&tpl.name),
-                    semibold(t.type_sizes.title),
-                    t.text,
-                );
+                // A preview takes the top of the tile; the name and description go under it.
+                let top = match &tpl.preview {
+                    Some(preview) => paint_preview(ui, &t, preview, rect) + 10.0,
+                    None => rect.min.y,
+                };
+                ui.painter().text(pos2(rect.min.x + 12.0, top + 18.0), Align2::LEFT_CENTER, tr(&tpl.name), semibold(t.type_sizes.title), t.text);
                 let about = ui.painter().layout(tr(&tpl.about), regular(t.type_sizes.caption), t.text_dim, rect.width() - 24.0);
-                ui.painter().with_clip_rect(rect.shrink(4.0)).galley(pos2(rect.min.x + 12.0, rect.min.y + 34.0), about, t.text_dim);
+                ui.painter().with_clip_rect(rect.shrink(4.0)).galley(pos2(rect.min.x + 12.0, top + 34.0), about, t.text_dim);
                 let name = tr(&tpl.name);
                 resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &name));
                 crate::widgets::record(shell, Some(ids::NEW_FROM_TEMPLATE), rect);
@@ -90,6 +145,21 @@ pub fn chooser(ui: &mut Ui, shell: &mut Shell, templates: &[TemplateSpec]) -> Op
         shell.run(Cmd::with(ids::NEW_FROM_TEMPLATE, json!({ "template": id })));
     }
     picked
+}
+
+/// Draw `preview` on a small page at the top of the tile `rect`; returns the page's bottom.
+fn paint_preview(ui: &Ui, t: &Theme, preview: &TemplatePreview, rect: Rect) -> f32 {
+    // Paper, as a document's page is drawn, whatever the interface's theme.
+    let (paper, ink) = (egui::Color32::WHITE, egui::Color32::from_gray(60));
+    let page = Rect::from_min_size(rect.min + vec2(12.0, 12.0), vec2(rect.width() - 24.0, PREVIEW_PAGE));
+    ui.painter().rect(page, 3.0, paper, Stroke::new(1.0, t.border), StrokeKind::Inside);
+    let size = (t.type_sizes.caption - 2.0).max(7.0);
+    let font = if preview.monospace { jcj_theme::mono(size) } else { regular(size) };
+    let mut job = egui::text::LayoutJob::simple(preview.lines.join("\n"), font, ink, page.width() - 12.0);
+    job.wrap.max_rows = PREVIEW_LINES;
+    let galley = ui.painter().layout_job(job);
+    ui.painter().with_clip_rect(page.shrink(1.0)).galley(page.min + vec2(6.0, 6.0), galley, ink);
+    page.max.y
 }
 
 /// Draw the start window: the app's name, its templates, Open, and the recent files.
@@ -210,6 +280,57 @@ mod tests {
         let ran = &h.state().app.ran;
         assert!(ran.iter().any(|c| c.id == ids::NEW_FROM_TEMPLATE && c.params == json!({ "template": "letter" })));
         assert!(h.query_by_label("The document").is_some(), "once the app has a document it is shown");
+    }
+
+    #[test]
+    fn a_preview_keeps_a_few_short_lines() {
+        let long = "x".repeat(PREVIEW_LINE_CHARS + 10);
+        let p = TemplatePreview::lines(["FADE IN:", "", "A ROOM - DAY\nA second line", long.as_str(), "5", "6", "7"]);
+        assert_eq!(p.text_lines().len(), PREVIEW_LINES);
+        assert_eq!(&p.text_lines()[..4], ["FADE IN:", "", "A ROOM - DAY", "A second line"]);
+        assert_eq!(p.text_lines()[4].chars().count(), PREVIEW_LINE_CHARS);
+        assert!(!p.is_monospace() && p.clone().monospace().is_monospace());
+        let tpl = TemplateSpec::new("a", "A", "About.").with_preview(p.clone());
+        assert_eq!(tpl.preview, Some(p));
+        assert_eq!(TemplateSpec::new("a", "A", "About.").preview, None, "no preview unless the app gives one");
+    }
+
+    #[test]
+    fn a_tile_with_a_preview_is_taller_and_one_without_is_as_before() {
+        struct Previewed(Blank);
+        impl Commands for Previewed {
+            fn command(&self, id: &str) -> Option<CommandInfo> {
+                self.0.command(id)
+            }
+        }
+        impl App for Previewed {
+            fn document_name(&self) -> String {
+                self.0.document_name()
+            }
+            fn run(&mut self, cmd: &Cmd, shell: &mut Shell) -> Result<(), String> {
+                self.0.run(cmd, shell)
+            }
+            fn document_ui(&mut self, ui: &mut Ui, shell: &mut Shell) {
+                self.0.document_ui(ui, shell);
+            }
+            fn templates(&self) -> Vec<TemplateSpec> {
+                vec![
+                    TemplateSpec::new("plain", "Plain", "An empty document."),
+                    TemplateSpec::new("letter", "Letter", "A letter.").with_preview(TemplatePreview::lines(["Dear reader,", "", "Yours."])),
+                ]
+            }
+        }
+        let shell = Shell::new("Test App", "1.0", jcj_theme::Tokens::default())
+            .with_options(crate::ShellOptions { start_window: true, ..crate::ShellOptions::default() });
+        let mut h = Harness::builder()
+            .with_size(vec2(1000.0, 700.0))
+            .build_ui_state(|ui, s: &mut (Shell, Previewed)| s.0.ui(ui, &mut s.1), (shell, Previewed(Blank { open: false, ran: Vec::new() })));
+        h.run();
+        assert_eq!(h.get_by_label("Plain").rect().size(), TILE);
+        assert_eq!(h.get_by_label("Letter").rect().size(), TILE_WITH_PREVIEW);
+        h.get_by_label("Letter").click();
+        h.run();
+        assert!(h.state().1.0.ran.iter().any(|c| c.params == json!({ "template": "letter" })));
     }
 
     #[test]

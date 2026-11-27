@@ -8,7 +8,13 @@
 //!
 //! Words deleted count against the session and the day (net words), so the numbers never reward
 //! padding; a big jump at once (a paste or an import) can be left out with
-//! [`Writing::rebase`].
+//! [`Writing::rebase`]. An app whose writers count what they wrote, whatever they later cut,
+//! turns on [`Counting::UpOnly`] ([`Writing::counting`]).
+//!
+//! A writer's statistics kept between runs, with pages, writing time, goals and a window to see
+//! them, are in [`stats`]; an app opts in by using them.
+
+pub mod stats;
 
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -152,6 +158,16 @@ impl Sprint {
     }
 }
 
+/// How a session and its days count words.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum Counting {
+    /// Net words: deleting takes words away (the default).
+    #[default]
+    Net,
+    /// Only words added count; deleting takes nothing away.
+    UpOnly,
+}
+
 /// One writing session: words since it started, its target, a sprint, and the day's history.
 #[derive(Clone, Debug)]
 pub struct Writing {
@@ -167,12 +183,42 @@ pub struct Writing {
     pub sprint: Option<Sprint>,
     /// Words per day.
     pub history: History,
+    /// How words count.
+    counting: Counting,
+    /// Words added this session ([`Counting::UpOnly`]).
+    written: i64,
+    /// Words added when the running sprint started ([`Counting::UpOnly`]).
+    sprint_written: i64,
+    /// The page count when the running sprint started, when the app gave one.
+    sprint_pages: Option<usize>,
 }
 
 impl Writing {
     /// A session starting at `words`.
     pub fn new(words: usize) -> Writing {
-        Writing { start_words: words, words, carried: 0, target: None, sprint: None, history: History::default() }
+        Writing {
+            start_words: words,
+            words,
+            carried: 0,
+            target: None,
+            sprint: None,
+            history: History::default(),
+            counting: Counting::Net,
+            written: 0,
+            sprint_written: 0,
+            sprint_pages: None,
+        }
+    }
+
+    /// The same session counting words as `counting` says ([`Counting::Net`] by default).
+    pub fn counting(mut self, counting: Counting) -> Writing {
+        self.counting = counting;
+        self
+    }
+
+    /// How this session counts words.
+    pub fn counts(&self) -> Counting {
+        self.counting
     }
 
     /// The same session with a target.
@@ -181,10 +227,18 @@ impl Writing {
         self
     }
 
-    /// Report the current word count on `day`; the change goes into the day's history.
+    /// Report the current word count on `day`; the change goes into the day's history (only a
+    /// rise, with [`Counting::UpOnly`]).
     pub fn observe(&mut self, words: usize, day: Day) {
         let delta = words as i64 - self.words as i64;
-        self.history.add(day, delta);
+        match self.counting {
+            Counting::Net => self.history.add(day, delta),
+            Counting::UpOnly if delta > 0 => {
+                self.history.add(day, delta);
+                self.written += delta;
+            }
+            Counting::UpOnly => {}
+        }
         self.words = words;
     }
 
@@ -196,9 +250,12 @@ impl Writing {
         self.words = words;
     }
 
-    /// Net words written this session.
+    /// Words written this session: net words, or with [`Counting::UpOnly`] the words added.
     pub fn session_words(&self) -> i64 {
-        self.carried + self.words as i64 - self.start_words as i64
+        match self.counting {
+            Counting::Net => self.carried + self.words as i64 - self.start_words as i64,
+            Counting::UpOnly => self.written,
+        }
     }
 
     /// Progress toward the session target, 0 to 1 (`None` without a target).
@@ -210,17 +267,36 @@ impl Writing {
     /// Start a sprint of `length` now.
     pub fn start_sprint(&mut self, length: Duration, now: Instant) {
         self.sprint = Some(Sprint { started: now, length, start_words: self.words });
+        self.sprint_written = self.written;
+        self.sprint_pages = None;
     }
 
-    /// Words written in the running sprint.
+    /// Start a sprint of `length` now, with the document's page count, so its result is given in
+    /// pages too ([`Writing::sprint_pages`]).
+    pub fn start_sprint_with_pages(&mut self, length: Duration, now: Instant, pages: usize) {
+        self.start_sprint(length, now);
+        self.sprint_pages = Some(pages);
+    }
+
+    /// Words written in the running sprint (words added, with [`Counting::UpOnly`]).
     pub fn sprint_words(&self) -> i64 {
-        self.sprint.map_or(0, |s| self.words as i64 - s.start_words as i64)
+        match self.counting {
+            Counting::Net => self.sprint.map_or(0, |s| self.words as i64 - s.start_words as i64),
+            Counting::UpOnly => self.sprint.map_or(0, |_| self.written - self.sprint_written),
+        }
+    }
+
+    /// Pages added in the running sprint, given the page count now: `None` with no sprint, or one
+    /// started without a page count.
+    pub fn sprint_pages(&self, pages: usize) -> Option<i64> {
+        self.sprint.and(self.sprint_pages).map(|start| pages as i64 - start as i64)
     }
 
     /// Start the session again from the current count.
     pub fn reset(&mut self) {
         self.start_words = self.words;
         self.carried = 0;
+        self.written = 0;
     }
 }
 
@@ -294,6 +370,32 @@ mod tests {
         let s = w.sprint.unwrap();
         assert!(!s.finished(now + Duration::from_secs(599)));
         assert!(s.finished(now + Duration::from_secs(600)));
+    }
+
+    #[test]
+    fn counting_up_only_keeps_what_was_written() {
+        let day = Day { year: 2026, month: 11, day: 24 };
+        let mut w = Writing::new(1000).counting(Counting::UpOnly).with_target(Some(500));
+        assert_eq!(w.counts(), Counting::UpOnly);
+        assert_eq!(Writing::new(0).counts(), Counting::Net, "net words unless the app asks");
+        w.observe(1250, day);
+        w.observe(1200, day);
+        assert_eq!(w.session_words(), 250, "the 50 cut take nothing away");
+        assert_eq!(w.history.on(day), 250);
+        assert_eq!(w.progress(), Some(0.5));
+        w.rebase(5200);
+        w.observe(5300, day);
+        assert_eq!((w.session_words(), w.history.on(day)), (350, 350), "the rebased jump is left out");
+        let now = Instant::now();
+        w.start_sprint_with_pages(Duration::from_secs(600), now, 20);
+        w.observe(5280, day);
+        w.observe(5330, day);
+        assert_eq!(w.sprint_words(), 50);
+        assert_eq!(w.sprint_pages(22), Some(2));
+        w.start_sprint(Duration::from_secs(600), now);
+        assert_eq!(w.sprint_pages(22), None, "a sprint started without pages has no page result");
+        w.reset();
+        assert_eq!(w.session_words(), 0);
     }
 
     #[test]

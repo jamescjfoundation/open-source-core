@@ -6,8 +6,10 @@
 //! drawn, the window keeps drawing while it is up, and when the user has chosen, the command runs
 //! with the choice in its parameters (`"path"`, and `"paths"` for every file chosen). Closing
 //! the dialog without choosing runs nothing, unless the app named a command for that too
-//! ([`Shell::ask_file_or`](crate::Shell::ask_file_or)). One dialog shows at a time; later ones
-//! wait their turn.
+//! ([`Shell::ask_file_or`](crate::Shell::ask_file_or)). When no dialog can be shown, the status
+//! bar says why and that command runs as well, with the reason in its parameters
+//! (`"unavailable"`, read with [`unavailable`]). One dialog shows at a time; later ones wait
+//! their turn.
 //!
 //! ```no_run
 //! # use jcj_shell::{Cmd, Shell, commands::ids, files::FileAsk};
@@ -210,8 +212,33 @@ pub(crate) struct Then {
 enum Outcome {
     /// Run this command.
     Run(Cmd),
-    /// Say this in the status bar: no dialog could be shown.
-    Unavailable(String),
+    /// Say this in the status bar: no dialog could be shown. Then run the command for a dialog
+    /// closed without choosing, if there is one, with the reason in its parameters.
+    Unavailable(String, Option<Cmd>),
+}
+
+/// The parameter that holds why no dialog could be shown, in the command run for a dialog
+/// closed without choosing ([`Shell::ask_file_or`](crate::Shell::ask_file_or)).
+pub const UNAVAILABLE: &str = "unavailable";
+
+/// Why no file dialog could be shown, when `cmd` was run for that and not because the user
+/// closed the dialog without choosing; `None` when it was closed. An app that keeps a step
+/// waiting on the answer gives it up either way; one that has another way to ask (a typed path,
+/// a default folder) can offer it only when this is `Some`.
+pub fn unavailable(cmd: &Cmd) -> Option<&str> {
+    cmd.params.get(UNAVAILABLE).and_then(Value::as_str)
+}
+
+/// `cancelled` with `why` in its parameters ([`UNAVAILABLE`]). Parameters it already has are
+/// kept; ones that are not an object are replaced.
+fn with_unavailable(mut cancelled: Cmd, why: &str) -> Cmd {
+    if !cancelled.params.is_object() {
+        cancelled.params = json!({});
+    }
+    if let Some(params) = cancelled.params.as_object_mut() {
+        params.insert(UNAVAILABLE.into(), Value::String(why.to_owned()));
+    }
+    cancelled
 }
 
 /// `then` with the paths chosen in its parameters: `path` (the first) and `paths` (all), as
@@ -317,7 +344,12 @@ impl FileDialogs {
         for outcome in answers.into_iter().filter_map(|(then, answer)| outcome(then, answer)) {
             match outcome {
                 Outcome::Run(cmd) => shell.run(cmd),
-                Outcome::Unavailable(why) => shell.message = tr_with("The file dialog could not be shown: {why}", &[("why", &why)]),
+                Outcome::Unavailable(why, cancelled) => {
+                    shell.message = tr_with("The file dialog could not be shown: {why}", &[("why", &why)]);
+                    if let Some(cmd) = cancelled {
+                        shell.run(cmd);
+                    }
+                }
             }
         }
     }
@@ -344,7 +376,10 @@ fn outcome(then: Then, answer: up::Answer) -> Option<Outcome> {
     match answer {
         up::Answer::Paths(paths) if !paths.is_empty() => Some(Outcome::Run(with_paths(then.chosen, &paths))),
         up::Answer::Paths(_) | up::Answer::Cancelled | up::Answer::Message(_) => then.cancelled.map(Outcome::Run),
-        up::Answer::Unavailable(why) => Some(Outcome::Unavailable(why)),
+        up::Answer::Unavailable(why) => {
+            let cancelled = then.cancelled.map(|c| with_unavailable(c, &why));
+            Some(Outcome::Unavailable(why, cancelled))
+        }
     }
 }
 
@@ -387,6 +422,21 @@ mod tests {
         assert_eq!(outcome(then(), up::Answer::Paths(Vec::new())), None);
         let or = Then { cancelled: Some(Cmd::new("file.closeCancelled")), ..then() };
         assert_eq!(outcome(or, up::Answer::Cancelled), Some(Outcome::Run(Cmd::new("file.closeCancelled"))));
-        assert_eq!(outcome(then(), up::Answer::Unavailable("no portal".into())), Some(Outcome::Unavailable("no portal".into())));
+        assert_eq!(outcome(then(), up::Answer::Unavailable("no portal".into())), Some(Outcome::Unavailable("no portal".into(), None)));
+    }
+
+    #[test]
+    fn a_dialog_that_cannot_be_shown_gives_up_the_waiting_step_with_the_reason() {
+        let then = Then { chosen: Cmd::new("file.saveAs"), cancelled: Some(Cmd::with("file.closeCancelled", json!({"window": 2}))) };
+        let given_up = Cmd::with("file.closeCancelled", json!({"window": 2, "unavailable": "no portal"}));
+        assert_eq!(
+            outcome(then.clone(), up::Answer::Unavailable("no portal".into())),
+            Some(Outcome::Unavailable("no portal".into(), Some(given_up.clone())))
+        );
+        assert_eq!(unavailable(&given_up), Some("no portal"));
+        // Closed by the user: the same command, and no reason.
+        let Some(Outcome::Run(closed)) = outcome(then, up::Answer::Cancelled) else { panic!("the cancelled command runs") };
+        assert_eq!(unavailable(&closed), None);
+        assert_eq!(with_unavailable(Cmd::with("x", json!(7)), "none").params, json!({"unavailable": "none"}));
     }
 }

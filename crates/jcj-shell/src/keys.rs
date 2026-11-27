@@ -3,8 +3,10 @@
 //! `Enter`, `Mod+3`), and the map from shortcuts to commands.
 //!
 //! `Mod` is Command on macOS and Ctrl elsewhere. On macOS the platform's own text-editing keys
-//! are translated to the portable ones first: Option+Arrow moves by word, Command+Left/Right goes
-//! to the line's ends, Command+Up/Down to the document's.
+//! that have a portable form are translated to it first: Command+Left/Right goes to the line's
+//! ends (`Home`, `End`), Command+Up/Down to the document's (`Mod+Home`, `Mod+End`). Option+Left
+//! and Option+Right stay `Alt+Left` and `Alt+Right`, the keys that move by word on every system:
+//! a command that moves by word declares them (`Mod+Left / Alt+Left`), as the engine's do.
 //!
 //! A [`KeyMap`] holds the commands' own keys and the user's: the user's come first, and a user
 //! key bound to nothing (`""`) turns a command's key off.
@@ -105,16 +107,13 @@ pub fn key_name(key: Key) -> Option<&'static str> {
 /// where Control is not `Mod`), `Alt`, `Shift`, then the key. `mac` applies macOS's own keys.
 pub fn shortcut(key: Key, m: Modifiers, mac: bool) -> Option<String> {
     let name = key_name(key)?;
-    let (mut cmd, mut alt, shift) = (m.command, m.alt, m.shift);
+    let (mut cmd, alt, shift) = (m.command, m.alt, m.shift);
     let ctrl = mac && m.ctrl;
     let mut name = name;
     if mac {
         match (cmd, alt, name) {
-            // Option+Left/Right: by word.
-            (false, true, "Left" | "Right") => {
-                alt = false;
-                cmd = true;
-            }
+            // Option+Left/Right stay `Alt+Left`/`Alt+Right`: by word, on every system. They
+            // are not made `Mod+Left`, which the engine binds to the line's start on macOS.
             // Command+Left/Right: the line's ends.
             (true, false, "Left") => {
                 cmd = false;
@@ -354,8 +353,8 @@ mod tests {
         let opt = Modifiers { alt: true, ..Modifiers::NONE };
         let cmd = Modifiers { command: true, mac_cmd: true, ..Modifiers::NONE };
         let cmd_shift = Modifiers { shift: true, ..cmd };
-        assert_eq!(shortcut(Key::ArrowLeft, opt, true).as_deref(), Some("Mod+Left"));
-        assert_eq!(shortcut(Key::ArrowRight, Modifiers { shift: true, ..opt }, true).as_deref(), Some("Mod+Shift+Right"));
+        assert_eq!(shortcut(Key::ArrowLeft, opt, true).as_deref(), Some("Alt+Left"));
+        assert_eq!(shortcut(Key::ArrowRight, Modifiers { shift: true, ..opt }, true).as_deref(), Some("Alt+Shift+Right"));
         assert_eq!(shortcut(Key::ArrowLeft, cmd, true).as_deref(), Some("Home"));
         assert_eq!(shortcut(Key::ArrowRight, cmd_shift, true).as_deref(), Some("Shift+End"));
         assert_eq!(shortcut(Key::ArrowUp, cmd, true).as_deref(), Some("Mod+Home"));
@@ -363,6 +362,50 @@ mod tests {
         assert_eq!(shortcut(Key::Num1, cmd, true).as_deref(), Some("Mod+1"));
         // Control on a Mac is its own modifier, not Mod.
         assert_eq!(shortcut(Key::A, Modifiers { ctrl: true, ..Modifiers::NONE }, true).as_deref(), Some("Ctrl+A"));
+    }
+
+    /// The engine declares its caret keys per system (`mac_or` in its caret commands); the
+    /// keys a person presses on macOS reach the right command with either set, so the test
+    /// holds on every system it runs on.
+    #[test]
+    fn macos_text_keys_reach_the_engine_s_caret_commands() {
+        let declared = |mac: bool| {
+            let (word_left, word_right, home, end) = if mac {
+                ("Alt+Left", "Alt+Right", "Home / Mod+Left", "End / Mod+Right")
+            } else {
+                ("Mod+Left / Alt+Left", "Mod+Right / Alt+Right", "Home", "End")
+            };
+            [
+                CommandInfo::new("caret.left", "Left", "Left"),
+                CommandInfo::new("caret.wordLeft", "Word Left", word_left),
+                CommandInfo::new("caret.wordRight", "Word Right", word_right),
+                CommandInfo::new("caret.home", "Line Start", home),
+                CommandInfo::new("caret.end", "Line End", end),
+                CommandInfo::new("caret.paraUp", "Paragraph Up", "Mod+Up / Alt+Up"),
+                CommandInfo::new("caret.docStart", "Document Start", "Mod+Home"),
+                CommandInfo::new("caret.docEnd", "Document End", "Mod+End"),
+            ]
+        };
+        let opt = Modifiers { alt: true, ..Modifiers::NONE };
+        let cmd = Modifiers { command: true, mac_cmd: true, ..Modifiers::NONE };
+        let shift = |m: Modifiers| Modifiers { shift: true, ..m };
+        let extend = |id: &str| Some(Cmd::with(id, serde_json::json!({ "extend": true })));
+        for engine_on_mac in [true, false] {
+            let map = KeyMap::from_commands(&declared(engine_on_mac));
+            let press = |key: Key, m: Modifiers| shortcut(key, m, true).and_then(|s| map.command_for(&s));
+            assert_eq!(press(Key::ArrowLeft, opt), Some(Cmd::new("caret.wordLeft")), "{engine_on_mac}");
+            assert_eq!(press(Key::ArrowRight, opt), Some(Cmd::new("caret.wordRight")), "{engine_on_mac}");
+            assert_eq!(press(Key::ArrowLeft, shift(opt)), extend("caret.wordLeft"), "{engine_on_mac}");
+            assert_eq!(press(Key::ArrowRight, shift(opt)), extend("caret.wordRight"), "{engine_on_mac}");
+            assert_eq!(press(Key::ArrowLeft, cmd), Some(Cmd::new("caret.home")), "{engine_on_mac}");
+            assert_eq!(press(Key::ArrowRight, shift(cmd)), extend("caret.end"), "{engine_on_mac}");
+            assert_eq!(press(Key::ArrowUp, cmd), Some(Cmd::new("caret.docStart")), "{engine_on_mac}");
+            assert_eq!(press(Key::ArrowDown, shift(cmd)), extend("caret.docEnd"), "{engine_on_mac}");
+        }
+        // Elsewhere nothing is translated: Ctrl+Left moves by word.
+        let map = KeyMap::from_commands(&declared(false));
+        let ctrl = Modifiers { ctrl: true, command: true, ..Modifiers::NONE };
+        assert_eq!(shortcut(Key::ArrowLeft, ctrl, false).and_then(|s| map.command_for(&s)), Some(Cmd::new("caret.wordLeft")));
     }
 
     #[test]

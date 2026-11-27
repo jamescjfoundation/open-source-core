@@ -33,6 +33,8 @@ pub mod cmd {
     pub const SELFTEST: &str = "testbed.selftest";
     /// Export every format into a folder the user chooses.
     pub const EXPORT_TO: &str = "testbed.exportTo";
+    /// Show the writing statistics window.
+    pub const STATISTICS: &str = "testbed.statistics";
 }
 
 /// The extension of the test app's project files.
@@ -78,6 +80,13 @@ pub struct Testbed {
     split_state: jcj_shell::split::SplitState,
     /// Words written this session, toward a session target (the core's writing statistics).
     pub writing: jcj_shell::writing::Writing,
+    /// The writer's statistics (the core's statistics file and window): words written per day,
+    /// counted only upward, and writing time. Kept in memory: the testbed keeps no history.
+    pub stats: jcj_shell::writing::stats::Statistics,
+    /// What counts writing into `stats`.
+    pub tracker: jcj_shell::writing::stats::Tracker,
+    /// The statistics window.
+    pub stats_view: jcj_shell::writing::stats::StatsView,
     /// The headings panel's tree state (the core's tree widget).
     pub headings: jcj_shell::tree::TreeState<usize>,
     /// The interface language kept in the preferences; empty for English.
@@ -99,6 +108,12 @@ impl Testbed {
             split: jcj_shell::split::Split::None,
             split_state: jcj_shell::split::SplitState::default(),
             writing: jcj_shell::writing::Writing::new(0).with_target(Some(500)),
+            stats: jcj_shell::writing::stats::Statistics {
+                goals: jcj_shell::writing::stats::Goals { words_per_day: 500, minutes_per_day: 20, ..Default::default() },
+                ..Default::default()
+            },
+            tracker: jcj_shell::writing::stats::Tracker::new(),
+            stats_view: jcj_shell::writing::stats::StatsView::new(jcj_shell::writing::stats::Unit::Words),
             headings: jcj_shell::tree::TreeState::default(),
             language: String::new(),
             page: None,
@@ -109,7 +124,11 @@ impl Testbed {
     fn changed(&mut self) {
         self.revision += 1;
         let words = self.session.doc.body.iter().filter_map(|b| b.as_para()).map(|p| jcj_doc::count_words(&p.plain_text())).sum();
-        self.writing.observe(words, jcj_shell::writing::Day::of(std::time::SystemTime::now(), 0));
+        let now = std::time::SystemTime::now();
+        self.writing.observe(words, jcj_shell::writing::Day::of(now, 0));
+        // The testbed has no pages of its own to count: its unit is words.
+        let at = jcj_shell::writing::stats::Moment::of(now, 0);
+        self.tracker.count(&mut self.stats, words, None, at, std::time::Instant::now());
     }
 
     fn save(&mut self) -> Result<(), String> {
@@ -127,6 +146,8 @@ impl Testbed {
         let project = jcj_project::files::open(&path, &APP).map_err(|e| e.to_string())?;
         let doc = project.find_document("Main").and_then(|id| project.document(id)).cloned().ok_or("the file has no main document")?;
         self.board = project.app_data().get("board").cloned().and_then(|b| serde_json::from_value(b).ok()).unwrap_or_default();
+        // Another document: its words are the base, not written.
+        self.tracker.forget();
         self.session = crate::selftest::session(doc);
         self.path = path;
         self.changed();
@@ -205,6 +226,7 @@ impl Commands for Testbed {
             CommandInfo::new(cmd::ADD_CARD, "Add Card", ""),
             CommandInfo::new(cmd::SNAPSHOT, "Save With Snapshot", ""),
             CommandInfo::new(cmd::SELFTEST, "Run Self-Test", ""),
+            CommandInfo::new(cmd::STATISTICS, "Writing Statistics", ""),
         ]
     }
 }
@@ -235,6 +257,10 @@ impl App for Testbed {
     }
 
     fn status_ui(&mut self, ui: &mut egui::Ui, _shell: &mut Shell) {
+        // Writing time, once a frame; and the statistics window while it is open.
+        let at = jcj_shell::writing::stats::Moment::of(std::time::SystemTime::now(), 0);
+        self.tracker.tick(&mut self.stats, at, std::time::Instant::now());
+        jcj_shell::writing::stats::statistics_window(ui.ctx(), &mut self.stats, &mut self.stats_view, at.day);
         let words = self.writing.session_words();
         jcj_shell::writing::progress_bar(ui, &format!("{words} of 500 words this session"), self.writing.progress().unwrap_or(0.0), 80.0);
         // A count in the interface language, through the shell's door to the catalogs.
@@ -248,7 +274,9 @@ impl App for Testbed {
     fn templates(&self) -> Vec<jcj_shell::TemplateSpec> {
         vec![
             jcj_shell::TemplateSpec::new("blank", "Blank", "An empty document.").in_group("Documents"),
-            jcj_shell::TemplateSpec::new("sample", "Sample", "A document using every feature the testbed shows.").in_group("Documents"),
+            jcj_shell::TemplateSpec::new("sample", "Sample", "A document using every feature the testbed shows.")
+                .in_group("Documents")
+                .with_preview(sample_preview()),
         ]
     }
 
@@ -293,7 +321,15 @@ impl App for Testbed {
                     shell.ask_file(FileAsk::folder().title("Export every format to"), Cmd::new(cmd::EXPORT_TO));
                 }
             },
-            cmd::LOG => self.log.push(c.params.get("line").and_then(|l| l.as_str()).unwrap_or_default().to_owned()),
+            cmd::LOG => {
+                let line = c.params.get("line").and_then(|l| l.as_str()).unwrap_or_default();
+                // Run for a dialog closed without choosing, or for one that could not be shown.
+                self.log.push(match jcj_shell::files::unavailable(c) {
+                    Some(why) => format!("{line} (no dialog could be shown: {why})"),
+                    None => line.to_owned(),
+                });
+            }
+            cmd::STATISTICS => self.stats_view.open = true,
             "testbed.split" => {
                 self.split = if self.split == jcj_shell::split::Split::None { jcj_shell::split::Split::Side } else { jcj_shell::split::Split::None };
             }
@@ -302,10 +338,14 @@ impl App for Testbed {
                     Some("sample") => sample_document()?,
                     _ => jcj_doc::new_document(),
                 };
+                // Another document: its words are the base, not written.
+                self.tracker.forget();
                 self.session = crate::selftest::session(doc);
                 self.changed();
             }
             ids::NEW => {
+                // Another document: its words are the base, not written.
+                self.tracker.forget();
                 self.session = crate::selftest::session(jcj_doc::new_document());
                 self.changed();
             }
@@ -315,6 +355,8 @@ impl App for Testbed {
                 self.changed();
             }
             cmd::SAMPLE => {
+                // Another document: its words are the base, not written.
+                self.tracker.forget();
                 self.session = crate::selftest::session(sample_document()?);
                 self.changed();
             }
@@ -509,6 +551,16 @@ impl DesktopApp for Testbed {
     }
 }
 
+/// The first lines of the sample template, as its tile shows them (built once).
+fn sample_preview() -> jcj_shell::TemplatePreview {
+    static LINES: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    let lines = LINES.get_or_init(|| {
+        let doc = sample_document().unwrap_or_default();
+        doc.body.iter().filter_map(|b| b.as_para()).map(|p| p.plain_text()).filter(|t| !t.trim().is_empty()).take(3).collect()
+    });
+    jcj_shell::TemplatePreview::lines(lines)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -530,7 +582,17 @@ mod tests {
         assert!(project.app_data().contains_key("board"));
         app.run(&Cmd::with(ids::NEW_FROM_TEMPLATE, json!({ "template": "sample" })), &mut shell).unwrap();
         assert!(app.writing.session_words() > 0, "the sample's words count as written this session");
+        let today = jcj_shell::writing::stats::Moment::of(std::time::SystemTime::now(), 0).day;
+        let before = app.stats.on(today).words;
+        app.run(&Cmd::new(cmd::INSERT), &mut shell).unwrap();
+        assert!(app.stats.on(today).words > before, "words typed count in the day's statistics");
+        app.run(&Cmd::new(ids::UNDO), &mut shell).unwrap();
+        assert!(app.stats.on(today).words > before, "and undoing them takes nothing away");
+        app.run(&Cmd::new(cmd::STATISTICS), &mut shell).unwrap();
+        assert!(app.stats_view.open);
         assert!(app.has_document() && !app.templates().is_empty());
+        let sample = app.templates().into_iter().find(|t| t.id == "sample").and_then(|t| t.preview).unwrap();
+        assert_eq!(sample.text_lines().first().map(String::as_str), Some("A Sample Document"), "the sample's tile shows its first lines");
         app.run(&Cmd::new(cmd::EXPORT_ALL), &mut shell).unwrap();
         assert!(dir.join("test.epub").is_file() && dir.join("test.docx").is_file());
         let _ = std::fs::remove_dir_all(&dir);
@@ -586,6 +648,17 @@ mod tests {
         let app = &h.state().2;
         assert!(!app.is_dirty() && app.board.cards.len() == 1, "the saved file is open again");
         assert!(app.log.iter().any(|l| l.starts_with("opened ")));
+        // No dialog can be shown: the status bar says why, and the step that waited is given up.
+        h.state_mut().1.answer_with(Some(Box::new(|_| FileAnswer::Unavailable("no dialog service".into()))));
+        h.state_mut().0.run(Cmd::new(ids::SAVE_AS));
+        h.run();
+        h.run();
+        let (shell, _, app) = h.state();
+        assert_eq!(shell.message, "The file dialog could not be shown: no dialog service");
+        assert_eq!(
+            app.log.last().map(String::as_str),
+            Some("Save As was closed without a place chosen (no dialog could be shown: no dialog service)")
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 

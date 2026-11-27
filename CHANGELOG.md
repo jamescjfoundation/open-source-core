@@ -5,6 +5,49 @@ minor release may, and then **What apps must do** says exactly what (decision 00
 
 ## Unreleased
 
+### Added
+
+- **A template tile can show what the template holds** (issue #40). `TemplateSpec` gains
+  `preview: Option<TemplatePreview>` and `with_preview`; `TemplatePreview::lines` takes the
+  template's first lines (at most `PREVIEW_LINES`, each cut at `PREVIEW_LINE_CHARS`), and
+  `monospace()` draws them in a fixed-width font. The chooser, on the start window and the File
+  page's New page, draws a tile with a preview taller (`TILE_WITH_PREVIEW`), with the lines on a
+  small page above the name. A template without one looks as it did. `TemplatePreview` is also
+  exported at `jcj_shell::TemplatePreview`.
+- **Writing statistics kept between runs** (issue #41), in `jcj_shell::writing::stats`, used only
+  by an app that asks for them:
+  - `Statistics`: per day (`DayStats`) the words written, whole pages added, seconds of writing
+    and those seconds by hour of the day; `Goals` (pages or words a day on so many days a week,
+    and minutes a day); whether statistics are kept, the idle minutes after which writing time
+    stops, and a sprint's length. `Statistics::open(dir, fresh)` and `save(dir)` keep it as
+    `stats.json` in the settings folder (atomically; a damaged file is moved aside as
+    `stats.json.damaged`), and `from_json` / `to_json` read and write the text. Everything read
+    is bounded (`repaired`): settings within their ranges, days that are not dates dropped, at
+    most `MAX_STAT_DAYS` (3,700) days, 24 hours a day.
+  - `Tracker` counts into it: `count` after an edit, with the word count and, for an app with
+    pages, the page count; what grew is added to the day and deleting takes nothing away.
+    `tick` once a frame adds the writing time while input came within the idle time; `input`
+    marks input that changed no count; `forget` makes the next count the base (another
+    document, an import). The day and hour are the app's (`Moment::of`, with the zone's offset).
+  - `Statistics::summary` (current and longest streak, where a day counts with words or a
+    minute of writing; the best weekday; the best hour), `bars` (by days, weeks, months or
+    years, `Range`) and `goal` (the goal line for a bar).
+  - `statistics_window` (and `statistics_ui`, to draw the same into any `Ui`): the streaks, the
+    best day and hours, bars of words, pages or minutes with the goal as a line, and the goals
+    and settings to change. `StatsView` holds what it shows; its `Unit` (words or pages) is the
+    app's and sets the goal offered; `zone` is said after the best hours.
+  - **An app's earlier file reads as it is.** The file's shape is `{"enabled", "idle_minutes",
+    "sprint_minutes", "goals": {"pages_per_day", "days_per_week", "minutes_per_day"}, "days":
+    {"YYYY-MM-DD": {"words", "pages", "seconds", "hours"}}}`, the shape Wordsmith Script's
+    `stats.json` already has, with one new field, `goals.words_per_day`, that takes 0 when
+    missing. So Script's file is read by `Statistics::open` from the same folder with no
+    conversion, and written back with every day it had (a test holds a file of that shape to a
+    lossless round trip).
+- **`Writing` can count only upward, and give a sprint's result in pages** (issue #41).
+  `Writing::counting(Counting::UpOnly)` makes the session and its days count words added only;
+  `Counting::Net`, today's behaviour, stays the default. `start_sprint_with_pages` and
+  `sprint_pages` give a sprint's pages beside its words.
+
 ### Changed
 
 - **The comment at the top of the managed `.github/workflows/release.yml` says the release
@@ -12,10 +55,60 @@ minor release may, and then **What apps must do** says exactly what (decision 00
   to `main`, which GitHub has refused since 0.1.23 (decision 0013, amended). The workflow itself
   is unchanged.
 
+### Fixed
+
+- **On macOS, Option with Left or Right moves by word again** (issue #48). `keys::shortcut`
+  turned Option+Left into `Mod+Left`, which the engine binds on macOS to the line's start, so
+  the caret went to the line's ends and nothing reached word movement from the keyboard. Option
+  with Left or Right now stays `Alt+Left` / `Alt+Right`, which the engine binds to moving by word
+  on every system; Command+Left/Right still become `Home` / `End`, and Command+Up/Down the
+  document's ends. A test presses the four keys against key maps built as the engine declares
+  them on macOS and elsewhere, and the testbed's self-test does it with this system's engine.
+- **A file dialog that cannot be shown now gives up the step that waited on it** (issue #43).
+  When the system shows no dialog, the status bar still says why, and the command given to
+  `Shell::ask_file_or` for a dialog closed without choosing now runs too, with the reason in its
+  parameters (`"unavailable"`; `files::unavailable(&cmd)` reads it, and `files::UNAVAILABLE` is
+  its name). An app can give up its waiting step either way, and offer another way to ask (a
+  typed path) only when the dialog was not shown. `Shell::ask_file` still runs nothing then.
+- **The template's `build.rs` reads `[package.metadata.winresource]`** (issue #58).
+  `template/Cargo.toml` turns on winresource's `toml` feature, without which a Windows program
+  made from the template was named after its package and carried no company or copyright. The
+  gate's `template` task checks the template, the core's own workspace and the testbed for it.
+
 ### What apps must do
 
-Nothing. The comment reaches each app with the next core release: move the pin and run
-`cargo xtask sync`, as that release says.
+Nothing is required: every addition is opt-in and the apps build as before. To take the release:
+
+1. Move every `jcj-` dependency to this release's tag, then run
+   `cargo metadata --format-version 1 >/dev/null` to bring `Cargo.lock` in line.
+2. Run `cargo xtask sync`, then `cargo xtask sync --check`. It brings the changed comment of
+   `.github/workflows/release.yml` and nothing else.
+
+Two fixes reach every app with the pin move alone: Option+Left and Option+Right move by word on
+macOS (issue #48), and the command an app gave `Shell::ask_file_or` for a closed dialog now also
+runs when no dialog could be shown, with `"unavailable"` in its parameters (issue #43). An app
+whose test pressed Option+Arrow only off macOS because of issue #48 may now press it there too.
+
+An app whose own `Cargo.toml` declares `winresource` with `default-features = false` and whose
+`build.rs` reads `[package.metadata.winresource]` adds `features = ["toml"]` to it, as the
+template now does (issue #58); without it the Windows program carries its package's name.
+
+What an app may now switch to, when it is ready:
+
+- **Template tiles with a preview** (issue #40): give each template its first lines with
+  `TemplateSpec::with_preview(TemplatePreview::lines(..))` (`.monospace()` for text laid out by
+  columns), list the templates through `App::templates`, and delete the app's own template
+  cards. Wordsmith Script's cards (`template_card` and `preview` in
+  `crates/script-ui/src/backstage.rs`) are what this replaces.
+- **Writing statistics** (issue #41): keep a `Statistics` opened with
+  `Statistics::open(<settings folder>, <the app's starting goals>)` and saved with `save`, a
+  `Tracker` fed with `count` after each edit and `tick` each frame, and show
+  `statistics_window` with a `StatsView` of the app's `Unit`. An app that kept its statistics
+  in `stats.json` in this shape beside its preferences (Wordsmith Script) reads that file as
+  it is: its writers keep their history. Script set its hours in UTC: it passes
+  `Moment::of(now, 0)` and `zone: "UTC"`. A sprint's pages come from
+  `Writing::start_sprint_with_pages` and `sprint_pages`. Script's own `StatsData`, `Day`,
+  `Goals`, `track` and statistics window can then be deleted.
 
 ## 0.1.23 (2026-11-27)
 
