@@ -100,3 +100,7 @@ of `template/AGENTS.md`, copied and checked by `cargo xtask sync` (decision 0003
 
 The first app built on the core has a public release: from then a broken `main` can reach users
 through an update, and required checks or pull requests on `main` should be decided again.
+
+2026-11-27: this is due. Apps built on the core published their first releases, previews, on
+that day. How a change lands has not been decided again yet, and changes still land as above;
+issue #52 holds the question.

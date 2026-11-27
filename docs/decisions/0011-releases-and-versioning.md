@@ -87,3 +87,6 @@ contract and the reasons.
 
 An app has a public release that users update from (a core release then reaches users, and may
 need a slower path), or the core reaches 1.0.
+
+2026-11-27: this is due. Apps built on the core published their first releases, previews, on
+that day. The record has not been looked at again yet; issue #52 holds the question.
