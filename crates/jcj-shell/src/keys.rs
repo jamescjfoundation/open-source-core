@@ -364,16 +364,17 @@ mod tests {
         assert_eq!(shortcut(Key::A, Modifiers { ctrl: true, ..Modifiers::NONE }, true).as_deref(), Some("Ctrl+A"));
     }
 
-    /// The engine declares its caret keys per system (`mac_or` in its caret commands); the
-    /// keys a person presses on macOS reach the right command with either set, so the test
-    /// holds on every system it runs on.
+    /// The engine declares its caret keys per system (`mac_or` in its caret commands, and its
+    /// Promote and Demote on Ctrl+Shift+Left/Right on macOS, Alt+Shift+Left/Right elsewhere).
+    /// The keys a person presses on macOS reach the right command with the keys the engine
+    /// declares there; elsewhere nothing is translated.
     #[test]
     fn macos_text_keys_reach_the_engine_s_caret_commands() {
         let declared = |mac: bool| {
-            let (word_left, word_right, home, end) = if mac {
-                ("Alt+Left", "Alt+Right", "Home / Mod+Left", "End / Mod+Right")
+            let (word_left, word_right, home, end, promote, demote) = if mac {
+                ("Alt+Left", "Alt+Right", "Home / Mod+Left", "End / Mod+Right", "Ctrl+Shift+Left", "Ctrl+Shift+Right")
             } else {
-                ("Mod+Left / Alt+Left", "Mod+Right / Alt+Right", "Home", "End")
+                ("Mod+Left / Alt+Left", "Mod+Right / Alt+Right", "Home", "End", "Alt+Shift+Left", "Alt+Shift+Right")
             };
             [
                 CommandInfo::new("caret.left", "Left", "Left"),
@@ -384,28 +385,34 @@ mod tests {
                 CommandInfo::new("caret.paraUp", "Paragraph Up", "Mod+Up / Alt+Up"),
                 CommandInfo::new("caret.docStart", "Document Start", "Mod+Home"),
                 CommandInfo::new("caret.docEnd", "Document End", "Mod+End"),
+                CommandInfo::new("para.promote", "Promote", promote),
+                CommandInfo::new("para.demote", "Demote", demote),
             ]
         };
         let opt = Modifiers { alt: true, ..Modifiers::NONE };
         let cmd = Modifiers { command: true, mac_cmd: true, ..Modifiers::NONE };
         let shift = |m: Modifiers| Modifiers { shift: true, ..m };
         let extend = |id: &str| Some(Cmd::with(id, serde_json::json!({ "extend": true })));
-        for engine_on_mac in [true, false] {
-            let map = KeyMap::from_commands(&declared(engine_on_mac));
-            let press = |key: Key, m: Modifiers| shortcut(key, m, true).and_then(|s| map.command_for(&s));
-            assert_eq!(press(Key::ArrowLeft, opt), Some(Cmd::new("caret.wordLeft")), "{engine_on_mac}");
-            assert_eq!(press(Key::ArrowRight, opt), Some(Cmd::new("caret.wordRight")), "{engine_on_mac}");
-            assert_eq!(press(Key::ArrowLeft, shift(opt)), extend("caret.wordLeft"), "{engine_on_mac}");
-            assert_eq!(press(Key::ArrowRight, shift(opt)), extend("caret.wordRight"), "{engine_on_mac}");
-            assert_eq!(press(Key::ArrowLeft, cmd), Some(Cmd::new("caret.home")), "{engine_on_mac}");
-            assert_eq!(press(Key::ArrowRight, shift(cmd)), extend("caret.end"), "{engine_on_mac}");
-            assert_eq!(press(Key::ArrowUp, cmd), Some(Cmd::new("caret.docStart")), "{engine_on_mac}");
-            assert_eq!(press(Key::ArrowDown, shift(cmd)), extend("caret.docEnd"), "{engine_on_mac}");
-        }
-        // Elsewhere nothing is translated: Ctrl+Left moves by word.
-        let map = KeyMap::from_commands(&declared(false));
+        let mac = KeyMap::from_commands(&declared(true));
+        let press = |key: Key, m: Modifiers| shortcut(key, m, true).and_then(|s| mac.command_for(&s));
+        assert_eq!(press(Key::ArrowLeft, opt), Some(Cmd::new("caret.wordLeft")));
+        assert_eq!(press(Key::ArrowRight, opt), Some(Cmd::new("caret.wordRight")));
+        assert_eq!(press(Key::ArrowLeft, shift(opt)), extend("caret.wordLeft"));
+        assert_eq!(press(Key::ArrowRight, shift(opt)), extend("caret.wordRight"));
+        assert_eq!(press(Key::ArrowLeft, cmd), Some(Cmd::new("caret.home")));
+        assert_eq!(press(Key::ArrowRight, shift(cmd)), extend("caret.end"));
+        assert_eq!(press(Key::ArrowUp, cmd), Some(Cmd::new("caret.docStart")));
+        assert_eq!(press(Key::ArrowDown, shift(cmd)), extend("caret.docEnd"));
+        let control = Modifiers { ctrl: true, ..Modifiers::NONE };
+        assert_eq!(press(Key::ArrowLeft, shift(control)), Some(Cmd::new("para.promote")), "Control is its own modifier on a Mac");
+        // Elsewhere nothing is translated: Ctrl+Left moves by word, and Alt+Shift+Left promotes.
+        let other = KeyMap::from_commands(&declared(false));
         let ctrl = Modifiers { ctrl: true, command: true, ..Modifiers::NONE };
-        assert_eq!(shortcut(Key::ArrowLeft, ctrl, false).and_then(|s| map.command_for(&s)), Some(Cmd::new("caret.wordLeft")));
+        let press = |key: Key, m: Modifiers| shortcut(key, m, false).and_then(|s| other.command_for(&s));
+        assert_eq!(press(Key::ArrowLeft, ctrl), Some(Cmd::new("caret.wordLeft")));
+        assert_eq!(press(Key::ArrowRight, shift(ctrl)), extend("caret.wordRight"));
+        assert_eq!(press(Key::ArrowLeft, opt), Some(Cmd::new("caret.wordLeft")));
+        assert_eq!(press(Key::ArrowLeft, shift(opt)), Some(Cmd::new("para.promote")));
     }
 
     #[test]

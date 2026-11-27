@@ -269,8 +269,10 @@ pub fn run() -> Result<Vec<Step>, String> {
     let command = Modifiers { command: true, mac_cmd: true, ..Modifiers::NONE };
     let mac_press = |key: Key, m: Modifiers| jcj_shell::keys::shortcut(key, m, true).and_then(|s| keys.command_for(&s)).map(|c| c.id);
     check(mac_press(Key::ArrowLeft, opt).as_deref() == Some("caret.wordLeft"), "Option+Left moves by word on macOS")?;
+    // Option+Shift+Arrow selects by word with the engine built for macOS; elsewhere the engine
+    // binds Alt+Shift+Arrow to Promote and Demote.
     check(
-        mac_press(Key::ArrowRight, Modifiers { shift: true, ..opt }).as_deref() == Some("caret.wordRight"),
+        !cfg!(target_os = "macos") || mac_press(Key::ArrowRight, Modifiers { shift: true, ..opt }).as_deref() == Some("caret.wordRight"),
         "Option+Shift+Right selects by word on macOS",
     )?;
     check(mac_press(Key::ArrowLeft, command).as_deref() == Some("caret.home"), "Command+Left goes to the line's start on macOS")?;
