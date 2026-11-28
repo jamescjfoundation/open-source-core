@@ -3,6 +3,21 @@
 Each release says what changed for apps. While at 0.x, a patch release never breaks an app; a
 minor release may, and then **What apps must do** says exactly what (decision 0011).
 
+## Unreleased
+
+### Fixed
+
+- **A macOS app shows its icon.** The `Info.plist` that `cargo xtask package` writes named the
+  icon by the app id alone (`CFBundleIconFile` = `org.example.sample`). macOS adds `.icns` only to
+  a name without an extension, and took the id's last part for one, so it never found
+  `Resources/<app id>.icns` and Finder, the Dock and Launchpad showed the blank icon. The key now
+  names the file with its extension (`org.example.sample.icns`).
+
+### What apps must do
+
+- Run `cargo xtask sync` after moving to this release; the fix is in the core-owned
+  `xtask/src/shared.rs`. Nothing else: the next release's macOS app carries the icon.
+
 ## 0.1.24 (2026-11-27)
 
 ### Added
