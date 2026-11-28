@@ -1,5 +1,11 @@
 # open-source-core
 
+[![CI status](https://img.shields.io/github/actions/workflow/status/jamescjfoundation/open-source-core/ci.yml?branch=main&label=CI&style=flat-square&labelColor=1C2340)](https://github.com/jamescjfoundation/open-source-core/actions/workflows/ci.yml)
+[![nightly status](https://img.shields.io/github/actions/workflow/status/jamescjfoundation/open-source-core/nightly.yml?branch=main&label=nightly&style=flat-square&labelColor=1C2340)](https://github.com/jamescjfoundation/open-source-core/actions/workflows/nightly.yml)
+[![Latest release](https://img.shields.io/github/v/release/jamescjfoundation/open-source-core?label=release&color=3B4FA8&style=flat-square&labelColor=1C2340)](https://github.com/jamescjfoundation/open-source-core/releases/latest)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-3B4FA8?style=flat-square&labelColor=1C2340)](#license)
+[![Written in Rust](https://img.shields.io/badge/written%20in-Rust-5A6080?logo=rust&style=flat-square&labelColor=1C2340)](https://www.rust-lang.org)
+
 The James C. J. Foundation's shared base for its open-source desktop apps. It holds the code
 every app needs and none should write twice — the app shell, project files, format conversion,
 cards and boards, theming, agent control — and it is the only place that talks to the open-source
